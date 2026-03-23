@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Geminus Ratio — Ludus Tactics</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=VT323&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/main.css" />
+</head>
+<body class="theme-fft">
+  <div id="app">
+    <header class="banner">
+      <div class="banner__crest" aria-hidden="true">⚔</div>
+      <div class="banner__text">
+        <h1>Geminus Ratio</h1>
+        <p class="tagline">Rome · Ludus · Tactics</p>
+      </div>
+      <div class="banner__phase" id="phaseLabel">Ludus</div>
+    </header>
+
+    <main class="layout">
+      <aside class="panel panel--left">
+        <section id="panelRoster" class="panel__section">
+          <h2>Hire for the bout</h2>
+          <p class="budget"><span id="budgetLabel">Denarii</span>: <strong id="budgetValue">0</strong> / <span id="budgetMax">0</span></p>
+          <p class="hint">Each class has different stats, move, jump, and a unique arena ability.</p>
+          <div id="classList" class="class-list"></div>
+          <div class="roster-summary">
+            <h3>Your lanista’s picks</h3>
+            <ul id="pickedList" class="picked"></ul>
+            <button type="button" id="btnClearRoster" class="btn btn--ghost">Clear roster</button>
+            <button type="button" id="btnToDeploy" class="btn btn--gold" disabled>To the gates</button>
+          </div>
+        </section>
+
+        <section id="panelDeploy" class="panel__section is-hidden">
+          <h2>Deploy</h2>
+          <p class="hint">Click a <em>blue</em> gate tile, then a fighter below to place. Ready when all are placed.</p>
+          <ul id="deployQueue" class="deploy-queue"></ul>
+          <button type="button" id="btnToBattle" class="btn btn--gold" disabled>Enter arena</button>
+          <button type="button" id="btnBackLudus" class="btn btn--ghost">Back to Ludus</button>
+        </section>
+
+        <section id="panelBattle" class="panel__section is-hidden">
+          <h2 id="battleTitle">Arena</h2>
+          <p id="turnInfo" class="turn-info"></p>
+          <div id="unitCard" class="unit-card is-hidden">
+            <h3 id="ucName"></h3>
+            <p id="ucClass"></p>
+            <dl class="stat-grid">
+              <div><dt>HP</dt><dd id="ucHp"></dd></div>
+              <div><dt>ATK</dt><dd id="ucAtk"></dd></div>
+              <div><dt>DEF</dt><dd id="ucDef"></dd></div>
+              <div><dt>SPD</dt><dd id="ucSpd"></dd></div>
+              <div><dt>Move</dt><dd id="ucMove"></dd></div>
+              <div><dt>Jump</dt><dd id="ucJump"></dd></div>
+            </dl>
+            <p class="ability" id="ucAbility"></p>
+          </div>
+          <div class="battle-actions" id="battleActions">
+            <button type="button" id="btnMove" class="btn" disabled>Move</button>
+            <button type="button" id="btnAttack" class="btn" disabled>Attack</button>
+            <button type="button" id="btnAbility" class="btn btn--accent" disabled>Ability</button>
+            <button type="button" id="btnWait" class="btn btn--ghost" disabled>Wait</button>
+            <div id="abilityMenu" class="ability-menu is-hidden"></div>
+          </div>
+          <div id="logFeed" class="log-feed"></div>
+        </section>
+      </aside>
+
+      <section class="stage-wrap">
+        <div class="fft-battlefield">
+          <aside class="fft-ct-strip" id="ctStrip" aria-label="Upcoming turns" hidden></aside>
+          <div class="iso-canvas-wrap">
+            <canvas id="isoCanvas" class="iso-canvas" aria-label="Battle grid"></canvas>
+            <div id="tileInfo" class="tile-info is-hidden"></div>
+            <div id="forecastTooltip" class="forecast-tooltip is-hidden"></div>
+            <div class="camera-controls">
+              <button type="button" id="btnRotL" class="cam-btn" title="Rotate left (Q)">↺</button>
+              <button type="button" id="btnZoomIn" class="cam-btn" title="Zoom in">+</button>
+              <button type="button" id="btnZoomOut" class="cam-btn" title="Zoom out">−</button>
+              <button type="button" id="btnRotR" class="cam-btn" title="Rotate right (E)">↻</button>
+              <button type="button" id="btnCamReset" class="cam-btn cam-btn--small" title="Reset camera">⌂</button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Result overlay -->
+  <div id="resultOverlay" class="result-overlay is-hidden">
+    <div class="result-panel">
+      <h2 id="resultTitle" class="result-title"></h2>
+      <div id="resultBody" class="result-body"></div>
+      <button type="button" id="btnResultContinue" class="btn btn--gold">Continue</button>
+    </div>
+  </div>
+
+  <script src="js/rng.js"></script>
+  <script src="js/sfx.js"></script>
+  <script src="js/renderer.js"></script>
+  <script src="js/sprites.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
