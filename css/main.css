@@ -9,7 +9,6 @@
   --fft-gold-dim: #5c4a18;
   --fft-cyan: #7ae8f0;
   --fft-cyan-dim: #3a9ca8;
-  --fft-blue-move: #4a8ad8;
   --fft-red: #d84838;
   --fft-red-dark: #882820;
   --fft-text: #f0e8d8;
@@ -356,6 +355,10 @@ html, body {
   color: var(--fft-cyan);
   background: linear-gradient(180deg, #2a3838 0%, #1a2020 100%);
 }
+.btn:focus-visible {
+  outline: 2px solid var(--fft-cyan);
+  outline-offset: 2px;
+}
 
 .btn:disabled {
   opacity: 0.35;
@@ -412,6 +415,10 @@ html, body {
 .ability-menu__btn:hover {
   border-color: var(--fft-cyan);
   background: linear-gradient(180deg, #2a3838 0%, #1a2020 100%);
+}
+.ability-menu__btn:focus-visible {
+  outline: 2px solid var(--fft-cyan);
+  outline-offset: 1px;
 }
 .ability-menu__btn small {
   display: block;
@@ -560,6 +567,10 @@ html, body {
 .cam-btn:hover {
   background: rgba(40, 44, 60, 0.95);
   border-color: var(--fft-gold);
+}
+.cam-btn:focus-visible {
+  outline: 2px solid var(--fft-gold);
+  outline-offset: 2px;
 }
 
 .cam-btn--small {

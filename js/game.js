@@ -217,7 +217,6 @@
     height: HEIGHT,
     activeUnit: null,
     battleMode: "idle",
-    pendingPath: null,
     highlightCells: new Set(),
     hasMoved: false,
     hasActed: false,
@@ -225,7 +224,6 @@
     turnCount: 0,
     totalDamageDealt: 0,
     animating: false,
-    hoverCell: null,
     boutNumber: 0,
   };
 
@@ -384,7 +382,7 @@
       function tick() {
         var t = Math.min(1, (performance.now() - start) / dur);
         unit._deathAnim = 1 - t;
-        if (t >= 1) { delete unit._deathAnim; resolve(); return; }
+        if (t >= 1) { delete unit._deathAnim; refreshCtStrip(); resolve(); return; }
         requestAnimationFrame(tick);
       }
       unit._deathAnim = 1;
@@ -579,7 +577,7 @@
   function applyDamage(u, dmg) {
     u.hp -= dmg;
     if (u.hp < 0) u.hp = 0;
-    state.totalDamageDealt += dmg;
+    if (u.team === "enemy") state.totalDamageDealt += dmg;
     spawnDmgNumber(u, "-" + dmg, "#ff6040");
   }
 
@@ -623,7 +621,6 @@
       testudoBonus: 0,
       markDebuffTurns: 0,
       markFocusId: null,
-      abilityUsedThisActivation: false,
     };
   }
 
@@ -688,7 +685,6 @@
       activeUnitId: state.activeUnit ? state.activeUnit.id : null,
       phase: state.phase,
     });
-    if (state.phase === "battle") refreshCtStrip();
   }
 
   function initSpriteCache() {
@@ -922,7 +918,22 @@
   function onTileClick(x, y) {
     if (state.phase === "ludus") return;
     if (state.phase === "deploy") {
-      if (!isGateTile(x, y) || occupantAt(x, y)) return;
+      var existing = occupantAt(x, y);
+      if (existing && existing.team === "player") {
+        var tplIdx = state.deployTemplate.findIndex(
+          (p) => p.placed && p.classId === existing.classId
+        );
+        if (tplIdx >= 0) {
+          state.deployTemplate[tplIdx].placed = false;
+          state.units = state.units.filter((u) => u !== existing);
+          state.deploySelectedIndex = tplIdx;
+          refreshDeployUI();
+          renderBoard();
+          log("Recalled " + classById(existing.classId).name + ".");
+        }
+        return;
+      }
+      if (!isGateTile(x, y) || existing) return;
       const pick = state.deployTemplate[state.deploySelectedIndex];
       if (!pick || pick.placed) return;
       state.units.push(createUnit("player", pick.classId, x, y));
@@ -931,7 +942,7 @@
       state.deploySelectedIndex = next >= 0 ? next : 0;
       refreshDeployUI();
       renderBoard();
-      log("Placed " + classById(pick.classId).name + ".");
+      log("Placed " + classById(pick.classId).name + ". Click to recall.");
       return;
     }
     if (state.phase === "battle") {
@@ -985,6 +996,7 @@
     if (await checkVictoryAsync()) return;
     state.turnCount++;
     const actor = nextActor();
+    refreshCtStrip();
     if (!actor) {
       log("Combat over.", "system");
       renderBoard();
@@ -1008,7 +1020,6 @@
     }
     actor.tempExtraMove = false;
     actor.testudoBonus = 0;
-    actor.abilityUsedThisActivation = false;
     state.activeUnit = actor;
     state.battleMode = "idle";
     state.highlightCells.clear();
@@ -1124,6 +1135,8 @@
   }
 
   async function clearPlayerTurn() {
+    const actor = state.activeUnit;
+    if (actor) tickMarkDebuffIfNeeded(actor);
     state.activeUnit = null;
     state.battleMode = "idle";
     state.highlightCells.clear();
@@ -1283,8 +1296,11 @@
     }
     if (state.battleMode === "ability") {
       state.animating = true;
-      await doPlayerAbility(u, x, y);
-      state.animating = false;
+      try {
+        await doPlayerAbility(u, x, y);
+      } finally {
+        state.animating = false;
+      }
       if (await checkVictoryAsync()) return;
       return;
     }
@@ -1316,6 +1332,11 @@
       }
       for (const f of foes) {
         const dmg = physicalDamage(u, f, ab.mult || 1);
+        if (f.riposteActive) {
+          applyDamage(u, 5);
+          f.riposteActive = false;
+          log("Riposte pricks the whirlwind!");
+        }
         applyDamage(f, dmg);
         await Promise.all([animateHitFlash(f), screenShake(80, 2)]);
         log("Cyclone cuts " + classById(f.classId).name + " (" + dmg + ").");
@@ -1491,7 +1512,9 @@
   function checkVictory() {
     const pAlive = state.units.some((u) => u.team === "player" && u.hp > 0);
     const eAlive = state.units.some((u) => u.team === "enemy" && u.hp > 0);
-    return (!eAlive && pAlive) ? "victory" : (!pAlive && eAlive) ? "defeat" : null;
+    if (!eAlive && pAlive) return "victory";
+    if (!pAlive) return "defeat";
+    return null;
   }
 
   async function checkVictoryAsync() {
@@ -1513,7 +1536,7 @@
     var pTotal = state.units.filter(function (u) { return u.team === "player"; }).length;
     var html = "<p><strong>" + pAlive + "</strong> of <strong>" + pTotal + "</strong> gladiators standing</p>";
     html += "<p><strong>" + state.turnCount + "</strong> turns fought</p>";
-    html += "<p><strong>" + state.totalDamageDealt + "</strong> total damage dealt</p>";
+    html += "<p><strong>" + state.totalDamageDealt + "</strong> damage dealt to enemies</p>";
     if (won) {
       html += '<p style="color:var(--fft-gold);margin-top:0.5rem;">The crowd chants your name!</p>';
     } else {
@@ -1535,6 +1558,7 @@
   async function runEnemyTurn(enemy) {
     const players = state.units.filter((u) => u.team === "player" && u.hp > 0);
     if (!players.length) return;
+    const eDef = classById(enemy.classId);
     enemy.testudoBonus = 0;
     enemy.tempExtraMove = false;
 
@@ -1542,20 +1566,27 @@
       manhattan(enemy, a) <= manhattan(enemy, b) ? a : b
     );
 
-    const reach = computeMoves(enemy);
-    let best = null;
-    let bestScore = 1e9;
-    for (const [key] of reach) {
-      const [sx, sy] = key.split(",").map(Number);
-      if (occupantAt(sx, sy) && !(sx === enemy.x && sy === enemy.y)) continue;
-      const d = manhattan({ x: sx, y: sy }, target);
-      const h = state.height[sy][sx];
-      const score = d * 100 - h;
-      if (score < bestScore) { bestScore = score; best = { x: sx, y: sy }; }
+    var usedAbilityPreMove = false;
+    if (eDef.abilities && manhattan(enemy, target) > 1) {
+      usedAbilityPreMove = await aiTryPreMoveAbility(enemy, eDef, players, target);
     }
-    if (best && (best.x !== enemy.x || best.y !== enemy.y)) {
-      var ePath = computePath(enemy, best.x, best.y);
-      if (ePath.length) await animateMove(enemy, ePath);
+
+    if (!usedAbilityPreMove) {
+      const reach = computeMoves(enemy);
+      let best = null;
+      let bestScore = 1e9;
+      for (const [key] of reach) {
+        const [sx, sy] = key.split(",").map(Number);
+        if (occupantAt(sx, sy) && !(sx === enemy.x && sy === enemy.y)) continue;
+        const d = manhattan({ x: sx, y: sy }, target);
+        const h = state.height[sy][sx];
+        const score = d * 100 - h;
+        if (score < bestScore) { bestScore = score; best = { x: sx, y: sy }; }
+      }
+      if (best && (best.x !== enemy.x || best.y !== enemy.y)) {
+        var ePath = computePath(enemy, best.x, best.y);
+        if (ePath.length) await animateMove(enemy, ePath);
+      }
     }
 
     const adjTargets = [];
@@ -1566,82 +1597,219 @@
       if (occ && occ.team === "player" && occ.hp > 0) adjTargets.push(occ);
     }
 
-    if (adjTargets.length > 0) {
+    if (adjTargets.length > 0 && !usedAbilityPreMove) {
       const adjTarget = adjTargets.reduce((a, b) => a.hp <= b.hp ? a : b);
-      const eDef = classById(enemy.classId);
 
-      if (Math.random() < 0.3 && eDef.abilities) {
-        const dmgAbilities = eDef.abilities.filter(function (a) {
-          return (a.type === "attack" && a.target === "adjacent_enemy") || a.target === "aoe_adjacent";
-        });
-        if (dmgAbilities.length > 0) {
-          const ab = dmgAbilities[Math.floor(Math.random() * dmgAbilities.length)];
-          SFX.ability();
-          if (ab.target === "aoe_adjacent") {
-            for (const t of adjTargets) {
-              const dmg = physicalDamage(enemy, t, ab.mult || 1);
-              applyDamage(t, dmg);
-              await Promise.all([animateHitFlash(t), screenShake(80, 2)]);
-              log(eDef.name + " uses " + ab.name + " on " + classById(t.classId).name + " (" + dmg + ").");
-              if (t.hp <= 0) await animateDeath(t);
-            }
-          } else {
-            await animateAttack(enemy, adjTarget);
-            const hitPct = computeHitChance(enemy, adjTarget);
-            if (rollHit(enemy, adjTarget)) {
-              SFX.hit();
-              const dmg = physicalDamage(enemy, adjTarget, ab.mult || 1, ab.ignoreDefPct || 0);
-              if (adjTarget.riposteActive) { applyDamage(enemy, 5); adjTarget.riposteActive = false; }
-              applyDamage(adjTarget, dmg);
-              await Promise.all([animateHitFlash(adjTarget), screenShake(80, 2)]);
-              log(eDef.name + " uses " + ab.name + " on " + classById(adjTarget.classId).name + " for " + dmg + ". (" + hitPct + "%)");
-              if (ab.selfDamage) applyDamage(enemy, ab.selfDamage);
-              if (ab.effect === "push") {
-                const pdx = adjTarget.x - enemy.x;
-                const pdy = adjTarget.y - enemy.y;
-                const pnx = adjTarget.x + pdx;
-                const pny = adjTarget.y + pdy;
-                if (inBounds(pnx, pny) && !occupantAt(pnx, pny)) {
-                  await animateMove(adjTarget, [[pnx, pny]]);
-                }
-              }
-              if (adjTarget.hp <= 0) await animateDeath(adjTarget);
-            } else {
-              SFX.miss();
-              spawnDmgNumber(adjTarget, "MISS", "#aaaaaa");
-              log(eDef.name + " uses " + ab.name + " — misses! (" + hitPct + "%)");
-            }
-          }
-          tickMarkDebuffIfNeeded(enemy);
-          renderBoard();
-          return;
-        }
+      var usedAdj = false;
+      if (Math.random() < 0.4 && eDef.abilities) {
+        usedAdj = await aiTryAdjacentAbility(enemy, eDef, adjTargets, adjTarget);
       }
 
-      await animateAttack(enemy, adjTarget);
-      const hitPct = computeHitChance(enemy, adjTarget);
-      if (rollHit(enemy, adjTarget)) {
-        SFX.hit();
-        const dmg = physicalDamage(enemy, adjTarget, 1);
-        if (adjTarget.riposteActive) {
-          applyDamage(enemy, 5);
-          adjTarget.riposteActive = false;
-        }
-        applyDamage(adjTarget, dmg);
-        await Promise.all([animateHitFlash(adjTarget), screenShake(100, 3)]);
-        log(classById(enemy.classId).name + " strikes " + classById(adjTarget.classId).name + " for " + dmg + ". (" + hitPct + "%)");
-        if (adjTarget.hp <= 0) await animateDeath(adjTarget);
-      } else {
-        SFX.miss();
-        spawnDmgNumber(adjTarget, "MISS", "#aaaaaa");
-        log(classById(enemy.classId).name + " swings at " + classById(adjTarget.classId).name + " — misses! (" + hitPct + "%)");
+      if (!usedAdj) {
+        await aiBasicAttack(enemy, adjTarget);
       }
-    } else {
-      log(classById(enemy.classId).name + " closes distance.");
+    } else if (adjTargets.length === 0 && !usedAbilityPreMove) {
+      if (eDef.abilities && !await aiTryLineAttack(enemy, eDef, players)) {
+        log(eDef.name + " closes distance.");
+      }
     }
 
     tickMarkDebuffIfNeeded(enemy);
     renderBoard();
+  }
+
+  async function aiTryPreMoveAbility(enemy, eDef, players, target) {
+    var hpPct = enemy.hp / enemy.maxHp;
+    for (const ab of eDef.abilities) {
+      if (ab.type === "heal" && ab.target === "self" && hpPct < 0.5) {
+        SFX.ability();
+        var heal = Math.round(enemy.maxHp * 0.2);
+        enemy.hp = Math.min(enemy.maxHp, enemy.hp + heal);
+        spawnDmgNumber(enemy, "+" + heal, "#80ff80");
+        log(eDef.name + " uses " + ab.name + " (+" + heal + " HP).");
+        return true;
+      }
+      if (ab.type === "buff" && ab.target === "self") {
+        if (ab.name === "Testudo" && Math.random() < 0.5) {
+          SFX.ability();
+          enemy.testudoBonus = 3;
+          log(eDef.name + " raises Testudo (+3 DEF).");
+          return true;
+        }
+        if (ab.name === "Cetus Wall" && Math.random() < 0.4) {
+          SFX.ability();
+          enemy.braceCharges += 1;
+          log(eDef.name + " braces with Cetus Wall.");
+          return true;
+        }
+        if (ab.name === "Sica Riposte" && Math.random() < 0.4 && manhattan(enemy, target) <= 2) {
+          SFX.ability();
+          enemy.riposteActive = true;
+          log(eDef.name + " readies Sica Riposte.");
+          return true;
+        }
+        if (ab.name === "Umbra" && Math.random() < 0.6) {
+          SFX.ability();
+          enemy.tempExtraMove = true;
+          log(eDef.name + " uses Umbra (+1 move).");
+          return false;
+        }
+      }
+      if (ab.type === "debuff" && ab.target === "adjacent_enemy" && ab.name === "Iaculum") {
+        if (manhattan(enemy, target) <= 1 && Math.random() < 0.5 && !target.rootedSkip) {
+          SFX.ability();
+          target.rootedSkip = true;
+          log(eDef.name + " nets " + classById(target.classId).name + "!");
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  async function aiTryAdjacentAbility(enemy, eDef, adjTargets, adjTarget) {
+    const abilities = eDef.abilities;
+    if (!abilities) return false;
+
+    for (const ab of abilities) {
+      if (ab.target === "aoe_adjacent" && adjTargets.length >= 2 && Math.random() < 0.6) {
+        SFX.ability();
+        for (const t of adjTargets) {
+          const dmg = physicalDamage(enemy, t, ab.mult || 1);
+          applyDamage(t, dmg);
+          await Promise.all([animateHitFlash(t), screenShake(80, 2)]);
+          log(eDef.name + " uses " + ab.name + " on " + classById(t.classId).name + " (" + dmg + ").");
+          if (t.hp <= 0) await animateDeath(t);
+        }
+        return true;
+      }
+
+      if (ab.type === "debuff" && ab.target === "adjacent_enemy" && ab.name === "Provocatio") {
+        if (Math.random() < 0.35 && adjTarget.markDebuffTurns <= 0) {
+          SFX.ability();
+          adjTarget.markDebuffTurns = 2;
+          adjTarget.markFocusId = enemy.id;
+          log(eDef.name + " marks " + classById(adjTarget.classId).name + " with Provocatio!");
+          return true;
+        }
+      }
+
+      if (ab.type === "debuff" && ab.target === "adjacent_enemy" && ab.name === "Iaculum") {
+        if (Math.random() < 0.45 && !adjTarget.rootedSkip) {
+          SFX.ability();
+          adjTarget.rootedSkip = true;
+          log(eDef.name + " nets " + classById(adjTarget.classId).name + "!");
+          return true;
+        }
+      }
+
+      if (ab.type === "attack" && ab.target === "adjacent_enemy" && ab.effect === "push") {
+        if (Math.random() < 0.35) {
+          SFX.ability();
+          await animateAttack(enemy, adjTarget);
+          if (rollHit(enemy, adjTarget)) {
+            SFX.hit();
+            const dmg = physicalDamage(enemy, adjTarget, ab.mult || 1);
+            applyDamage(adjTarget, dmg);
+            await Promise.all([animateHitFlash(adjTarget), screenShake(80, 2)]);
+            log(eDef.name + " uses " + ab.name + " on " + classById(adjTarget.classId).name + " (" + dmg + ").");
+            const pdx = adjTarget.x - enemy.x;
+            const pdy = adjTarget.y - enemy.y;
+            const pnx = adjTarget.x + pdx;
+            const pny = adjTarget.y + pdy;
+            if (inBounds(pnx, pny) && !occupantAt(pnx, pny)) {
+              await animateMove(adjTarget, [[pnx, pny]]);
+            }
+            if (adjTarget.hp <= 0) await animateDeath(adjTarget);
+          } else {
+            SFX.miss();
+            spawnDmgNumber(adjTarget, "MISS", "#aaaaaa");
+            log(eDef.name + " uses " + ab.name + " — misses!");
+          }
+          return true;
+        }
+      }
+
+      if (ab.type === "attack" && ab.target === "adjacent_enemy" && !ab.effect && Math.random() < 0.35) {
+        SFX.ability();
+        await animateAttack(enemy, adjTarget);
+        if (rollHit(enemy, adjTarget)) {
+          SFX.hit();
+          const dmg = physicalDamage(enemy, adjTarget, ab.mult || 1, ab.ignoreDefPct || 0);
+          if (adjTarget.riposteActive) { applyDamage(enemy, 5); adjTarget.riposteActive = false; }
+          applyDamage(adjTarget, dmg);
+          await Promise.all([animateHitFlash(adjTarget), screenShake(80, 2)]);
+          log(eDef.name + " uses " + ab.name + " on " + classById(adjTarget.classId).name + " (" + dmg + ").");
+          if (ab.selfDamage) applyDamage(enemy, ab.selfDamage);
+          if (adjTarget.hp <= 0) await animateDeath(adjTarget);
+        } else {
+          SFX.miss();
+          spawnDmgNumber(adjTarget, "MISS", "#aaaaaa");
+          log(eDef.name + " uses " + ab.name + " — misses!");
+        }
+        return true;
+      }
+    }
+    return false;
+  }
+
+  async function aiTryLineAttack(enemy, eDef, players) {
+    const abilities = eDef.abilities;
+    if (!abilities) return false;
+    for (const ab of abilities) {
+      if (ab.type !== "attack" || ab.target !== "line") continue;
+      const range = ab.range || 3;
+      for (const [dx, dy] of DIRS) {
+        for (let s = 1; s <= range; s++) {
+          const tx = enemy.x + dx * s;
+          const ty = enemy.y + dy * s;
+          if (!inBounds(tx, ty)) break;
+          const occ = occupantAt(tx, ty);
+          if (occ && occ.team === "player" && occ.hp > 0) {
+            SFX.ability();
+            await animateAttack(enemy, occ);
+            if (rollHit(enemy, occ)) {
+              SFX.hit();
+              const dmg = physicalDamage(enemy, occ, ab.mult || 1, ab.ignoreDefPct || 0);
+              if (occ.riposteActive && s === 1) { applyDamage(enemy, 5); occ.riposteActive = false; }
+              applyDamage(occ, dmg);
+              await Promise.all([animateHitFlash(occ), screenShake(80, 2)]);
+              log(eDef.name + " uses " + ab.name + " on " + classById(occ.classId).name + " (" + dmg + ").");
+              if (occ.hp <= 0) await animateDeath(occ);
+            } else {
+              SFX.miss();
+              spawnDmgNumber(occ, "MISS", "#aaaaaa");
+              log(eDef.name + " uses " + ab.name + " — misses!");
+            }
+            return true;
+          }
+          if (occ) break;
+        }
+      }
+    }
+    return false;
+  }
+
+  async function aiBasicAttack(enemy, adjTarget) {
+    const eDef = classById(enemy.classId);
+    await animateAttack(enemy, adjTarget);
+    const hitPct = computeHitChance(enemy, adjTarget);
+    if (rollHit(enemy, adjTarget)) {
+      SFX.hit();
+      const dmg = physicalDamage(enemy, adjTarget, 1);
+      if (adjTarget.riposteActive) {
+        applyDamage(enemy, 5);
+        adjTarget.riposteActive = false;
+      }
+      applyDamage(adjTarget, dmg);
+      await Promise.all([animateHitFlash(adjTarget), screenShake(100, 3)]);
+      log(eDef.name + " strikes " + classById(adjTarget.classId).name + " for " + dmg + ". (" + hitPct + "%)");
+      if (adjTarget.hp <= 0) await animateDeath(adjTarget);
+    } else {
+      SFX.miss();
+      spawnDmgNumber(adjTarget, "MISS", "#aaaaaa");
+      log(eDef.name + " swings at " + classById(adjTarget.classId).name + " — misses! (" + hitPct + "%)");
+    }
   }
 
   function init() {
@@ -1663,7 +1831,6 @@
       const my = e.clientY - rect.top;
       const cell = renderer.screenToGrid(mx, my);
       if (cell) {
-        state.hoverCell = cell;
         if (state.phase === "battle" || state.phase === "deploy") {
           showTileInfo(cell.col, cell.row);
         }
@@ -1687,7 +1854,6 @@
           hideForecast();
         }
       } else {
-        state.hoverCell = null;
         isoCanvas.style.cursor = "default";
         hideTileInfo();
         hideForecast();
