@@ -25,6 +25,7 @@
 
     <main class="layout">
       <aside class="panel panel--left">
+        <div id="campaignHud" class="campaign-hud is-hidden"></div>
         <section id="panelRoster" class="panel__section">
           <h2>Hire for the bout</h2>
           <p class="budget"><span id="budgetLabel">Denarii</span>: <strong id="budgetValue">0</strong> / <span id="budgetMax">0</span></p>
@@ -35,6 +36,7 @@
             <ul id="pickedList" class="picked"></ul>
             <button type="button" id="btnClearRoster" class="btn btn--ghost">Clear roster</button>
             <button type="button" id="btnToDeploy" class="btn btn--gold" disabled>To the gates</button>
+            <button type="button" id="btnTrainingBout" class="btn btn--training is-hidden">Training Bout</button>
           </div>
         </section>
 
@@ -93,12 +95,38 @@
     </main>
   </div>
 
+  <!-- Title screen overlay -->
+  <div id="titleOverlay" class="title-overlay">
+    <div class="title-panel">
+      <div class="title-panel__crest" aria-hidden="true">⚔</div>
+      <h1 class="title-panel__name">Geminus Ratio</h1>
+      <p class="title-panel__sub">Ludus Tactics</p>
+      <div class="title-panel__buttons">
+        <button type="button" id="btnNewCampaign" class="btn btn--gold">New Campaign</button>
+        <button type="button" id="btnSkirmish" class="btn btn--ghost">Skirmish</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scene / dialogue overlay -->
+  <div id="sceneOverlay" class="scene-overlay is-hidden">
+    <div class="scene-panel">
+      <p id="sceneSpeaker" class="scene-speaker"></p>
+      <p id="sceneText" class="scene-text"></p>
+      <div id="sceneChoices" class="scene-choices is-hidden"></div>
+      <button type="button" id="btnSceneNext" class="btn btn--gold">Continue</button>
+    </div>
+  </div>
+
   <!-- Result overlay -->
   <div id="resultOverlay" class="result-overlay is-hidden">
     <div class="result-panel">
       <h2 id="resultTitle" class="result-title"></h2>
       <div id="resultBody" class="result-body"></div>
-      <button type="button" id="btnResultContinue" class="btn btn--gold">Continue</button>
+      <div id="resultButtons" class="result-buttons">
+        <button type="button" id="btnResultContinue" class="btn btn--gold">Continue</button>
+        <button type="button" id="btnResultRetry" class="btn btn--ghost is-hidden">Retry Mission</button>
+      </div>
     </div>
   </div>
 
@@ -106,6 +134,7 @@
   <script src="js/sfx.js"></script>
   <script src="js/renderer.js"></script>
   <script src="js/sprites.js"></script>
+  <script src="js/campaign.js"></script>
   <script src="js/game.js"></script>
 </body>
 </html>

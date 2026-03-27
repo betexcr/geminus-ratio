@@ -32,6 +32,21 @@ var IsoRenderer = (function () {
       { top: "#686058", left: "#484038", right: "#585048" },
       { top: "#787068", left: "#585048", right: "#686058" },
     ],
+    building: [
+      { top: "#7a7068", left: "#4a4438", right: "#5a5448" },
+      { top: "#8a8078", left: "#5a5448", right: "#6a6458" },
+      { top: "#9a9088", left: "#6a6458", right: "#7a7468" },
+    ],
+    water_deep: [
+      { top: "#2a5a8a", left: "#1a3a5a", right: "#204060" },
+      { top: "#2a5a8a", left: "#1a3a5a", right: "#204060" },
+      { top: "#2a5a8a", left: "#1a3a5a", right: "#204060" },
+    ],
+    water_shallow: [
+      { top: "#4a8aaa", left: "#2a6080", right: "#3a7090" },
+      { top: "#4a8aaa", left: "#2a6080", right: "#3a7090" },
+      { top: "#4a8aaa", left: "#2a6080", right: "#3a7090" },
+    ],
   };
 
   function _seedRng(col, row) {
@@ -213,9 +228,8 @@ var IsoRenderer = (function () {
     }
   }
 
-  function _drawTopFace(ctx, cx, cy, baseColor, zone, col, row) {
+  function _drawTopFace(ctx, cx, cy, baseColor, zone, col, row, pulsePhase) {
     var rng = _seedRng(col, row);
-    // quantized color banding: snap to multiples of 12
     var rawNoise = (rng() - 0.5) * 24;
     var noise = Math.round(rawNoise / 12) * 12;
     var tileColor = _adjustColor(baseColor, noise);
@@ -226,7 +240,45 @@ var IsoRenderer = (function () {
     _clipDiamond(ctx, cx, cy);
     ctx.clip();
 
-    if (zone === "sand") {
+    if (zone === "building") {
+      var halfW = TILE_W / 2;
+      var halfH = TILE_H / 2;
+      ctx.strokeStyle = "rgba(40,30,20,0.35)";
+      ctx.lineWidth = 1;
+      for (var br = 0; br < 4; br++) {
+        var by = cy - halfH + (br + 1) * (TILE_H / 5);
+        ctx.beginPath();
+        ctx.moveTo(cx - halfW, by);
+        ctx.lineTo(cx + halfW, by);
+        ctx.stroke();
+      }
+      for (var bc = 0; bc < 3; bc++) {
+        var bx = cx - halfW * 0.6 + (bc + 1) * (TILE_W * 0.4);
+        ctx.beginPath();
+        ctx.moveTo(bx, cy - halfH);
+        ctx.lineTo(bx, cy + halfH);
+        ctx.stroke();
+      }
+      ctx.fillStyle = "rgba(100,90,70,0.12)";
+      ctx.fillRect(cx - 4, cy - 3, 8, 6);
+    } else if (zone === "water_deep" || zone === "water_shallow") {
+      var ph = pulsePhase || 0;
+      var waveAlpha = zone === "water_deep" ? 0.25 : 0.18;
+      var waveCount = zone === "water_deep" ? 5 : 4;
+      for (var wi = 0; wi < waveCount; wi++) {
+        var wy = cy - TILE_H / 2 + (wi + 0.5) * (TILE_H / waveCount);
+        var wOff = Math.sin(ph * 1.5 + wi * 1.8 + col * 0.7) * 3;
+        ctx.strokeStyle = "rgba(255,255,255," + (waveAlpha * (0.6 + 0.4 * Math.sin(ph + wi))).toFixed(3) + ")";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(cx - TILE_W / 3 + wOff, wy);
+        ctx.quadraticCurveTo(cx + wOff, wy - 2 + Math.sin(ph + wi * 0.5) * 1.5, cx + TILE_W / 3 + wOff, wy);
+        ctx.stroke();
+      }
+      if (zone === "water_deep") {
+        _fillDiamond(ctx, cx, cy, "rgba(10,30,60,0.18)");
+      }
+    } else if (zone === "sand") {
       var halfW = TILE_W / 2;
       var halfH = TILE_H / 2;
       for (var i = 0; i < 7; i++) {
@@ -264,7 +316,6 @@ var IsoRenderer = (function () {
       }
     }
 
-    // PS1 dithered directional shadow on bottom-right half of diamond
     var eP = { x: cx + TILE_W / 2, y: cy };
     var sP = { x: cx, y: cy + TILE_H / 2 };
     var wP = { x: cx - TILE_W / 2, y: cy };
@@ -276,7 +327,6 @@ var IsoRenderer = (function () {
     ctx.fillStyle = "rgba(0,0,0,0.06)";
     ctx.fill();
 
-    // dithered edge along the shadow diagonal
     ctx.fillStyle = "rgba(0,0,0,0.04)";
     for (var di = 0; di < 16; di++) {
       var dt = di / 16;
@@ -289,7 +339,6 @@ var IsoRenderer = (function () {
 
     ctx.restore();
 
-    // warm highlight on lit (NW) edge — subtle
     _clipDiamond(ctx, cx, cy);
     var grad = ctx.createLinearGradient(
       cx - TILE_W / 2,
@@ -472,6 +521,10 @@ var IsoRenderer = (function () {
     var highlights = params.highlights || {};
     var units = params.units || [];
     var activeUnitId = params.activeUnitId;
+    var cursedTiles = params.cursedTiles || null;
+    var collapsedTiles = params.collapsedTiles || null;
+    var glowTiles = params.glowTiles || null;
+    var darkSky = params.darkSky || false;
 
     this._lastHeights = heights;
     this._pulsePhase += 0.06;
@@ -524,14 +577,63 @@ var IsoRenderer = (function () {
       var px = p.x + jx;
       var py = p.y + jy;
 
-      var wallH = h + 1;
-      _drawLeftFace(ctx, px, py, wallH, colors.left, dc, dr);
-      _drawRightFace(ctx, px, py, wallH, colors.right, dc, dr);
+      var tKey = dc + "," + dr;
+      var isCollapsed = collapsedTiles && collapsedTiles.has(tKey);
 
-      _drawTopFace(ctx, px, py, colors.top, zone, dc, dr);
+      if (!isCollapsed) {
+        var wallH = h + 1;
+        _drawLeftFace(ctx, px, py, wallH, colors.left, dc, dr);
+        _drawRightFace(ctx, px, py, wallH, colors.right, dc, dr);
+      }
+      var isCursed = !isCollapsed && cursedTiles && cursedTiles.has(tKey);
+      var isGlow = !isCollapsed && glowTiles && glowTiles.has(tKey);
+
+      if (isCollapsed) {
+        _fillDiamond(ctx, px, py, "#0a0808");
+        ctx.save();
+        _clipDiamond(ctx, px, py);
+        ctx.clip();
+        var cRng = _seedRng(dc * 7 + 3, dr * 11 + 1);
+        ctx.strokeStyle = "rgba(60, 30, 20, 0.6)";
+        ctx.lineWidth = 1;
+        for (var ci = 0; ci < 4; ci++) {
+          var cx1 = px - TILE_W / 2 + cRng() * TILE_W;
+          var cy1 = py - TILE_H / 2 + cRng() * TILE_H;
+          ctx.beginPath();
+          ctx.moveTo(cx1, cy1);
+          ctx.lineTo(cx1 + (cRng() - 0.5) * 16, cy1 + (cRng() - 0.5) * 10);
+          ctx.stroke();
+        }
+        ctx.restore();
+      } else {
+        _drawTopFace(ctx, px, py, colors.top, zone, dc, dr, this._pulsePhase);
+      }
+
+      if (isCursed) {
+        _fillDiamond(ctx, px, py, "rgba(80, 20, 40, 0.30)");
+        ctx.save();
+        _clipDiamond(ctx, px, py);
+        ctx.clip();
+        var eRng = _seedRng(dc * 13 + 1, dr * 7 + 5);
+        for (var ei = 0; ei < 3; ei++) {
+          var ex = px - TILE_W / 3 + eRng() * (TILE_W * 0.66);
+          var ey = py - TILE_H / 3 + eRng() * (TILE_H * 0.66);
+          var er = 1 + eRng() * 1.5;
+          ctx.fillStyle = "rgba(180, 50, 30, " + (0.25 + eRng() * 0.3).toFixed(2) + ")";
+          ctx.beginPath();
+          ctx.arc(ex, ey, er, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+
+      if (isGlow) {
+        _fillDiamond(ctx, px, py, "rgba(200, 180, 100, 0.15)");
+      }
+
       _drawTileOutlines(ctx, px, py, h);
 
-      var key = dc + "," + dr;
+      var key = tKey;
       var hlType = highlights[key];
       if (hlType) {
         var hlBase = _hlBaseColor(hlType);
@@ -582,6 +684,31 @@ var IsoRenderer = (function () {
           drawPy += unit.lungeY;
         }
         this._drawUnit(ctx, drawPx, drawPy, unit, unit.id === activeUnitId);
+      }
+    }
+
+    if (darkSky) {
+      ctx.save();
+      ctx.globalCompositeOperation = "multiply";
+      ctx.fillStyle = "rgba(20, 15, 30, 0.18)";
+      var logW = this.canvas.clientWidth || this.canvas.width;
+      var logH = this.canvas.clientHeight || this.canvas.height;
+      ctx.fillRect(-logW, -logH, logW * 3, logH * 3);
+      ctx.restore();
+      var tRng = _seedRng(3, 7);
+      for (var ti = 0; ti < 4; ti++) {
+        var twx = tRng() * this.cols;
+        var twy = tRng() < 0.5 ? 0 : this.rows - 1;
+        var tH = heights[twy] ? (heights[twy][Math.floor(twx)] || 0) : 0;
+        var tp = this.tileToScreen(Math.floor(twx), twy, tH);
+        var flicker = 6 + Math.sin(this._pulsePhase * 2 + ti * 1.5) * 3;
+        ctx.save();
+        ctx.globalAlpha = 0.15 + Math.sin(this._pulsePhase * 3 + ti) * 0.05;
+        ctx.fillStyle = "#ff9040";
+        ctx.beginPath();
+        ctx.arc(tp.x, tp.y - 10, flicker, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
       }
     }
 

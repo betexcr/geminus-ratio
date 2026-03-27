@@ -45,6 +45,26 @@ var TEAM_PAL = {
     gold_dark: "#886018",
     accent: "#d04040",
   },
+  gifted: {
+    main: "#4a5848",
+    main_mid: "#3a4438",
+    light: "#8a9888",
+    dark: "#2a3228",
+    iron: "#707870",
+    iron_dark: "#505850",
+    iron_hi: "#98a098",
+    skin: "#c8b898",
+    skin_shade: "#a89878",
+    skin_hi: "#e0d0b0",
+    leather: "#584838",
+    leather_hi: "#786858",
+    leather_dark: "#302818",
+    hair: "#887858",
+    cloth: "#586858",
+    gold: "#b8a840",
+    gold_dark: "#787020",
+    accent: "#607060",
+  },
 };
 
 /**
@@ -750,5 +770,247 @@ var SPRITE_RECTS = {
     [32, 55, 9, 1, "leather_hi"],
     [32, 58, 9, 1, "brown"],
     [36, 49, 1, 5, "iron"],
+  ],
+
+  /* ══════ Sagittarius ══════ archer with composite bow, light tunic */
+  sagittarius: [
+    // head
+    [22, 2, 18, 18, "skin"],
+    [22, 2, 18, 1, "skin_hi"],
+    [22, 2, 1, 18, "skin_shade"],
+    [39, 2, 1, 18, "skin_shade"],
+    [24, 3, 14, 4, "hair"],
+    [24, 3, 14, 1, "gold"],
+    [26, 8, 4, 3, "black"],
+    [33, 8, 3, 3, "black"],
+    [27, 9, 2, 1, "white"],
+    [34, 9, 1, 1, "white"],
+    [28, 13, 6, 2, "skin_shade"],
+    // body — light tunic
+    [20, 20, 22, 22, "cloth"],
+    [21, 21, 20, 20, "accent"],
+    [20, 20, 22, 1, "light"],
+    [20, 20, 1, 22, "dark"],
+    [41, 20, 1, 22, "dark"],
+    [25, 24, 2, 2, "dark"],
+    [35, 24, 2, 2, "dark"],
+    [28, 30, 6, 1, "gold"],
+    // belt
+    [22, 40, 18, 3, "leather"],
+    [22, 40, 18, 1, "leather_hi"],
+    [22, 42, 18, 1, "leather_dark"],
+    [30, 40, 2, 3, "gold"],
+    // bow (left side)
+    [4, 10, 2, 34, "leather"],
+    [4, 10, 1, 34, "leather_hi"],
+    [3, 14, 1, 4, "leather_dark"],
+    [3, 36, 1, 4, "leather_dark"],
+    [5, 8, 1, 2, "leather"],
+    [5, 44, 1, 2, "leather"],
+    // bowstring
+    [6, 10, 1, 34, "white"],
+    // quiver (right side)
+    [44, 18, 6, 20, "leather"],
+    [44, 18, 6, 1, "leather_hi"],
+    [44, 18, 1, 20, "leather_dark"],
+    [46, 14, 1, 6, "iron"],
+    [48, 14, 1, 5, "iron"],
+    [47, 13, 1, 3, "gold"],
+    // arms
+    [14, 22, 6, 12, "skin"],
+    [14, 22, 1, 12, "skin_shade"],
+    [42, 22, 6, 12, "skin"],
+    [47, 22, 1, 12, "skin_shade"],
+    // legs
+    [22, 44, 8, 14, "cloth"],
+    [22, 44, 1, 14, "dark"],
+    [33, 44, 8, 14, "cloth"],
+    [40, 44, 1, 14, "dark"],
+    // sandals
+    [22, 57, 8, 2, "leather"],
+    [33, 57, 8, 2, "leather"],
+    [22, 58, 8, 1, "brown"],
+    [33, 58, 8, 1, "brown"],
+  ],
+
+  /* ══════ Essedarius ══════ chariot fighter, heavy armor, whip+shield */
+  essedarius: [
+    // head — open helm
+    [22, 0, 18, 20, "iron"],
+    [22, 0, 18, 1, "iron_hi"],
+    [22, 0, 1, 20, "iron_dark"],
+    [39, 0, 1, 20, "iron_dark"],
+    [24, 2, 14, 4, "dark"],
+    [24, 6, 14, 2, "iron_hi"],
+    // face
+    [26, 8, 10, 10, "skin"],
+    [26, 8, 10, 1, "skin_hi"],
+    [28, 10, 3, 3, "black"],
+    [33, 10, 3, 3, "black"],
+    [29, 11, 1, 1, "white"],
+    [34, 11, 1, 1, "white"],
+    [30, 15, 4, 1, "skin_shade"],
+    // crest
+    [28, 0, 6, 2, "accent"],
+    [29, 0, 4, 1, "light"],
+    // body — heavy plate
+    [18, 20, 26, 22, "iron"],
+    [19, 21, 24, 20, "main"],
+    [18, 20, 26, 1, "iron_hi"],
+    [18, 20, 1, 22, "iron_dark"],
+    [43, 20, 1, 22, "iron_dark"],
+    [24, 24, 14, 2, "gold"],
+    [24, 24, 14, 1, "gold_dark"],
+    [28, 28, 6, 6, "gold"],
+    [29, 29, 4, 4, "light"],
+    // belt
+    [20, 40, 22, 3, "leather"],
+    [20, 40, 22, 1, "gold"],
+    // whip (right)
+    [44, 16, 2, 28, "leather"],
+    [44, 16, 1, 28, "leather_hi"],
+    [46, 42, 4, 1, "leather"],
+    [50, 40, 3, 1, "leather"],
+    [52, 38, 2, 1, "leather"],
+    // shield (left)
+    [2, 20, 14, 18, "main"],
+    [2, 20, 14, 1, "light"],
+    [2, 20, 1, 18, "dark"],
+    [15, 20, 1, 18, "dark"],
+    [5, 23, 8, 12, "accent"],
+    [7, 26, 4, 6, "gold"],
+    // arms
+    [14, 22, 4, 12, "skin"],
+    [14, 22, 1, 12, "skin_shade"],
+    [44, 22, 4, 12, "skin"],
+    [47, 22, 1, 12, "skin_shade"],
+    // legs
+    [20, 44, 10, 14, "iron"],
+    [20, 44, 1, 14, "iron_dark"],
+    [32, 44, 10, 14, "iron"],
+    [41, 44, 1, 14, "iron_dark"],
+    // boots
+    [20, 56, 10, 3, "leather"],
+    [32, 56, 10, 3, "leather"],
+    [20, 58, 10, 1, "brown"],
+    [32, 58, 10, 1, "brown"],
+  ],
+
+  /* ══════ Umbra ══════ shadow acolyte, dark robes, glowing eyes */
+  umbra: [
+    // hood/head
+    [20, 0, 22, 20, "dark"],
+    [21, 1, 20, 18, "main_mid"],
+    [20, 0, 22, 1, "dark"],
+    [20, 0, 1, 20, "dark"],
+    [41, 0, 1, 20, "dark"],
+    // face in shadow
+    [26, 6, 10, 12, "dark"],
+    [28, 8, 2, 2, "accent"],
+    [33, 8, 2, 2, "accent"],
+    [29, 13, 4, 1, "dark"],
+    // robes
+    [16, 20, 30, 26, "dark"],
+    [17, 21, 28, 24, "main_mid"],
+    [16, 20, 30, 1, "main"],
+    [16, 20, 1, 26, "dark"],
+    [45, 20, 1, 26, "dark"],
+    [22, 24, 18, 1, "accent"],
+    [26, 28, 10, 2, "accent"],
+    [29, 26, 4, 6, "light"],
+    // belt/sash
+    [20, 38, 22, 3, "accent"],
+    [20, 38, 22, 1, "light"],
+    [30, 38, 2, 3, "gold"],
+    // rune glow on chest
+    [28, 32, 6, 4, "accent"],
+    [29, 33, 4, 2, "light"],
+    // shadowy hands
+    [12, 26, 4, 10, "skin_shade"],
+    [12, 26, 1, 10, "dark"],
+    [46, 26, 4, 10, "skin_shade"],
+    [49, 26, 1, 10, "dark"],
+    // fingers
+    [11, 34, 2, 3, "skin"],
+    [49, 34, 2, 3, "skin"],
+    // lower robes / legs hidden
+    [18, 46, 12, 14, "dark"],
+    [18, 46, 1, 14, "main_mid"],
+    [32, 46, 12, 14, "dark"],
+    [43, 46, 1, 14, "main_mid"],
+    // feet barely visible
+    [20, 58, 8, 2, "dark"],
+    [34, 58, 8, 2, "dark"],
+    [21, 59, 6, 1, "leather_dark"],
+    [35, 59, 6, 1, "leather_dark"],
+  ],
+
+  /* ══════ Vestige ══════ Dis Pater's remnant, decayed armor, spectral glow */
+  vestige: [
+    // head — cracked helm with glow
+    [22, 0, 18, 18, "iron_dark"],
+    [22, 0, 18, 1, "iron"],
+    [22, 0, 1, 18, "dark"],
+    [39, 0, 1, 18, "dark"],
+    [24, 2, 14, 4, "dark"],
+    // spectral face
+    [26, 6, 10, 10, "accent"],
+    [27, 7, 8, 8, "light"],
+    [28, 8, 3, 3, "main"],
+    [33, 8, 3, 3, "main"],
+    [29, 9, 1, 1, "white"],
+    [34, 9, 1, 1, "white"],
+    [30, 14, 4, 1, "dark"],
+    // cracks on helm
+    [25, 3, 1, 5, "accent"],
+    [36, 2, 1, 6, "accent"],
+    // body — decayed plate
+    [18, 18, 26, 24, "iron_dark"],
+    [19, 19, 24, 22, "main_mid"],
+    [18, 18, 26, 1, "iron"],
+    [18, 18, 1, 24, "dark"],
+    [43, 18, 1, 24, "dark"],
+    // spectral glow lines
+    [24, 22, 14, 1, "accent"],
+    [28, 26, 6, 6, "accent"],
+    [29, 27, 4, 4, "light"],
+    [26, 34, 10, 1, "accent"],
+    // broken belt
+    [20, 40, 22, 3, "leather_dark"],
+    [20, 40, 22, 1, "iron"],
+    [30, 40, 2, 3, "accent"],
+    // sword — spectral blade
+    [46, 8, 3, 34, "accent"],
+    [46, 8, 1, 34, "light"],
+    [48, 8, 1, 34, "main"],
+    [47, 6, 1, 4, "gold"],
+    [46, 4, 3, 3, "accent"],
+    [47, 3, 1, 2, "light"],
+    // shield remnant (left)
+    [4, 22, 12, 14, "iron_dark"],
+    [4, 22, 12, 1, "iron"],
+    [4, 22, 1, 14, "dark"],
+    [7, 25, 6, 8, "main_mid"],
+    [8, 26, 4, 6, "accent"],
+    // arms
+    [14, 22, 4, 12, "iron_dark"],
+    [14, 22, 1, 12, "dark"],
+    [44, 22, 4, 10, "iron_dark"],
+    [47, 22, 1, 10, "dark"],
+    // legs — tattered
+    [20, 44, 10, 14, "iron_dark"],
+    [20, 44, 1, 14, "dark"],
+    [20, 44, 10, 1, "iron"],
+    [33, 44, 10, 14, "iron_dark"],
+    [42, 44, 1, 14, "dark"],
+    [33, 44, 10, 1, "iron"],
+    // spectral glow on legs
+    [23, 48, 4, 2, "accent"],
+    [36, 50, 4, 2, "accent"],
+    // boots
+    [20, 57, 10, 2, "dark"],
+    [33, 57, 10, 2, "dark"],
+    [21, 58, 8, 1, "iron_dark"],
+    [34, 58, 8, 1, "iron_dark"],
   ],
 };

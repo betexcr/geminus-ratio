@@ -300,6 +300,23 @@ html, body {
   flex-shrink: 0;
 }
 
+.picked__sprite.unit-sprite-svg {
+  width: 24px;
+  height: 30px;
+  display: inline-block;
+}
+
+.pick-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-fft);
+  font-size: 0.9rem;
+  color: var(--fft-text);
+}
+
 .picked li button {
   background: none;
   border: none;
@@ -317,20 +334,79 @@ html, body {
   list-style: none;
   padding: 0;
   margin: 0 0 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
 }
 
-.deploy-queue li {
-  padding: 0.4rem 0.5rem;
-  margin-bottom: 0.25rem;
+.deploy-card {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.5rem;
   background: #141210;
   border: 2px solid #3a3020;
+  border-left: 4px solid #3a3020;
   cursor: pointer;
+  transition: border-color 0.08s, background 0.08s;
 }
 
-.deploy-queue li.is-picked {
+.deploy-card:hover {
+  border-left-color: var(--fft-gold-dim);
+  background: #1c1814;
+}
+
+.deploy-card.is-picked {
   border-color: var(--fft-cyan);
+  border-left-color: var(--fft-cyan);
   background: #1a2228;
   box-shadow: 0 0 0 1px var(--fft-cyan-dim);
+}
+
+.deploy-card.is-placed {
+  opacity: 0.55;
+}
+
+.deploy-card.is-placed.is-picked {
+  opacity: 0.7;
+}
+
+.deploy-card__sprite {
+  width: 32px;
+  height: 40px;
+  flex-shrink: 0;
+  image-rendering: pixelated;
+}
+
+.deploy-card__info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.deploy-card__name {
+  font-family: var(--font-fft);
+  font-size: 0.95rem;
+  color: var(--fft-text);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.deploy-card__class {
+  font-size: 0.8rem;
+  color: var(--fft-text-dim);
+}
+
+.deploy-card__status {
+  font-family: var(--font-fft);
+  font-size: 1.1rem;
+  color: var(--fft-gold);
+  flex-shrink: 0;
+  width: 1.5rem;
+  text-align: center;
 }
 
 /* ---- Buttons ---- */
@@ -500,6 +576,11 @@ html, body {
 .fft-ct-slot--enemy {
   border-color: rgba(230, 100, 90, 0.55);
   box-shadow: inset 0 0 8px rgba(200, 60, 50, 0.1);
+}
+
+.fft-ct-slot--gifted {
+  border-color: rgba(140, 170, 130, 0.7);
+  box-shadow: inset 0 0 8px rgba(74, 88, 72, 0.2);
 }
 
 .fft-ct-slot__sprite {
@@ -751,6 +832,178 @@ html, body {
   background: rgba(20, 30, 40, 0.8);
   color: var(--fft-cyan);
   letter-spacing: 0.04em;
+}
+
+/* ---- Title Screen ---- */
+.title-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--fft-black);
+}
+.title-overlay.is-hidden { display: none; }
+.title-panel {
+  text-align: center;
+  padding: 3rem 2.5rem;
+}
+.title-panel__crest {
+  font-size: 3.5rem;
+  margin-bottom: 0.5rem;
+  filter: drop-shadow(0 0 12px rgba(232, 192, 64, 0.4));
+}
+.title-panel__name {
+  font-family: var(--font-title);
+  font-size: 2.4rem;
+  color: var(--fft-gold);
+  letter-spacing: 0.15em;
+  margin: 0;
+  text-shadow: 0 0 20px rgba(232, 192, 64, 0.25);
+}
+.title-panel__sub {
+  font-family: var(--font-fft);
+  font-size: 1.1rem;
+  color: var(--fft-text-dim);
+  letter-spacing: 0.2em;
+  margin: 0.3rem 0 2rem;
+}
+.title-panel__buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: center;
+}
+.title-panel__buttons .btn { min-width: 12rem; }
+
+/* ---- Scene / Dialogue Overlay ---- */
+.scene-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 180;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 2rem;
+  background: rgba(12, 10, 8, 0.7);
+}
+.scene-overlay.is-hidden { display: none; }
+.scene-panel {
+  width: min(42rem, 92vw);
+  background: var(--fft-window-outer);
+  border: 2px solid var(--fft-gold-dim);
+  padding: 1.4rem 1.8rem 1.2rem;
+  position: relative;
+}
+.scene-panel::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border: 1px solid var(--fft-border);
+  pointer-events: none;
+}
+.scene-speaker {
+  font-family: var(--font-title);
+  font-size: 1rem;
+  color: var(--fft-gold);
+  letter-spacing: 0.08em;
+  margin: 0 0 0.5rem;
+  min-height: 1.2em;
+}
+.scene-speaker:empty { display: none; }
+.scene-text {
+  font-family: var(--font-fft);
+  font-size: 1.05rem;
+  color: var(--fft-text);
+  line-height: 1.5;
+  margin: 0 0 1rem;
+}
+.scene-text--internal {
+  color: var(--fft-text-dim);
+  font-style: italic;
+}
+.scene-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+.scene-choices.is-hidden { display: none; }
+.scene-choices .btn {
+  text-align: left;
+  font-family: var(--font-fft);
+  font-size: 0.95rem;
+}
+
+/* ---- Campaign HUD ---- */
+.campaign-hud {
+  font-family: var(--font-fft);
+  font-size: 0.85rem;
+  color: var(--fft-text-dim);
+  padding: 0.25rem 0;
+  margin-bottom: 0.4rem;
+  border-bottom: 1px solid var(--fft-border);
+}
+.campaign-hud__mission {
+  color: var(--fft-gold);
+  font-family: var(--font-title);
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+}
+
+.result-buttons {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+}
+
+/* ---- Level Badges ---- */
+.level-badge {
+  display: inline-block;
+  background: var(--fft-gold-dim);
+  color: #1a1610;
+  font-family: var(--font-fft);
+  font-size: 0.75rem;
+  padding: 0 0.3rem;
+  border-radius: 2px;
+  margin-left: 0.3rem;
+  vertical-align: middle;
+}
+
+/* ---- Name Input ---- */
+.name-input {
+  width: 100%;
+  max-width: 10rem;
+  background: #1a1610;
+  border: 1px solid var(--fft-gold-dim);
+  color: var(--fft-text);
+  font-family: var(--font-fft);
+  font-size: 0.9rem;
+  padding: 0.2rem 0.4rem;
+  outline: none;
+}
+.name-input:focus {
+  border-color: var(--fft-gold);
+  box-shadow: 0 0 4px var(--fft-gold-dim);
+}
+
+/* ---- Training Bout Button ---- */
+.btn--training {
+  background: linear-gradient(180deg, #2a4020 0%, #1a2a10 100%);
+  border: 1px solid #4a6030;
+  color: #a0d070;
+  font-family: var(--font-title);
+  font-size: 0.85rem;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  margin-top: 0.35rem;
+}
+.btn--training:hover {
+  border-color: #6a8040;
+  background: linear-gradient(180deg, #3a5030 0%, #2a3a20 100%);
+  color: #c0f080;
 }
 
 /* ---- Responsive ---- */
