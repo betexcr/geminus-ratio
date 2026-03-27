@@ -988,6 +988,23 @@ html, body {
   box-shadow: 0 0 4px var(--fft-gold-dim);
 }
 
+.btn-reroll {
+  background: none;
+  border: 1px solid var(--fft-gold-dim);
+  color: var(--fft-gold);
+  font-size: 1rem;
+  padding: 0.1rem 0.35rem;
+  margin-left: 0.25rem;
+  cursor: pointer;
+  vertical-align: middle;
+  line-height: 1;
+  border-radius: 2px;
+}
+.btn-reroll:hover {
+  background: rgba(200,180,100,0.15);
+  border-color: var(--fft-gold);
+}
+
 /* ---- Training Bout Button ---- */
 .btn--training {
   background: linear-gradient(180deg, #2a4020 0%, #1a2a10 100%);

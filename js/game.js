@@ -47,6 +47,36 @@
   const XP_PER_KILL = 20;
   const MAX_LEVEL = 6;
 
+  const ROMAN_NAMES = [
+    "Aelianus","Agrippa","Antonius","Aquila","Atticus","Augustus",
+    "Aurelius","Balbus","Blasius","Brennus","Brutus","Caelus",
+    "Cassius","Cato","Corvinus","Corvus","Crispus","Cursor",
+    "Decimus","Drusus","Fabius","Falco","Felix","Festus",
+    "Flaccus","Flavius","Gallus","Gaius","Germanus","Gracchus",
+    "Hadrianus","Hector","Horatius","Ignatius","Julianus","Justus",
+    "Labienus","Lentulus","Lepidus","Longinus","Lucius","Lucullus",
+    "Magnus","Marcellus","Marcus","Marius","Maximus","Metellus",
+    "Nero","Nerva","Niger","Norbanus","Octavius","Otho",
+    "Paullus","Perseus","Petrus","Pilatus","Pius","Plautus",
+    "Pollio","Pompeius","Primus","Priscus","Proculus","Publius",
+    "Quintus","Regulus","Rufus","Sabinus","Scaevola","Scipio",
+    "Seneca","Septimus","Severus","Sextus","Silius","Silvanus",
+    "Soranus","Spurius","Strabo","Sulla","Tacitus","Tarquinius",
+    "Tertius","Tiberius","Titus","Trajan","Tullius","Varro",
+    "Valerius","Ventidius","Verres","Vespasian","Victor","Vindex",
+    "Vitruvius","Volso","Vulso","Zeno",
+  ];
+
+  function randomRomanName() {
+    var used = {};
+    for (var i = 0; i < state.picks.length; i++) {
+      if (state.picks[i].displayName) used[state.picks[i].displayName] = true;
+    }
+    var available = ROMAN_NAMES.filter(function(n) { return !used[n]; });
+    if (!available.length) available = ROMAN_NAMES;
+    return available[Math.floor(Math.random() * available.length)];
+  }
+
   function levelBonus(unit, stat) {
     var total = 0;
     for (var i = 1; i < LEVEL_TABLE.length && LEVEL_TABLE[i].level <= (unit.level || 1); i++) {
@@ -1275,9 +1305,9 @@
       log("Not enough denarii for " + c.name + ".");
       return;
     }
-    var newPick = { uid: "p" + state.unitSeq + "_" + state.picks.length, classId: c.id };
+    var newPick = { uid: "p" + state.unitSeq + "_" + state.picks.length, classId: c.id, displayName: randomRomanName() };
     state.picks.push(newPick);
-    log("Hired " + c.name + ".");
+    log("Hired " + newPick.displayName + " the " + c.name + ".");
     refreshRosterUI();
     if (campaignState.active) {
       promptFighterName(newPick);
@@ -1293,10 +1323,24 @@
     var input = document.createElement("input");
     input.type = "text";
     input.className = "name-input";
+    input.value = pick.displayName || "";
     input.placeholder = classById(pick.classId).name;
     input.maxLength = 16;
     nameSpan.appendChild(input);
+    var reroll = document.createElement("button");
+    reroll.type = "button";
+    reroll.className = "btn-reroll";
+    reroll.textContent = "\u2684";
+    reroll.title = "Randomize name";
+    reroll.addEventListener("click", function(e) {
+      e.stopPropagation();
+      var newName = randomRomanName();
+      input.value = newName;
+      pick.displayName = newName;
+    });
+    nameSpan.appendChild(reroll);
     input.focus();
+    input.select();
     function finalize() {
       var val = input.value.trim();
       if (val) pick.displayName = val;
