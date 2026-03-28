@@ -7,6 +7,7 @@
 
   const BOARD_W = 12;
   const BOARD_H = 10;
+  const MAX_ROSTER = 6;
   const BUDGET_MAX_DEFAULT = 140;
   var budgetCurrent = BUDGET_MAX_DEFAULT;
   var MAP_MODIFIER_DEFS = {
@@ -36,12 +37,12 @@
   ];
 
   const LEVEL_TABLE = [
-    { level: 1, xp: 0,   bonusHp: 0, bonusAtk: 0, bonusDef: 0, bonusSpd: 0 },
-    { level: 2, xp: 20,  bonusHp: 2, bonusAtk: 0, bonusDef: 0, bonusSpd: 1 },
-    { level: 3, xp: 50,  bonusHp: 3, bonusAtk: 1, bonusDef: 0, bonusSpd: 0 },
-    { level: 4, xp: 100, bonusHp: 4, bonusAtk: 0, bonusDef: 1, bonusSpd: 1 },
-    { level: 5, xp: 170, bonusHp: 5, bonusAtk: 1, bonusDef: 1, bonusSpd: 0 },
-    { level: 6, xp: 260, bonusHp: 6, bonusAtk: 2, bonusDef: 1, bonusSpd: 1 },
+    { level: 1, xp: 0 },
+    { level: 2, xp: 20 },
+    { level: 3, xp: 50 },
+    { level: 4, xp: 100 },
+    { level: 5, xp: 170 },
+    { level: 6, xp: 260 },
   ];
   const XP_PER_HIT = 5;
   const XP_PER_KILL = 20;
@@ -77,15 +78,54 @@
     return available[Math.floor(Math.random() * available.length)];
   }
 
-  function levelBonus(unit, stat) {
-    var total = 0;
-    for (var i = 1; i < LEVEL_TABLE.length && LEVEL_TABLE[i].level <= (unit.level || 1); i++) {
-      total += LEVEL_TABLE[i]["bonus" + stat] || 0;
-    }
-    return total;
+  /**
+   * Deterministic hash for growth rolls — same unit + level + stat always
+   * produces the same roll so growth is reproducible across save/load.
+   */
+  function _growthRoll(uid, level, statIdx) {
+    var h = 0;
+    if (typeof uid === "string") {
+      for (var i = 0; i < uid.length; i++) h = ((h << 5) - h + uid.charCodeAt(i)) | 0;
+    } else { h = uid | 0; }
+    var s = (Math.imul(h, 2654435761) + level * 65537 + statIdx * 97) | 0;
+    s = (Math.imul(s, 1103515245) + 12345) | 0;
+    return ((s >>> 16) & 0x7FFF) / 0x8000;
   }
 
-  function levelMaxHpBonus(unit) { return levelBonus(unit, "Hp"); }
+  /**
+   * FFT-style growth: compute the stat gain for a single level-up.
+   * growthVal is in centistats — e.g. 450 → guaranteed 4, plus 50% chance of +1.
+   */
+  function _statGain(growthVal, uid, level, statIdx) {
+    var base = Math.floor(growthVal / 100);
+    var remainder = growthVal % 100;
+    if (remainder > 0 && _growthRoll(uid, level, statIdx) * 100 < remainder) base++;
+    return base;
+  }
+
+  /**
+   * Compute total growth bonuses for a class from level 1 to targetLevel.
+   * Returns { hp, atk, def, spd } accumulated bonuses.
+   */
+  function computeGrowthBonuses(classId, uid, targetLevel) {
+    var g = classById(classId).growth;
+    var out = { hp: 0, atk: 0, def: 0, spd: 0 };
+    if (!g) return out;
+    for (var lv = 2; lv <= targetLevel; lv++) {
+      out.hp  += _statGain(g.hp,  uid, lv, 0);
+      out.atk += _statGain(g.atk, uid, lv, 1);
+      out.def += _statGain(g.def, uid, lv, 2);
+      out.spd += _statGain(g.spd, uid, lv, 3);
+    }
+    return out;
+  }
+
+  function levelBonus(unit, stat) {
+    var key = "bonus" + stat;
+    return unit[key] || 0;
+  }
+
+  function levelMaxHpBonus(unit) { return unit.bonusHp || 0; }
 
   function checkLevelUp(unit) {
     if (!campaignState.active) return;
@@ -96,11 +136,30 @@
     if (unit.xp >= next.xp) {
       var oldLevel = unit.level || 1;
       unit.level = next.level;
-      var hpGain = next.bonusHp;
-      unit.maxHp += hpGain;
-      unit.hp = Math.min(unit.hp + hpGain, unit.maxHp);
-      var cDef = classById(unit.classId);
-      log((unit.displayName || cDef.name) + " reached Level " + unit.level + "!", "system");
+      var g = classById(unit.classId).growth;
+      var uid = unit.uid || unit.id;
+      if (g) {
+        var hpGain  = _statGain(g.hp,  uid, unit.level, 0);
+        var atkGain = _statGain(g.atk, uid, unit.level, 1);
+        var defGain = _statGain(g.def, uid, unit.level, 2);
+        var spdGain = _statGain(g.spd, uid, unit.level, 3);
+        unit.bonusHp  = (unit.bonusHp  || 0) + hpGain;
+        unit.bonusAtk = (unit.bonusAtk || 0) + atkGain;
+        unit.bonusDef = (unit.bonusDef || 0) + defGain;
+        unit.bonusSpd = (unit.bonusSpd || 0) + spdGain;
+        unit.maxHp += hpGain;
+        unit.hp = Math.min(unit.hp + hpGain, unit.maxHp);
+        var parts = [];
+        if (hpGain)  parts.push("+" + hpGain + " HP");
+        if (atkGain) parts.push("+" + atkGain + " ATK");
+        if (defGain) parts.push("+" + defGain + " DEF");
+        if (spdGain) parts.push("+" + spdGain + " SPD");
+        var cDef = classById(unit.classId);
+        log((unit.displayName || cDef.name) + " reached Level " + unit.level + "! " + parts.join(", "), "system");
+      } else {
+        var cDef2 = classById(unit.classId);
+        log((unit.displayName || cDef2.name) + " reached Level " + unit.level + "!", "system");
+      }
       spawnDmgNumber(unit, "LV" + unit.level, "#ffdd44");
       if (oldLevel < unit.level) checkLevelUp(unit);
     }
@@ -116,6 +175,7 @@
     {
       id: "murmillo", name: "Murmillo", role: "Bulwark — scutum & gladius",
       cost: 28, hp: 38, atk: 11, def: 6, spd: 6, move: 3, jump: 1,
+      growth: { hp: 450, atk: 30, def: 70, spd: 15 },
       abilities: [
         { name: "Cetus Wall", desc: "Brace: next hit deals half damage.", type: "buff", target: "self", levelReq: 1 },
         { name: "Testudo", desc: "+3 DEF until next turn.", type: "buff", target: "self", levelReq: 2 },
@@ -128,6 +188,7 @@
     {
       id: "retiarius", name: "Retiarius", role: "Skirmisher — trident & net",
       cost: 24, hp: 28, atk: 10, def: 3, spd: 9, move: 4, jump: 2,
+      growth: { hp: 250, atk: 40, def: 20, spd: 60 },
       abilities: [
         { name: "Iaculum", desc: "Net an adjacent foe (skip their next turn).", type: "debuff", target: "adjacent_enemy", levelReq: 1 },
         { name: "Trident Lunge", desc: "Range-2 line attack for 0.8× damage.", type: "attack", target: "line", range: 2, mult: 0.8, levelReq: 2 },
@@ -140,6 +201,7 @@
     {
       id: "secutor", name: "Secutor", role: "Hunter — pursues the nimble",
       cost: 26, hp: 32, atk: 12, def: 4, spd: 8, move: 4, jump: 1,
+      growth: { hp: 300, atk: 45, def: 30, spd: 50 },
       abilities: [
         { name: "Umbra", desc: "Move +1 this turn.", type: "buff", target: "self", levelReq: 1 },
         { name: "Pursuit", desc: "Adjacent strike for 1.25× if foe present.", type: "attack", target: "adjacent_enemy", mult: 1.25, levelReq: 2 },
@@ -152,6 +214,7 @@
     {
       id: "thraex", name: "Thraex", role: "Duelist — sica & parmula",
       cost: 22, hp: 30, atk: 13, def: 3, spd: 7, move: 3, jump: 2,
+      growth: { hp: 250, atk: 60, def: 20, spd: 50 },
       abilities: [
         { name: "Sica Riposte", desc: "Counter next melee hit for 5 true damage.", type: "buff", target: "self", levelReq: 1 },
         { name: "Curved Strike", desc: "Attack ignoring 50% of DEF.", type: "attack", target: "adjacent_enemy", mult: 1, ignoreDefPct: 0.5, levelReq: 2 },
@@ -164,6 +227,7 @@
     {
       id: "hoplomachus", name: "Hoplomachus", role: "Lancer — hasta & small shield",
       cost: 25, hp: 30, atk: 12, def: 4, spd: 7, move: 3, jump: 1,
+      growth: { hp: 300, atk: 50, def: 35, spd: 30 },
       abilities: [
         { name: "Hasta Impetus", desc: "Line thrust (range 3) for 1.25× damage.", type: "attack", target: "line", range: 3, mult: 1.25, levelReq: 1 },
         { name: "Shield Bash", desc: "0.5× damage + push foe 1 tile.", type: "attack", target: "adjacent_enemy", mult: 0.5, effect: "push", levelReq: 2 },
@@ -176,6 +240,7 @@
     {
       id: "dimachaerus", name: "Dimachaerus", role: "Blademaster — twin swords",
       cost: 30, hp: 29, atk: 14, def: 2, spd: 8, move: 4, jump: 2,
+      growth: { hp: 200, atk: 70, def: 10, spd: 60 },
       abilities: [
         { name: "Ferrum Cyclone", desc: "Hit all adjacent foes for 0.7×.", type: "attack", target: "aoe_adjacent", mult: 0.7, levelReq: 1 },
         { name: "Twin Slash", desc: "1.4× single target, costs 3 HP.", type: "attack", target: "adjacent_enemy", mult: 1.4, selfDamage: 3, levelReq: 2 },
@@ -188,6 +253,7 @@
     {
       id: "provocator", name: "Provocator", role: "Champion — provocatio rite",
       cost: 27, hp: 34, atk: 10, def: 5, spd: 6, move: 3, jump: 1,
+      growth: { hp: 350, atk: 30, def: 50, spd: 25 },
       abilities: [
         { name: "Provocatio", desc: "Mark foe: −4 ATK vs others for 2 turns.", type: "debuff", target: "adjacent_enemy", levelReq: 1 },
         { name: "Rally", desc: "Self-heal 20% of max HP.", type: "heal", target: "self", levelReq: 2 },
@@ -200,6 +266,7 @@
     {
       id: "samnite", name: "Samnite", role: "Veteran — early Italic kit",
       cost: 23, hp: 33, atk: 11, def: 4, spd: 6, move: 3, jump: 1,
+      growth: { hp: 350, atk: 35, def: 50, spd: 25 },
       abilities: [
         { name: "Samnis Press", desc: "Shove adjacent foe 1 tile.", type: "utility", target: "adjacent_enemy", effect: "push", levelReq: 1 },
         { name: "Veteran's Blow", desc: "1.3× damage, costs 5 HP.", type: "attack", target: "adjacent_enemy", mult: 1.3, selfDamage: 5, levelReq: 2 },
@@ -212,6 +279,7 @@
     {
       id: "sagittarius", name: "Sagittarius", role: "Archer — composite bow",
       cost: 22, hp: 25, atk: 11, def: 2, spd: 9, move: 3, jump: 2,
+      growth: { hp: 200, atk: 50, def: 15, spd: 60 },
       abilities: [
         { name: "Volley", desc: "Range-4 line shot for 0.7×.", type: "attack", target: "line", range: 4, mult: 0.7, levelReq: 1 },
         { name: "Pin Shot", desc: "0.6× hit + root foe 1 turn.", type: "attack", target: "adjacent_enemy", mult: 0.6, effect: "stun", levelReq: 2 },
@@ -224,6 +292,7 @@
     {
       id: "essedarius", name: "Essedarius", role: "Chariot Fighter — mobile brawler",
       cost: 26, hp: 30, atk: 12, def: 3, spd: 7, move: 5, jump: 1,
+      growth: { hp: 300, atk: 40, def: 20, spd: 55 },
       abilities: [
         { name: "Charge", desc: "Range-2 line dash + 1.3× hit.", type: "attack", target: "line", range: 2, mult: 1.3, effect: "charge", levelReq: 1 },
         { name: "Wheel Strike", desc: "Hit all adjacent foes for 0.6×.", type: "attack", target: "aoe_adjacent", mult: 0.6, levelReq: 2 },
@@ -236,6 +305,7 @@
     {
       id: "umbra", name: "Umbra", role: "Shadow Acolyte — cult-touched",
       cost: 28, hp: 27, atk: 12, def: 3, spd: 8, move: 4, jump: 2,
+      growth: { hp: 220, atk: 50, def: 15, spd: 65 },
       abilities: [
         { name: "Dark Grasp", desc: "0.9× hit, steal 3 HP.", type: "attack", target: "adjacent_enemy", mult: 0.9, effect: "lifesteal", steal: 3, levelReq: 1 },
         { name: "Phase Walk", desc: "Teleport within range 3.", type: "buff", target: "self", levelReq: 2 },
@@ -248,9 +318,10 @@
     {
       id: "vestige", name: "Vestige", role: "Dis Pater's Remnant — undead echo",
       cost: 30, hp: 32, atk: 13, def: 3, spd: 6, move: 3, jump: 1,
+      growth: { hp: 400, atk: 50, def: 25, spd: 15 },
       abilities: [
         { name: "Revenant Strike", desc: "1.2× hit, heal 25% of damage.", type: "attack", target: "adjacent_enemy", mult: 1.2, effect: "lifesteal", levelReq: 1 },
-        { name: "Grave Pulse", desc: "4 true dmg to all adjacent (ally+foe), costs 5 HP.", type: "attack", target: "aoe_adjacent", mult: 0, effect: "grave_pulse", selfDamage: 5, levelReq: 2 },
+        { name: "Grave Pulse", desc: "4 true dmg to all adjacent foes, costs 5 HP.", type: "attack", target: "aoe_adjacent", mult: 0, effect: "grave_pulse", selfDamage: 5, levelReq: 2 },
         { name: "Second Wind", desc: "Passive: revive once at 25% HP.", type: "passive", target: "self", levelReq: 3 },
         { name: "Unholy Resilience", desc: "+3 DEF for 2 turns.", type: "buff", target: "self", levelReq: 4 },
         { name: "Soul Drain", desc: "1.0× hit, heal 50% of damage.", type: "attack", target: "adjacent_enemy", mult: 1.0, effect: "lifesteal", steal: 0.5, levelReq: 5 },
@@ -471,6 +542,7 @@
     totalDamageDealt: 0,
     animating: false,
     boutNumber: 0,
+    _mapSeed: 0,
     mapMods: {
       cursedTiles: new Set(),
       cursedDmg: 0,
@@ -492,6 +564,26 @@
     titusForgottenName: false,
     endingATriggered: false,
     titusTurnCounter: 0,
+    tutorialStep: 0,
+    cutscene: {
+      active: false,
+      actors: [],
+      actorMap: {},
+      currentSpeaker: null,
+      bubbleText: "",
+      bubbleRevealed: 0,
+      bubbleStyle: "dialogue",
+      bubbleUnit: null,
+      letterbox: 0,
+      targetPanX: 0,
+      targetPanY: 0,
+      targetZoom: 1.3,
+      savedPanX: 0,
+      savedPanY: 0,
+      savedZoom: 1.0,
+      rafId: null,
+      awaitingEntry: false,
+    },
   };
 
   /** ----- DOM ----- */
@@ -541,6 +633,7 @@
   const btnZoomIn = $("#btnZoomIn");
   const btnZoomOut = $("#btnZoomOut");
   const btnCamReset = $("#btnCamReset");
+  const btnMute = $("#btnMute");
 
   var _srEl = document.getElementById("srAnnounce");
   function announce(msg) {
@@ -564,6 +657,19 @@
     logFeed.appendChild(p);
     while (logFeed.children.length > 40) logFeed.removeChild(logFeed.firstChild);
     logFeed.scrollTop = logFeed.scrollHeight;
+  }
+
+  function isTutorial() {
+    if (!campaignState.active) return false;
+    var m = Campaign.getMission();
+    return m && m.tutorial;
+  }
+
+  function tutorialTip(step, msg) {
+    if (!isTutorial()) return;
+    if (state.tutorialStep > step) return;
+    state.tutorialStep = step + 1;
+    log(msg, "tutorial");
   }
 
   // -- Animation helpers --
@@ -634,7 +740,7 @@
   }
 
   function screenShake(dur, intensity) {
-    if (!renderer) return Promise.resolve();
+    if (!renderer || renderer.reducedMotion) return Promise.resolve();
     return new Promise(function (resolve) {
       var start = performance.now();
       function tick() {
@@ -681,11 +787,12 @@
     var prev = {};
     var cost = {};
     var q = [{ x: unit.x, y: unit.y, c: 0 }];
+    var qi = 0;
     var startKey = cellKey(unit.x, unit.y);
     cost[startKey] = 0;
     prev[startKey] = null;
-    while (q.length) {
-      var cur = q.shift();
+    while (qi < q.length) {
+      var cur = q[qi++];
       for (var di = 0; di < DIRS.length; di++) {
         var nx = cur.x + DIRS[di][0], ny = cur.y + DIRS[di][1];
         if (!inBounds(nx, ny)) continue;
@@ -754,7 +861,8 @@
     if (u.bleedTurns > 0) icons.push(STATUS_DEFS.bleed);
     if (u.atkDebuffTurns > 0) icons.push(STATUS_DEFS.atkdown);
     if (u.blindRushAtk > 0) icons.push(STATUS_DEFS.blindrush);
-    if (u.highGroundNext) icons.push(STATUS_DEFS.highgnd);
+    if (u.battleFocusNext) icons.push(STATUS_DEFS.highgnd);
+    else if (u.highGroundNext) icons.push(STATUS_DEFS.highgnd);
     if (u.classId === "vestige" && !u.secondWindUsed) icons.push(STATUS_DEFS.second);
     if (u.parryCharges > 0) icons.push(STATUS_DEFS.parry);
     if (u.spearBraceActive) icons.push(STATUS_DEFS.spbrace);
@@ -781,8 +889,8 @@
     return y >= BOARD_H - 2;
   }
 
-  function unitAtk(u)  { return Math.max(1, (u.giftedAtk || classById(u.classId).atk) + levelBonus(u, "Atk") + (u.blindRushAtk || 0) + (u.atkBonus || 0) + (u.momentumBonus || 0) - (u.shadowMendAtkPenalty || 0) - (u.atkDebuffAmt && u.atkDebuffTurns > 0 ? u.atkDebuffAmt : 0)); }
-  function unitDef(u)  { return Math.max(0, (u.giftedDef || classById(u.classId).def) + levelBonus(u, "Def") + (u.phalanxBonus || 0) - (u.blindRushDef || 0)); }
+  function unitAtk(u)  { return Math.max(1, (u.giftedAtk || classById(u.classId).atk) + levelBonus(u, "Atk") + (u.blindRushAtk || 0) + (u.atkBonus || 0) + (u.momentumBonus || 0) + (u.battleHardenedTurns > 0 ? (u.battleHardenedAtk || 0) : 0) - (u.shadowMendAtkPenalty || 0) - (u.atkDebuffAmt && u.atkDebuffTurns > 0 ? u.atkDebuffAmt : 0)); }
+  function unitDef(u)  { return Math.max(0, (u.giftedDef || classById(u.classId).def) + levelBonus(u, "Def") + (u.phalanxBonus || 0) + (u.battleHardenedTurns > 0 ? (u.battleHardenedDef || 0) : 0) - (u.blindRushDef || 0)); }
   function unitSpd(u)  { return Math.max(1, (u.giftedSpd || classById(u.classId).spd) + levelBonus(u, "Spd") - (u.crowdSpdDebuff || 0)); }
   function unitMove(u) { return u.giftedMove || classById(u.classId).move; }
   function unitJump(u) { return u.giftedJump || classById(u.classId).jump; }
@@ -803,7 +911,7 @@
   }
 
   function attackerAtkValue(attacker, target) {
-    let atk = unitAtk(attacker) + (attacker.atkBonus || 0);
+    let atk = unitAtk(attacker);
     if (state.mapMods.glowTiles.has(cellKey(attacker.x, attacker.y))) {
       atk += 2;
     }
@@ -824,10 +932,11 @@
     const jmp = unitJump(unit);
     const best = new Map();
     const q = [{ x: unit.x, y: unit.y, cost: 0 }];
+    var qi2 = 0;
     best.set(cellKey(unit.x, unit.y), 0);
 
-    while (q.length) {
-      const cur = q.shift();
+    while (qi2 < q.length) {
+      const cur = q[qi2++];
       for (const [dx, dy] of DIRS) {
         const nx = cur.x + dx;
         const ny = cur.y + dy;
@@ -863,6 +972,7 @@
   }
 
   function computeHitChance(attacker, defender) {
+    if (attacker.eagleEyeHits > 0) return 100;
     const aSpd = unitSpd(attacker);
     const dSpd = unitSpd(defender);
     let chance = 80 + (aSpd - dSpd) * 5;
@@ -870,7 +980,8 @@
     const dH = state.height[defender.y][defender.x];
     if (aH > dH) chance += 10;
     else if (aH < dH) chance -= 10;
-    if (attacker.highGroundNext) chance += 15;
+    if (attacker.battleFocusNext) chance += 25;
+    else if (attacker.highGroundNext) chance += 15;
     return Math.max(30, Math.min(95, chance));
   }
 
@@ -881,6 +992,11 @@
     }
     const chance = computeHitChance(attacker, defender);
     return Math.random() * 100 < chance;
+  }
+
+  function consumeAttackBuffs(u) {
+    u.highGroundNext = false;
+    u.battleFocusNext = false;
   }
 
   function physicalDamage(attacker, defender, mult, ignoreDefPct, dryRun) {
@@ -923,13 +1039,12 @@
   }
 
   function applyDamage(u, dmg, attacker) {
-    if (u.dreadMarkDmg) {
+    if (u.markDebuffTurns > 0 && u.dreadMarkDmg) {
       dmg += u.dreadMarkDmg;
-      u.dreadMarkDmg = 0;
     }
-    var interceptor = state.units.find(function(a) {
+    var interceptor = (attacker && attacker.team !== u.team) ? state.units.find(function(a) {
       return a.hp > 0 && a.interceptActive && a.team === u.team && a.id !== u.id && manhattan(a, u) <= 1;
-    });
+    }) : null;
     if (interceptor) {
       interceptor.interceptActive = false;
       interceptor.hp -= dmg;
@@ -1021,10 +1136,15 @@
       blindRushAtk: 0,
       blindRushDef: 0,
       highGroundNext: false,
+      battleFocusNext: false,
       secondWindUsed: false,
       level: 1,
       xp: 0,
       kills: 0,
+      bonusHp: 0,
+      bonusAtk: 0,
+      bonusDef: 0,
+      bonusSpd: 0,
       resolveUsed: false,
       parryCharges: 0,
       spearBraceActive: false,
@@ -1076,23 +1196,27 @@
     renderer._recalcLayout();
     const unitData = state.units
       .filter((u) => u.hp > 0 || u._deathAnim != null)
-      .map((u) => ({
-        id: u.id,
-        x: u.x,
-        y: u.y,
-        hp: u.hp,
-        maxHp: u.maxHp,
-        classId: u.classId,
-        team: u.gifted ? "gifted" : (u.team === "player" ? "player" : "enemy"),
-        exhausted: state.phase === "battle" && u.ct < 50,
-        animX: u.animX,
-        animY: u.animY,
-        lungeX: u.lungeX,
-        lungeY: u.lungeY,
-        _deathAnim: u._deathAnim,
-        _flashAnim: u._flashAnim,
-        statusIcons: getUnitStatusIcons(u),
-      }));
+      .map((u) => {
+        var t = u.isCinematic ? u.team : (u.gifted ? "gifted" : (u.team === "player" ? "player" : "enemy"));
+        return {
+          id: u.id,
+          x: u.x,
+          y: u.y,
+          hp: u.hp,
+          maxHp: u.maxHp,
+          classId: u.classId,
+          team: t,
+          exhausted: u.isCinematic ? false : (state.phase === "battle" && u.ct < 50),
+          animX: u.animX,
+          animY: u.animY,
+          lungeX: u.lungeX,
+          lungeY: u.lungeY,
+          _deathAnim: u._deathAnim,
+          _flashAnim: u._flashAnim,
+          statusIcons: u.isCinematic ? [] : getUnitStatusIcons(u),
+          isCinematic: u.isCinematic || false,
+        };
+      });
 
     var cursedSet = null;
     if (state.mapMods.fullCurse) {
@@ -1103,10 +1227,10 @@
     } else if (state.mapMods.cursedTiles.size) {
       cursedSet = state.mapMods.cursedTiles;
     }
-    renderer.draw({
+    var drawParams = {
       heights: state.height,
       zones: buildZoneMap(),
-      highlights: buildHighlightMap(),
+      highlights: state.cutscene.active ? {} : buildHighlightMap(),
       units: unitData,
       activeUnitId: state.activeUnit ? state.activeUnit.id : null,
       phase: state.phase,
@@ -1114,8 +1238,51 @@
       collapsedTiles: state.mapMods.collapsedTiles.size ? state.mapMods.collapsedTiles : null,
       glowTiles: state.mapMods.glowTiles.size ? state.mapMods.glowTiles : null,
       darkSky: state.mapMods.darkSky,
-    });
+    };
+
+    if (state.cutscene.active) {
+      drawParams.letterbox = state.cutscene.letterbox;
+      var bu = state.cutscene.bubbleUnit;
+      if (bu && state.cutscene.bubbleText) {
+        var bp = renderer.tileToScreen(bu.x, bu.y, state.height[bu.y] ? state.height[bu.y][bu.x] || 0 : 0);
+        drawParams.cutsceneBubble = {
+          cx: bp.x,
+          cy: bp.y,
+          text: state.cutscene.bubbleText,
+          revealed: state.cutscene.bubbleRevealed,
+          style: state.cutscene.bubbleStyle,
+        };
+      } else if (!bu && state.cutscene.bubbleText && state.cutscene.bubbleStyle === "narration") {
+        drawParams.cutsceneBubble = {
+          cx: 0,
+          cy: 0,
+          text: state.cutscene.bubbleText,
+          revealed: state.cutscene.bubbleRevealed,
+          style: "narration",
+        };
+      }
+    }
+
+    renderer.draw(drawParams);
   }
+
+  var NPC_SPRITE_IDS = ["cassius", "livia", "lurco", "official", "nero", "aemilia", "varro", "dis_pater"];
+
+  var SPEAKER_SPRITES = {
+    "CASSIUS":   { classId: "cassius",     team: "npc_cassius" },
+    "TITUS":     { classId: "secutor",     team: "gifted" },
+    "LIVIA":     { classId: "livia",       team: "npc_livia" },
+    "LURCO":     { classId: "lurco",       team: "npc_lurco" },
+    "OFFICIAL":  { classId: "official",    team: "npc_official" },
+    "NERO":      { classId: "nero",        team: "npc_nero" },
+    "AEMILIA":   { classId: "aemilia",     team: "npc_aemilia" },
+    "VARRO":     { classId: "varro",       team: "npc_varro" },
+    "DIS PATER": { classId: "dis_pater",   team: "npc_dis_pater" },
+    "FEROX":     { classId: "dimachaerus", team: "gifted" },
+    "NERVA":     { classId: "retiarius",   team: "player" },
+    "SCAEVA":    { classId: "murmillo",    team: "player" },
+    "VALERIA":   { classId: "hoplomachus", team: "player" },
+  };
 
   function initSpriteCache() {
     if (!renderer) return;
@@ -1124,6 +1291,14 @@
       for (const team of teams) {
         const svg = gladiatorSpriteSvg(cls.id, team, 0);
         renderer.cacheSpriteFromSvg(cls.id, team, svg);
+      }
+    }
+    for (var ni = 0; ni < NPC_SPRITE_IDS.length; ni++) {
+      var npcId = NPC_SPRITE_IDS[ni];
+      var npcTeam = "npc_" + npcId;
+      if (SPRITE_RECTS[npcId] && TEAM_PAL[npcTeam]) {
+        var svg = gladiatorSpriteSvg(npcId, npcTeam, 0);
+        renderer.cacheSpriteFromSvg(npcId, npcTeam, svg);
       }
     }
   }
@@ -1295,8 +1470,10 @@
       rm.textContent = "Dismiss";
       rm.setAttribute("aria-label", "Dismiss " + label);
       rm.addEventListener("click", () => {
-        state.picks.splice(idx, 1);
+        var spliceIdx = state.picks.findIndex(function(p) { return p.uid === pick.uid; });
+        if (spliceIdx >= 0) state.picks.splice(spliceIdx, 1);
         refreshRosterUI();
+        if (campaignState.active) Campaign.saveToDisk();
       });
       li.appendChild(rm);
       pickedListEl.appendChild(li);
@@ -1313,6 +1490,10 @@
   }
 
   function hireClass(classId) {
+    if (state.picks.length >= MAX_ROSTER) {
+      log("Roster full (" + MAX_ROSTER + " fighters max).");
+      return;
+    }
     const c = classById(classId);
     var spent = 0;
     for (var i = 0; i < state.picks.length; i++) {
@@ -1322,10 +1503,11 @@
       log("Not enough denarii for " + c.name + ".");
       return;
     }
-    var newPick = { uid: "p" + state.unitSeq + "_" + state.picks.length, classId: c.id, displayName: randomRomanName() };
+    var newPick = { uid: "p" + (++state.unitSeq) + "_" + state.picks.length, classId: c.id, displayName: randomRomanName() };
     state.picks.push(newPick);
     log("Hired " + newPick.displayName + " the " + c.name + ".");
     refreshRosterUI();
+    if (campaignState.active) Campaign.saveToDisk();
     promptFighterName(newPick);
   }
 
@@ -1401,6 +1583,7 @@
     if (!state.picks.length) return;
     state.trainingBout = true;
     var trainSeed = (state.boutNumber + 1) * 71 + 137;
+    state._mapSeed = trainSeed;
     state.height = buildHeightField(trainSeed);
     state.terrain = buildTerrainMap(trainSeed, null);
     state.phase = "deploy";
@@ -1431,7 +1614,12 @@
       while (occupantAt(ex, ey) || isTileImpassableTerrain(ex, ey)) { ex = Math.floor(Math.random() * BOARD_W); ey = Math.floor(Math.random() * 3); }
       var eu = createUnit("enemy", cls, ex, ey);
       eu.level = enemyLvl;
-      eu.maxHp += levelMaxHpBonus(eu);
+      if (enemyLvl > 1) {
+        var tgb = computeGrowthBonuses(cls, eu.id, enemyLvl);
+        eu.bonusHp = tgb.hp; eu.bonusAtk = tgb.atk;
+        eu.bonusDef = tgb.def; eu.bonusSpd = tgb.spd;
+        eu.maxHp += tgb.hp;
+      }
       eu.hp = eu.maxHp;
       state.units.push(eu);
     }
@@ -1451,6 +1639,10 @@
         xp: p.xp || 0,
         kills: p.kills || 0,
         gifted: p.gifted || false,
+        bonusHp:  p.bonusHp  || 0,
+        bonusAtk: p.bonusAtk || 0,
+        bonusDef: p.bonusDef || 0,
+        bonusSpd: p.bonusSpd || 0,
       };
     });
     Campaign.saveToDisk();
@@ -1463,6 +1655,7 @@
     var mission = campaignState.active ? Campaign.getMission() : null;
     var nextBout = state.boutNumber + 1;
     var hSeed = mission ? mission.id * 97 + 42 : (nextBout * 71 + 42);
+    state._mapSeed = hSeed;
     state.height = buildHeightField(hSeed);
     state.terrain = buildTerrainMap(hSeed, mission ? mission.terrain : null);
     state.phase = "deploy";
@@ -1474,6 +1667,9 @@
     refreshDeployUI();
     renderBoard();
     log("Place your fighters on the blue gate tiles.");
+    state.tutorialStep = 10;
+    tutorialTip(10, "Click a blue-highlighted tile at the bottom of the arena to place a fighter. Click a placed fighter to recall them.");
+    tutorialTip(11, "Once all fighters are placed, click \"Enter arena\" to begin the battle.");
   }
 
   function placeEnemies() {
@@ -1554,8 +1750,12 @@
       if (unit.gifted) applyGiftedBoosts(unit);
       var eLvl = mission.enemyLevel || 1;
       unit.level = eLvl;
-      var eLvlHp = levelMaxHpBonus(unit);
-      if (eLvlHp > 0) { unit.maxHp += eLvlHp; unit.hp = unit.maxHp; }
+      if (eLvl > 1) {
+        var egb = computeGrowthBonuses(unit.classId, unit.id, eLvl);
+        unit.bonusHp = egb.hp; unit.bonusAtk = egb.atk;
+        unit.bonusDef = egb.def; unit.bonusSpd = egb.spd;
+        if (egb.hp > 0) { unit.maxHp += egb.hp; unit.hp = unit.maxHp; }
+      }
       state.units.push(unit);
     }
   }
@@ -1564,7 +1764,19 @@
     unit.level = pick.level || 1;
     unit.xp = pick.xp || 0;
     unit.kills = pick.kills || 0;
-    var hpBonus = levelMaxHpBonus(unit);
+    if (pick.bonusHp != null) {
+      unit.bonusHp  = pick.bonusHp  || 0;
+      unit.bonusAtk = pick.bonusAtk || 0;
+      unit.bonusDef = pick.bonusDef || 0;
+      unit.bonusSpd = pick.bonusSpd || 0;
+    } else if (unit.level > 1) {
+      var gb = computeGrowthBonuses(unit.classId, pick.uid || unit.id, unit.level);
+      unit.bonusHp  = gb.hp;
+      unit.bonusAtk = gb.atk;
+      unit.bonusDef = gb.def;
+      unit.bonusSpd = gb.spd;
+    }
+    var hpBonus = unit.bonusHp || 0;
     if (hpBonus > 0) {
       unit.maxHp += hpBonus;
       unit.hp += hpBonus;
@@ -1602,7 +1814,7 @@
       var info = document.createElement("div");
       info.className = "deploy-card__info";
       var nameStr = p.displayName ? p.displayName : def.name;
-      var lvlBadge = (campaignState.active && p.level && p.level > 1) ? ' <span class="level-badge">Lv.' + p.level + '</span>' : '';
+      var lvlBadge = campaignState.active ? ' <span class="level-badge">Lv.' + (p.level || 1) + '</span>' : '';
       info.innerHTML = '<span class="deploy-card__name">' + nameStr + lvlBadge + '</span><span class="deploy-card__class">' + def.name + '</span>';
       li.appendChild(info);
 
@@ -1627,7 +1839,7 @@
       var existing = occupantAt(x, y);
       if (existing && existing.team === "player") {
         var tplIdx = state.deployTemplate.findIndex(
-          (p) => p.placed && p.classId === existing.classId
+          (p) => p.placed && p.uid === existing.uid
         );
         if (tplIdx >= 0) {
           state.deployTemplate[tplIdx].placed = false;
@@ -1639,9 +1851,16 @@
         }
         return;
       }
-      if (!isGateTile(x, y) || existing || isTileImpassableTerrain(x, y)) return;
+      if (!isGateTile(x, y) || existing || isTileImpassableTerrain(x, y)) {
+        if (existing) log("Tile occupied. Click a placed ally to recall them.");
+        else if (!isGateTile(x, y)) log("Select a blue gate tile to place a fighter.");
+        return;
+      }
       const pick = state.deployTemplate[state.deploySelectedIndex];
-      if (!pick || pick.placed) return;
+      if (!pick || pick.placed) {
+        log("Select a fighter from the deploy queue first.");
+        return;
+      }
       var pu = createUnit("player", pick.classId, x, y);
       if (pick.displayName) pu.displayName = pick.displayName;
       if (pick.isFree) pu.isFree = true;
@@ -1861,7 +2080,7 @@
     var candidates = [];
     for (var y = 0; y < BOARD_H; y++) {
       for (var x = 0; x < BOARD_W; x++) {
-        if (!occupantAt(x, y) && !isTileCollapsed(x, y)) candidates.push([x, y]);
+        if (!occupantAt(x, y) && !isTileCollapsed(x, y) && !isTileImpassableTerrain(x, y)) candidates.push([x, y]);
       }
     }
     if (candidates.length < 2) return;
@@ -1936,9 +2155,8 @@
   function startBattle() {
     if (state.deployTemplate.some((p) => !p.placed)) return;
     var mission = campaignState.active ? Campaign.getMission() : null;
-    var hSeed = mission ? mission.id * 97 + 42 : (state.boutNumber * 71 + 42);
+    var hSeed = state._mapSeed;
     state.height = buildHeightField(hSeed);
-    state.terrain = buildTerrainMap(hSeed, mission ? mission.terrain : null);
     state.phase = "battle";
     state.activeUnit = null;
     state.battleMode = "idle";
@@ -1953,6 +2171,7 @@
       campaignState._preBattleCount = state.units.filter(function (u) { return u.team === "player"; }).length;
     }
     initMapModifiers(mission);
+    state.terrain = buildTerrainMap(hSeed, mission ? mission.terrain : null);
     applyCrowdMadnessAtBattleStart();
     showPhasePanels();
     unitCard.classList.add("is-hidden");
@@ -1991,8 +2210,27 @@
   function tickMarkDebuffIfNeeded(u) {
     if (u.markDebuffTurns > 0) {
       u.markDebuffTurns -= 1;
-      if (u.markDebuffTurns <= 0) u.markFocusId = null;
+      if (u.markDebuffTurns <= 0) { u.markFocusId = null; u.dreadMarkDmg = 0; }
     }
+  }
+
+  function clearTurnBuffs(u) {
+    u.tempExtraMove = false;
+    u.rallyCharge = false;
+    u.testudoBonus = 0;
+    u.phalanxBonus = 0;
+    u.blindRushAtk = 0;
+    u.blindRushDef = 0;
+    u.highGroundNext = false;
+    u.battleFocusNext = false;
+    u.atkBonus = 0;
+    u.momentumBonus = 0;
+    u.shadowMendAtkPenalty = 0;
+    if (u.battleHardenedTurns > 0) {
+      u.battleHardenedTurns--;
+      if (u.battleHardenedTurns <= 0) { u.battleHardenedAtk = 0; u.battleHardenedDef = 0; }
+    }
+    if (u.fortressRooted > 0) u.fortressRooted--;
   }
 
   async function tickBattleTurn() {
@@ -2003,6 +2241,7 @@
     if (await checkVictoryAsync()) return;
     const actor = nextActor();
     refreshCtStrip();
+    if (actor) clearTurnBuffs(actor);
     if (!actor) {
       log("Combat over.", "system");
       renderBoard();
@@ -2015,36 +2254,24 @@
       tickBattleTurn();
       return;
     }
-    if (actor.rootedSkip) {
-      actor.rootedSkip--;
-      log(classById(actor.classId).name + " is netted and cannot act!");
-      tickMarkDebuffIfNeeded(actor);
-      renderBoard();
-      await delay(350);
-      tickBattleTurn();
-      return;
-    }
-    actor.tempExtraMove = false;
-    actor.rallyCharge = false;
-    actor.testudoBonus = 0;
-    actor.phalanxBonus = 0;
-    actor.blindRushAtk = 0;
-    actor.blindRushDef = 0;
-    actor.highGroundNext = false;
-    actor.atkBonus = 0;
-    actor.momentumBonus = 0;
-    actor.shadowMendAtkPenalty = 0;
-    if (actor.battleHardenedTurns > 0) {
-      actor.battleHardenedTurns--;
-      if (actor.battleHardenedTurns <= 0) { actor.battleHardenedAtk = 0; actor.battleHardenedDef = 0; }
-    }
-    if (actor.fortressRooted > 0) actor.fortressRooted--;
     if (actor.atkDebuffTurns > 0) actor.atkDebuffTurns--;
     if (actor.atkDebuffTurns <= 0) actor.atkDebuffAmt = 0;
     if (actor.bleedTurns > 0) {
       actor.bleedTurns--;
       applyDamage(actor, 1);
       log(classById(actor.classId).name + " bleeds! (−1 HP)");
+      if (actor.hp <= 0) { await animateDeath(actor); tickBattleTurn(); return; }
+    }
+    if (actor.rootedSkip) {
+      actor.rootedSkip--;
+      log(classById(actor.classId).name + " is netted and cannot act!");
+      var cursedKillP = tickCursedTileDamage(actor);
+      if (cursedKillP) { await animateDeath(actor); tickBattleTurn(); return; }
+      tickMarkDebuffIfNeeded(actor);
+      renderBoard();
+      await delay(350);
+      tickBattleTurn();
+      return;
     }
     state.activeUnit = actor;
     state.battleMode = "idle";
@@ -2058,6 +2285,9 @@
     var turnMsg = "Turn: " + (actor.displayName ? actor.displayName + " the " : "") + classById(actor.classId).name + " — issue orders.";
     log(turnMsg, "system");
     announce(turnMsg + " HP " + actor.hp + " of " + actor.maxHp);
+    if (state.tutorialStep < 20) state.tutorialStep = 20;
+    tutorialTip(20, "It's your turn! Use Move (M) to reposition, Attack (A) to strike adjacent foes, Ability (B) for special skills, or Wait (W) to end your turn.");
+    tutorialTip(21, "Tip: Move first to get next to an enemy, then Attack. You can also use keyboard shortcuts: M, A, B, W.");
   }
 
   // -- Tile info & forecast --
@@ -2120,7 +2350,7 @@
     ucName.textContent = uNameStr;
     ucClass.textContent = def.role;
     ucHp.textContent = u.hp + " / " + u.maxHp;
-    ucAtk.textContent = String(unitAtk(u) + (u.atkBonus || 0));
+    ucAtk.textContent = String(unitAtk(u));
     ucDef.textContent = String(unitDef(u));
     ucSpd.textContent = String(unitSpd(u));
     ucMove.textContent = String(effectiveMove(u));
@@ -2215,6 +2445,7 @@
       setBattleButtons(u);
     }
     renderBoard();
+    tutorialTip(30, "Good move! Now click Attack (A) to strike an adjacent enemy, or use an Ability (B) if one is available.");
   }
 
   function endAction() {
@@ -2237,7 +2468,6 @@
           Campaign.setFlag("endingA_triggered");
           log("Cassius reaches out. Titus lowers his blade.", "system");
           log("The twin bond holds. The ritual shatters.", "system");
-          SFX.victory();
           showResultOverlay("victory");
           return;
         }
@@ -2381,6 +2611,7 @@
       }
       SFX.hit();
       let dmg = physicalDamage(u, tgt, 1);
+      consumeAttackBuffs(u);
       if (tgt.riposteActive) {
         applyDamage(u, 5);
         tgt.riposteActive = false;
@@ -2391,7 +2622,11 @@
       log(
         classById(u.classId).name + " hits " + classById(tgt.classId).name + " for " + dmg + ". (" + hitPct + "% hit)"
       );
-      if (tgt.hp <= 0) await animateDeath(tgt);
+      tutorialTip(40, "Hit! Damage is based on your ATK minus the defender's DEF, with height and buffs as modifiers.");
+      if (tgt.hp <= 0) {
+        await animateDeath(tgt);
+        tutorialTip(50, "Enemy down! Defeat all enemies to win the bout.");
+      }
       state.animating = false;
       if (await checkVictoryAsync()) return;
       endAction();
@@ -2451,6 +2686,7 @@
       state.animating = true;
       try {
         await doPlayerAbility(u, x, y);
+        consumeAttackBuffs(u);
       } finally {
         state.animating = false;
       }
@@ -2480,7 +2716,7 @@
         for (var gd = 0; gd < DIRS.length; gd++) {
           var gx = u.x + DIRS[gd][0], gy = u.y + DIRS[gd][1];
           var gt = occupantAt(gx, gy);
-          if (gt && gt.hp > 0) allAdj.push(gt);
+          if (gt && gt.hp > 0 && gt.team !== u.team) allAdj.push(gt);
         }
         for (var gi = 0; gi < allAdj.length; gi++) {
           applyDamage(allAdj[gi], 4);
@@ -2836,7 +3072,7 @@
       log("Neptune's Favor — healed " + nfHeal + " HP, Move +1.");
 
     } else if (name === "Battle Focus") {
-      u.highGroundNext = true;
+      u.battleFocusNext = true;
       log("Battle Focus — next attack +25% hit chance.");
 
     } else if (name === "Parry") {
@@ -2897,8 +3133,6 @@
       u.battleHardenedTurns = 2;
       u.battleHardenedAtk = 1;
       u.battleHardenedDef = 2;
-      u.testudoBonus += 2;
-      u.atkBonus += 1;
       log("Battle Hardened — +2 DEF, +1 ATK for 2 turns.");
 
     } else if (name === "Intimidating Roar") {
@@ -2939,8 +3173,9 @@
       return;
 
     } else if (name === "Unholy Resilience") {
-      u.testudoBonus += 3;
       u.battleHardenedTurns = 2;
+      u.battleHardenedDef = 3;
+      u.battleHardenedAtk = 0;
       log("Unholy Resilience — +3 DEF for 2 turns.");
 
     } else {
@@ -3117,7 +3352,7 @@
           var adj = occupantAt(ax, ay);
           if (!adj || adj.team === u.team) continue;
           var bx = ax + DIRS[di][0], by = ay + DIRS[di][1];
-          if (inBounds(bx, by) && !occupantAt(bx, by) && !isTileImpassableTerrain(bx, by)) {
+          if (inBounds(bx, by) && !occupantAt(bx, by) && !isTileImpassableTerrain(bx, by) && !isTileCollapsed(bx, by)) {
             await animateMove(adj, [[bx, by]]);
             pushed++;
           }
@@ -3128,7 +3363,7 @@
         var sdy = tgt.y - u.y;
         var snx = tgt.x + sdx;
         var sny = tgt.y + sdy;
-        if (inBounds(snx, sny) && !occupantAt(snx, sny)) {
+        if (inBounds(snx, sny) && !occupantAt(snx, sny) && !isTileImpassableTerrain(snx, sny) && !isTileCollapsed(snx, sny)) {
           await animateMove(tgt, [[snx, sny]]);
           log(ab.name + " — Pushed back!");
         } else {
@@ -3263,6 +3498,9 @@
   async function checkVictoryAsync() {
     const result = checkVictory();
     if (!result) return false;
+    if (result === "victory") {
+      tutorialTip(60, "Victoria! You've completed the practice bout. Surviving fighters carry over to the next mission.");
+    }
     await delay(300);
     showResultOverlay(result);
     return true;
@@ -3290,7 +3528,7 @@
     html += "<p><strong>" + state.turnCount + "</strong> turns fought</p>";
     html += "<p><strong>" + state.totalDamageDealt + "</strong> damage dealt to enemies</p>";
 
-    if (campaignState.active && won && mission) {
+    if (campaignState.active && won && mission && !state.trainingBout) {
       var bonus = mission.victoryBonus;
       if (pAlive === pTotal) bonus += mission.perfectBonus;
       html += '<p style="color:var(--fft-gold);margin-top:0.5rem;">+' + bonus + ' denarii earned</p>';
@@ -3337,7 +3575,7 @@
 
   function closeResultCampaign() {
     if (state.trainingBout) {
-      Campaign.saveSurvivors(state.units, false);
+      Campaign.saveSurvivors(state.units, false, true);
       var tbWon = checkVictory() === "victory";
       if (tbWon) {
         campaignState.denarii += 5;
@@ -3351,6 +3589,16 @@
     var result = state.endingATriggered ? "victory" : checkVictory();
     var won = result === "victory";
     var mission = Campaign.getMission();
+
+    if (!mission) {
+      if (campaignState.endingKey || Campaign.isFinished()) {
+        campaignState.active = false;
+        showTitleScreen();
+      } else {
+        runEndingScene();
+      }
+      return;
+    }
 
     if (won) {
       Campaign.saveSurvivors(state.units, mission.carryHp);
@@ -3404,7 +3652,9 @@
     if (choices.length > 0) {
       var combined = preScene.slice();
       for (var i = 0; i < choices.length; i++) {
-        combined.push({ choice: choices[i] });
+        if (Campaign.checkCondition(choices[i].condition)) {
+          combined.push({ choice: choices[i] });
+        }
       }
       runScene(combined, function () {
         loadMissionIntoLudus();
@@ -3440,6 +3690,10 @@
         level: s.level || 1,
         xp: s.xp || 0,
         kills: s.kills || 0,
+        bonusHp:  s.bonusHp  || 0,
+        bonusAtk: s.bonusAtk || 0,
+        bonusDef: s.bonusDef || 0,
+        bonusSpd: s.bonusSpd || 0,
       };
       if (s.gifted) pick.gifted = true;
       if (s.hp != null) { pick.hp = s.hp; pick.maxHp = s.maxHp; }
@@ -3462,6 +3716,11 @@
       }
     }
 
+    if (state.picks.length > MAX_ROSTER) {
+      log("Roster trimmed to " + MAX_ROSTER + " fighters.", "system");
+      state.picks = state.picks.slice(0, MAX_ROSTER);
+    }
+
     updateCampaignHud();
     showPhasePanels();
 
@@ -3473,6 +3732,10 @@
       refreshRosterUI();
       renderBoard();
       logFeed.innerHTML = "";
+      state.tutorialStep = 0;
+      tutorialTip(0, "Welcome, Lanista! This is the Ludus — your roster screen. Tiro, a free Murmillo, is already hired.");
+      tutorialTip(1, "Spend denarii to hire more fighters from the class list on the left. Each class has different stats and abilities.");
+      tutorialTip(2, "When ready, click \"To the gates\" to deploy your fighters onto the arena.");
     }
   }
 
@@ -3481,6 +3744,7 @@
     var mission = campaignState.active ? Campaign.getMission() : null;
     var nextBout = state.boutNumber + 1;
     var hSeed = mission ? mission.id * 97 + 42 : (nextBout * 71 + 42);
+    state._mapSeed = hSeed;
     state.height = buildHeightField(hSeed);
     state.terrain = buildTerrainMap(hSeed, mission ? mission.terrain : null);
     state.phase = "deploy";
@@ -3495,6 +3759,7 @@
       }
     }
 
+    var placed = 0;
     for (var i = 0; i < state.deployTemplate.length && i < gateTiles.length; i++) {
       var pick = state.deployTemplate[i];
       var t = gateTiles[i];
@@ -3507,6 +3772,13 @@
       if (pick.hp != null) { pu.hp = pick.hp; pu.maxHp = pick.maxHp; }
       state.units.push(pu);
       pick.placed = true;
+      placed++;
+    }
+    if (placed < state.deployTemplate.length) {
+      log("Warning: only " + placed + " of " + state.deployTemplate.length + " fighters could be placed.", "system");
+      for (var r = placed; r < state.deployTemplate.length; r++) {
+        state.deployTemplate[r].placed = true;
+      }
     }
 
     startBattle();
@@ -3584,13 +3856,304 @@
   var sceneQueue = [];
   var sceneCallback = null;
 
+  var _cutsceneUidCounter = 9000;
+
+  function stageCutscene(steps) {
+    var cs = state.cutscene;
+    cs.savedPanX = renderer.panX;
+    cs.savedPanY = renderer.panY;
+    cs.savedZoom = renderer.zoom;
+    cs.actors = [];
+    cs.actorMap = {};
+
+    var speakers = [];
+    var seen = {};
+    for (var i = 0; i < steps.length; i++) {
+      var sp = steps[i].speaker;
+      if (sp && !seen[sp]) {
+        seen[sp] = true;
+        speakers.push(sp);
+      }
+    }
+
+    var midY = Math.floor(BOARD_H / 2);
+    var count = speakers.length;
+    var spacing = Math.max(2, Math.floor((BOARD_W - 2) / Math.max(count, 1)));
+    var startX = Math.max(1, Math.floor((BOARD_W - spacing * (count - 1)) / 2));
+
+    for (var si = 0; si < speakers.length; si++) {
+      var name = speakers[si];
+      var info = SPEAKER_SPRITES[name];
+      if (!info) continue;
+      var gx = Math.min(BOARD_W - 2, startX + si * spacing);
+      var gy = midY;
+      var actor = {
+        classId: info.classId,
+        team: info.team,
+        x: gx,
+        y: gy,
+        hp: 1,
+        maxHp: 1,
+        id: "cine_" + (++_cutsceneUidCounter),
+        uid: "cine_" + _cutsceneUidCounter,
+        isCinematic: true,
+        exhausted: false,
+        ct: 0,
+        spawnEdgeX: (si % 2 === 0) ? -2 : BOARD_W + 1,
+        spawnEdgeY: gy,
+        entered: false,
+      };
+      cs.actors.push(actor);
+      cs.actorMap[name] = actor;
+      state.units.push(actor);
+    }
+
+    cs.active = true;
+    cs.letterbox = 0;
+    cs.bubbleText = "";
+    cs.bubbleRevealed = 0;
+    cs.currentSpeaker = null;
+    cs.bubbleUnit = null;
+    cs.targetZoom = 1.3;
+  }
+
+  function teardownCutscene() {
+    var cs = state.cutscene;
+    for (var i = state.units.length - 1; i >= 0; i--) {
+      if (state.units[i].isCinematic) state.units.splice(i, 1);
+    }
+    cs.actors = [];
+    cs.actorMap = {};
+    cs.active = false;
+    cs.currentSpeaker = null;
+    cs.bubbleText = "";
+    cs.bubbleRevealed = 0;
+    cs.bubbleUnit = null;
+    cs.targetPanX = 0;
+    cs.targetPanY = 0;
+    cs.targetZoom = 1.3;
+    cs.letterbox = 0;
+    cs.awaitingEntry = false;
+    renderer.panX = cs.savedPanX;
+    renderer.panY = cs.savedPanY;
+    renderer.zoom = cs.savedZoom;
+    if (cs.rafId) {
+      cancelAnimationFrame(cs.rafId);
+      cs.rafId = null;
+    }
+  }
+
+  function _walkInActor(actor) {
+    if (actor.entered) return Promise.resolve();
+    actor.entered = true;
+    var targetX = actor.x;
+    var targetY = actor.y;
+    actor.x = actor.spawnEdgeX;
+    actor.y = actor.spawnEdgeY;
+
+    var path = [];
+    var dx = targetX > actor.x ? 1 : -1;
+    var cx = actor.x;
+    while (cx !== targetX) {
+      cx += dx;
+      path.push([cx, actor.y]);
+    }
+    if (actor.y !== targetY) {
+      var dy = targetY > actor.y ? 1 : -1;
+      var cy = actor.y;
+      while (cy !== targetY) {
+        cy += dy;
+        path.push([targetX, cy]);
+      }
+    }
+    if (path.length === 0) {
+      actor.x = targetX;
+      actor.y = targetY;
+      return Promise.resolve();
+    }
+
+    var walkRaf = null;
+    function walkRender() {
+      if (!state.cutscene.active) return;
+      renderBoard();
+      walkRaf = requestAnimationFrame(walkRender);
+    }
+    walkRaf = requestAnimationFrame(walkRender);
+
+    return animateMove(actor, path).then(function () {
+      if (walkRaf) cancelAnimationFrame(walkRaf);
+    });
+  }
+
+  function _fadeOutCutsceneActors(onDone) {
+    var cs = state.cutscene;
+    var actors = cs.actors;
+    if (actors.length === 0) { onDone(); return; }
+
+    var startTime = null;
+    var dur = 600;
+    function tick(ts) {
+      if (!startTime) startTime = ts;
+      var t = Math.min(1, (ts - startTime) / dur);
+      for (var i = 0; i < actors.length; i++) {
+        actors[i]._deathAnim = 1 - t;
+      }
+      cs.letterbox = 1 - t;
+      renderBoard();
+      if (t >= 1) {
+        onDone();
+      } else {
+        requestAnimationFrame(tick);
+      }
+    }
+    if (cs.rafId) { cancelAnimationFrame(cs.rafId); cs.rafId = null; }
+    requestAnimationFrame(tick);
+  }
+
+  function tickCutscene() {
+    var cs = state.cutscene;
+    if (!cs.active) return;
+
+    if (cs.letterbox < 1) {
+      cs.letterbox = Math.min(1, cs.letterbox + 0.04);
+    }
+
+    if (cs.bubbleText && cs.bubbleRevealed < cs.bubbleText.length) {
+      cs.bubbleRevealed = Math.min(cs.bubbleText.length, cs.bubbleRevealed + 2);
+    }
+
+    if (cs.bubbleUnit) {
+      var dpr = window.devicePixelRatio || 1;
+      var cw = renderer.canvas.width / dpr;
+      var ch = renderer.canvas.height / dpr;
+      var bup = renderer.tileToScreen(cs.bubbleUnit.x, cs.bubbleUnit.y,
+        state.height[cs.bubbleUnit.y] ? state.height[cs.bubbleUnit.y][cs.bubbleUnit.x] || 0 : 0);
+      cs.targetPanX = -(bup.x - cw / 2);
+      cs.targetPanY = -(bup.y - ch / 2) + 30;
+    } else {
+      cs.targetPanX = 0;
+      cs.targetPanY = 0;
+    }
+
+    renderer.panX += (cs.targetPanX - renderer.panX) * 0.08;
+    renderer.panY += (cs.targetPanY - renderer.panY) * 0.08;
+    renderer.zoom += (cs.targetZoom - renderer.zoom) * 0.06;
+
+    renderBoard();
+
+    cs.rafId = requestAnimationFrame(tickCutscene);
+  }
+
   function runScene(steps, onComplete) {
     sceneQueue = steps.slice();
     sceneCallback = onComplete || null;
+
+    if (renderer && steps.length > 0) {
+      stageCutscene(steps);
+      showNextSceneStep();
+      return;
+    }
     showNextSceneStep();
   }
 
   function showNextSceneStep() {
+    var cs = state.cutscene;
+
+    if (!cs.active) {
+      _showNextSceneStepDOM();
+      return;
+    }
+
+    var advanceEl = $("#cutsceneAdvance");
+    var choicesEl = $("#cutsceneChoices");
+
+    if (sceneQueue.length === 0) {
+      if (advanceEl) advanceEl.classList.add("is-hidden");
+      if (choicesEl) choicesEl.classList.add("is-hidden");
+      _fadeOutCutsceneActors(function () {
+        teardownCutscene();
+        renderBoard();
+        if (sceneCallback) {
+          var cb = sceneCallback;
+          sceneCallback = null;
+          cb();
+        }
+      });
+      return;
+    }
+
+    var step = sceneQueue.shift();
+
+    if (step.choice) {
+      cs.bubbleText = step.choice.prompt || "";
+      cs.bubbleRevealed = cs.bubbleText.length;
+      cs.bubbleStyle = "narration";
+      cs.bubbleUnit = null;
+      cs.currentSpeaker = null;
+
+      if (advanceEl) advanceEl.classList.add("is-hidden");
+      if (choicesEl) { choicesEl.classList.remove("is-hidden"); choicesEl.innerHTML = ""; }
+      var _focusFirst = true;
+      for (var i = 0; i < step.choice.options.length; i++) {
+        (function (opt) {
+          var btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "btn btn--ghost";
+          btn.textContent = opt.label;
+          btn.addEventListener("click", function () {
+            if (opt.flag === "scaeva_allied" && campaignState.totalDeaths > 2) {
+              sceneQueue.unshift({
+                speaker: "SCAEVA",
+                text: "You have lost too many. I cannot risk my people on a losing cause.",
+              });
+            } else if (opt.flag) {
+              Campaign.setFlag(opt.flag);
+            }
+            if (choicesEl) choicesEl.classList.add("is-hidden");
+            if (advanceEl) advanceEl.classList.remove("is-hidden");
+            showNextSceneStep();
+          });
+          if (choicesEl) choicesEl.appendChild(btn);
+          if (_focusFirst) { setTimeout(function() { btn.focus(); }, 100); _focusFirst = false; }
+        })(step.choice.options[i]);
+      }
+      if (!cs.rafId) cs.rafId = requestAnimationFrame(tickCutscene);
+      return;
+    }
+
+    var speaker = step.speaker || null;
+    var actor = speaker ? cs.actorMap[speaker] : null;
+
+    cs.currentSpeaker = speaker;
+    cs.bubbleText = "";
+    cs.bubbleRevealed = 0;
+    cs.bubbleStyle = step.style || ((speaker && actor) ? "dialogue" : "narration");
+    cs.bubbleUnit = actor;
+
+    if (choicesEl) choicesEl.classList.add("is-hidden");
+    if (advanceEl) advanceEl.classList.remove("is-hidden");
+
+    var textToShow = step.text || "";
+
+    function startTypewriter() {
+      if (!state.cutscene.active) return;
+      cs.awaitingEntry = false;
+      cs.bubbleText = textToShow;
+      cs.bubbleRevealed = 0;
+      if (!cs.rafId) {
+        cs.rafId = requestAnimationFrame(tickCutscene);
+      }
+    }
+
+    if (actor && !actor.entered) {
+      cs.awaitingEntry = true;
+      _walkInActor(actor).then(startTypewriter);
+    } else {
+      startTypewriter();
+    }
+  }
+
+  function _showNextSceneStepDOM() {
     var sceneOverlay = $("#sceneOverlay");
     var sceneSpeaker = $("#sceneSpeaker");
     var sceneText = $("#sceneText");
@@ -3635,7 +4198,7 @@
             }
             sceneChoices.classList.add("is-hidden");
             btnNext.classList.remove("is-hidden");
-            showNextSceneStep();
+            _showNextSceneStepDOM();
           });
           sceneChoices.appendChild(btn);
           if (_focusFirst) { setTimeout(function() { btn.focus(); }, 100); _focusFirst = false; }
@@ -3688,7 +4251,9 @@
 
     var combined = preScene.slice();
     for (var i = 0; i < choices.length; i++) {
-      combined.push({ choice: choices[i] });
+      if (Campaign.checkCondition(choices[i].condition)) {
+        combined.push({ choice: choices[i] });
+      }
     }
 
     if (combined.length > 0) {
@@ -3758,16 +4323,6 @@
     const players = state.units.filter((u) => u.team === "player" && u.hp > 0);
     if (!players.length) return;
     const eDef = classById(enemy.classId);
-    enemy.testudoBonus = 0;
-    enemy.tempExtraMove = false;
-    enemy.rallyCharge = false;
-    enemy.phalanxBonus = 0;
-    enemy.blindRushAtk = 0;
-    enemy.blindRushDef = 0;
-    enemy.highGroundNext = false;
-    enemy.atkBonus = 0;
-    enemy.momentumBonus = 0;
-    enemy.shadowMendAtkPenalty = 0;
     if (enemy.atkDebuffTurns > 0) enemy.atkDebuffTurns--;
     if (enemy.atkDebuffTurns <= 0) enemy.atkDebuffAmt = 0;
     if (enemy.bleedTurns > 0) {
@@ -3775,6 +4330,16 @@
       applyDamage(enemy, 1);
       log(eDef.name + " bleeds! (−1 HP)");
       if (enemy.hp <= 0) { await animateDeath(enemy); return; }
+    }
+
+    if (enemy.rootedSkip > 0) {
+      enemy.rootedSkip--;
+      log(eDef.name + " is rooted and cannot act!");
+      var cursedKillRoot = tickCursedTileDamage(enemy);
+      if (cursedKillRoot) await animateDeath(enemy);
+      tickMarkDebuffIfNeeded(enemy);
+      renderBoard();
+      return;
     }
 
     if (enemy.boss && enemy.displayName === "Titus") {
@@ -3838,6 +4403,7 @@
       }
     }
 
+    consumeAttackBuffs(enemy);
     var cursedKill = tickCursedTileDamage(enemy);
     if (cursedKill) await animateDeath(enemy);
     tickMarkDebuffIfNeeded(enemy);
@@ -3847,7 +4413,8 @@
   async function aiTryPreMoveAbility(enemy, eDef, players, target) {
     var hpPct = enemy.hp / enemy.maxHp;
     for (const ab of unitAbilities(enemy)) {
-      if (ab.type === "heal" && ab.target === "self" && hpPct < 0.5) {
+      var _namedHeals = ["Iron Will", "Shadow Mend", "Guardian Aura", "Champion's Resolve"];
+      if (ab.type === "heal" && ab.target === "self" && hpPct < 0.5 && _namedHeals.indexOf(ab.name) === -1) {
         SFX.ability();
         var heal = Math.round(enemy.maxHp * 0.2);
         enemy.hp = Math.min(enemy.maxHp, enemy.hp + heal);
@@ -3864,7 +4431,7 @@
         }
         if (ab.name === "Cetus Wall" && Math.random() < 0.4) {
           SFX.ability();
-          enemy.braceCharges += 1;
+          enemy.braceCharges = 1;
           log(eDef.name + " braces with Cetus Wall.");
           return true;
         }
@@ -3916,7 +4483,7 @@
           for (var pwy = 0; pwy < BOARD_H; pwy++) {
             for (var pwx = 0; pwx < BOARD_W; pwx++) {
               if (manhattan(enemy, {x: pwx, y: pwy}) <= 3 && manhattan(enemy, {x: pwx, y: pwy}) > 0
-                  && !occupantAt(pwx, pwy) && inBounds(pwx, pwy) && !isTileCollapsed(pwx, pwy)) {
+                  && !occupantAt(pwx, pwy) && inBounds(pwx, pwy) && !isTileCollapsed(pwx, pwy) && !isTileImpassableTerrain(pwx, pwy)) {
                 var pd = manhattan({x: pwx, y: pwy}, target);
                 if (pd < bestDist) { bestDist = pd; bestTile = [pwx, pwy]; }
               }
@@ -3934,7 +4501,7 @@
           for (var ssy = 0; ssy < BOARD_H; ssy++) {
             for (var ssx = 0; ssx < BOARD_W; ssx++) {
               if (manhattan(enemy, {x: ssx, y: ssy}) <= 2 && manhattan(enemy, {x: ssx, y: ssy}) > 0
-                  && !occupantAt(ssx, ssy) && inBounds(ssx, ssy) && !isTileCollapsed(ssx, ssy)) {
+                  && !occupantAt(ssx, ssy) && inBounds(ssx, ssy) && !isTileCollapsed(ssx, ssy) && !isTileImpassableTerrain(ssx, ssy)) {
                 var sd = manhattan({x: ssx, y: ssy}, target);
                 if (sd < bsd) { bsd = sd; bst = [ssx, ssy]; }
               }
@@ -3955,7 +4522,7 @@
         }
         if (ab.name === "Battle Focus" && Math.random() < 0.35) {
           SFX.ability();
-          enemy.highGroundNext = true;
+          enemy.battleFocusNext = true;
           log(eDef.name + " uses Battle Focus (+25% accuracy).");
           return false;
         }
@@ -3973,7 +4540,9 @@
         }
         if (ab.name === "Unholy Resilience" && Math.random() < 0.3 && hpPct < 0.5) {
           SFX.ability();
-          enemy.testudoBonus += 3;
+          enemy.battleHardenedTurns = 2;
+          enemy.battleHardenedDef = 3;
+          enemy.battleHardenedAtk = 0;
           log(eDef.name + " uses Unholy Resilience (+3 DEF).");
           return true;
         }
@@ -4027,8 +4596,9 @@
       }
       if (ab.name === "Battle Hardened" && Math.random() < 0.3) {
         SFX.ability();
-        enemy.testudoBonus += 2;
-        enemy.atkBonus += 1;
+        enemy.battleHardenedTurns = 2;
+        enemy.battleHardenedAtk = 1;
+        enemy.battleHardenedDef = 2;
         log(eDef.name + " uses Battle Hardened (+2 DEF, +1 ATK).");
         return true;
       }
@@ -4089,7 +4659,7 @@
         for (var gdi = 0; gdi < DIRS.length; gdi++) {
           var ggx = enemy.x + DIRS[gdi][0], ggy = enemy.y + DIRS[gdi][1];
           var ggt = occupantAt(ggx, ggy);
-          if (ggt && ggt.hp > 0) allAdj.push(ggt);
+          if (ggt && ggt.hp > 0 && ggt.team !== enemy.team) allAdj.push(ggt);
         }
         for (var ggi = 0; ggi < allAdj.length; ggi++) {
           applyDamage(allAdj[ggi], 4);
@@ -4154,7 +4724,7 @@
             const pdy = adjTarget.y - enemy.y;
             const pnx = adjTarget.x + pdx;
             const pny = adjTarget.y + pdy;
-            if (inBounds(pnx, pny) && !occupantAt(pnx, pny) && !isTileImpassableTerrain(pnx, pny)) {
+            if (inBounds(pnx, pny) && !occupantAt(pnx, pny) && !isTileImpassableTerrain(pnx, pny) && !isTileCollapsed(pnx, pny)) {
               await animateMove(adjTarget, [[pnx, pny]]);
             }
             if (adjTarget.hp <= 0) await animateDeath(adjTarget);
@@ -4176,7 +4746,7 @@
             var adj = occupantAt(ax, ay);
             if (!adj || adj.team === enemy.team) continue;
             var bx = ax + DIRS[di][0], by = ay + DIRS[di][1];
-            if (inBounds(bx, by) && !occupantAt(bx, by) && !isTileImpassableTerrain(bx, by)) {
+            if (inBounds(bx, by) && !occupantAt(bx, by) && !isTileImpassableTerrain(bx, by) && !isTileCollapsed(bx, by)) {
               await animateMove(adj, [[bx, by]]);
               pushed++;
             }
@@ -4189,7 +4759,7 @@
           var sdy = adjTarget.y - enemy.y;
           var snx = adjTarget.x + sdx;
           var sny = adjTarget.y + sdy;
-          if (inBounds(snx, sny) && !occupantAt(snx, sny)) {
+          if (inBounds(snx, sny) && !occupantAt(snx, sny) && !isTileImpassableTerrain(snx, sny) && !isTileCollapsed(snx, sny)) {
             await animateMove(adjTarget, [[snx, sny]]);
             log(eDef.name + " shoves " + classById(adjTarget.classId).name + "!");
             return true;
@@ -4258,7 +4828,8 @@
           const dmg = physicalDamage(enemy, adjTarget, ab.mult || 1);
           if (adjTarget.riposteActive) { applyDamage(enemy, 5); adjTarget.riposteActive = false; }
           applyDamage(adjTarget, dmg);
-          var stolen = ab.steal || Math.round(dmg * 0.25);
+          var stealAmt = ab.steal || 0.25;
+          var stolen = (typeof stealAmt === "number" && stealAmt < 1) ? Math.round(dmg * stealAmt) : stealAmt;
           enemy.hp = Math.min(enemy.maxHp, enemy.hp + stolen);
           spawnDmgNumber(enemy, "+" + stolen, "#80ff80");
           await Promise.all([animateHitFlash(adjTarget), screenShake(80, 2)]);
@@ -4413,23 +4984,28 @@
             await animateAttack(enemy, occ);
             if (rollHit(enemy, occ)) {
               SFX.hit();
-              const dmg = physicalDamage(enemy, occ, ab.mult || 1, ab.ignoreDefPct || 0);
+              var dmg;
+              if (ab.effect === "suppress") {
+                dmg = 3;
+              } else {
+                dmg = physicalDamage(enemy, occ, ab.mult || 1, ab.ignoreDefPct || 0);
+              }
               if (occ.riposteActive && s === 1) { applyDamage(enemy, 5); occ.riposteActive = false; }
               applyDamage(occ, dmg);
               await Promise.all([animateHitFlash(occ), screenShake(80, 2)]);
               log(eDef.name + " uses " + ab.name + " on " + classById(occ.classId).name + " (" + dmg + ").");
               if (enemy.gifted && enemy.classId === "hoplomachus" && occ.hp > 0) {
                 var ppx = occ.x + dx, ppy = occ.y + dy;
-                if (inBounds(ppx, ppy) && !occupantAt(ppx, ppy)) {
+                if (inBounds(ppx, ppy) && !occupantAt(ppx, ppy) && !isTileImpassableTerrain(ppx, ppy) && !isTileCollapsed(ppx, ppy)) {
                   await animateMove(occ, [[ppx, ppy]]);
                   log("Tremor Thrust pushes back!");
                 }
               }
               if (ab.effect === "charge") {
                 var chX = occ.x - dx, chY = occ.y - dy;
-                if (occ.hp > 0 && inBounds(chX, chY) && !occupantAt(chX, chY) && !isTileCollapsed(chX, chY)) {
+                if (occ.hp > 0 && inBounds(chX, chY) && !occupantAt(chX, chY) && !isTileCollapsed(chX, chY) && !isTileImpassableTerrain(chX, chY)) {
                   enemy.x = chX; enemy.y = chY;
-                } else if (occ.hp <= 0 && inBounds(occ.x, occ.y) && !isTileCollapsed(occ.x, occ.y)) {
+                } else if (occ.hp <= 0 && inBounds(occ.x, occ.y) && !isTileCollapsed(occ.x, occ.y) && !isTileImpassableTerrain(occ.x, occ.y)) {
                   enemy.x = occ.x; enemy.y = occ.y;
                 }
               }
@@ -4526,6 +5102,7 @@
     // Zoom via scroll wheel
     isoCanvas.addEventListener("wheel", function (e) {
       e.preventDefault();
+      if (state.cutscene.active) return;
       var delta = e.deltaY > 0 ? -0.1 : 0.1;
       renderer.setZoom(renderer.zoom + delta);
       renderBoard();
@@ -4533,13 +5110,31 @@
 
     window.addEventListener("keydown", function (e) {
       if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+      if (state.cutscene.active) {
+        if (e.key === " " || e.key === "Enter") {
+          e.preventDefault();
+          var cs = state.cutscene;
+          if (cs.awaitingEntry) return;
+          var choicesVis = $("#cutsceneChoices");
+          if (choicesVis && !choicesVis.classList.contains("is-hidden")) return;
+          if (cs.bubbleRevealed < cs.bubbleText.length) {
+            cs.bubbleRevealed = cs.bubbleText.length;
+          } else {
+            showNextSceneStep();
+          }
+        }
+        return;
+      }
       var key = e.key.toLowerCase();
 
-      // Camera rotation
+      // Camera controls
       if (key === "q") { renderer.rotate(-1); renderBoard(); return; }
       if (key === "e") { renderer.rotate(1); renderBoard(); return; }
+      if (key === "=" || key === "+") { renderer.setZoom(renderer.zoom + 0.15); renderBoard(); return; }
+      if (key === "-" || key === "_") { renderer.setZoom(renderer.zoom - 0.15); renderBoard(); return; }
+      if (key === "r" || key === "home") { renderer.zoom = 1.0; renderer.panX = 0; renderer.panY = 0; renderer._recalcLayout(); renderBoard(); return; }
 
-      // Battle shortcuts (M)ove, (A)ttack, a(B)ility, (W)ait, E(sc)ape to cancel
+      // Battle shortcuts — (A)ttack, a(B)ility, (W)ait, E(sc)ape to cancel
       if (state.phase === "battle" && state.activeUnit && state.activeUnit.team === "player") {
         if (key === "m" && !btnMove.disabled) { btnMove.click(); return; }
         if (key === "a" && !btnAttack.disabled) { btnAttack.click(); return; }
@@ -4553,10 +5148,13 @@
           if (idx < btns.length) { btns[idx].click(); return; }
         }
       }
+
+      if (key === "m") { btnMute.click(); return; }
     });
 
     // Pan via middle-mouse or right-click drag
     isoCanvas.addEventListener("mousedown", function (e) {
+      if (state.cutscene.active) return;
       if (e.button === 1 || e.button === 2) {
         e.preventDefault();
         renderer._isPanning = true;
@@ -4579,18 +5177,74 @@
     });
     isoCanvas.addEventListener("contextmenu", function (e) { e.preventDefault(); });
 
+    // Touch support: tap = click, drag = pan, pinch = zoom
+    var _touch = { startX: 0, startY: 0, panOX: 0, panOY: 0, moved: false, pinchDist: 0, pinchZoom: 1 };
+    function _touchDist(t) {
+      var dx = t[0].clientX - t[1].clientX;
+      var dy = t[0].clientY - t[1].clientY;
+      return Math.sqrt(dx * dx + dy * dy);
+    }
+    isoCanvas.addEventListener("touchstart", function (e) {
+      if (e.touches.length === 1) {
+        _touch.startX = e.touches[0].clientX;
+        _touch.startY = e.touches[0].clientY;
+        _touch.panOX = renderer.panX;
+        _touch.panOY = renderer.panY;
+        _touch.moved = false;
+      } else if (e.touches.length === 2) {
+        _touch.pinchDist = _touchDist(e.touches);
+        _touch.pinchZoom = renderer.zoom;
+      }
+    }, { passive: true });
+    isoCanvas.addEventListener("touchmove", function (e) {
+      e.preventDefault();
+      if (state.cutscene.active) return;
+      if (e.touches.length === 1) {
+        var dx = _touch.startX - e.touches[0].clientX;
+        var dy = _touch.startY - e.touches[0].clientY;
+        if (Math.abs(dx) > 4 || Math.abs(dy) > 4) _touch.moved = true;
+        if (_touch.moved) {
+          renderer.panX = _touch.panOX + dx / renderer.zoom;
+          renderer.panY = _touch.panOY + dy / renderer.zoom;
+          renderBoard();
+        }
+      } else if (e.touches.length === 2) {
+        var dist = _touchDist(e.touches);
+        if (_touch.pinchDist > 0) {
+          renderer.setZoom(_touch.pinchZoom * (dist / _touch.pinchDist));
+          renderBoard();
+        }
+      }
+    }, { passive: false });
+    isoCanvas.addEventListener("touchend", function (e) {
+      if (e.changedTouches.length === 1 && !_touch.moved && e.touches.length === 0) {
+        var rect = isoCanvas.getBoundingClientRect();
+        var mx = _touch.startX - rect.left;
+        var my = _touch.startY - rect.top;
+        var cell = renderer.screenToGrid(mx, my);
+        if (cell) onTileClick(cell.col, cell.row);
+      }
+    }, { passive: true });
+
     // Camera control buttons
-    btnRotL.addEventListener("click", function () { renderer.rotate(-1); renderBoard(); });
-    btnRotR.addEventListener("click", function () { renderer.rotate(1); renderBoard(); });
-    btnZoomIn.addEventListener("click", function () { renderer.setZoom(renderer.zoom + 0.15); renderBoard(); });
-    btnZoomOut.addEventListener("click", function () { renderer.setZoom(renderer.zoom - 0.15); renderBoard(); });
+    btnRotL.addEventListener("click", function () { if (state.cutscene.active) return; renderer.rotate(-1); renderBoard(); });
+    btnRotR.addEventListener("click", function () { if (state.cutscene.active) return; renderer.rotate(1); renderBoard(); });
+    btnZoomIn.addEventListener("click", function () { if (state.cutscene.active) return; renderer.setZoom(renderer.zoom + 0.15); renderBoard(); });
+    btnZoomOut.addEventListener("click", function () { if (state.cutscene.active) return; renderer.setZoom(renderer.zoom - 0.15); renderBoard(); });
     btnCamReset.addEventListener("click", function () {
+      if (state.cutscene.active) return;
       renderer.zoom = 1.0;
       renderer.panX = 0;
       renderer.panY = 0;
       renderer.rotStep = 0;
       renderer._recalcLayout();
       renderBoard();
+    });
+
+    btnMute.addEventListener("click", function () {
+      var muted = SFX.mute();
+      btnMute.innerHTML = (muted ? "🔇" : "♪") + "<kbd>M</kbd>";
+      btnMute.setAttribute("aria-label", muted ? "Unmute (M)" : "Mute (M)");
     });
 
     window.addEventListener("resize", function () {
@@ -4601,6 +5255,10 @@
     btnClearRoster.addEventListener("click", () => {
       state.picks = [];
       refreshRosterUI();
+      if (campaignState.active) {
+        campaignState.survivingRoster = [];
+        Campaign.saveToDisk();
+      }
     });
     btnToDeploy.addEventListener("click", startDeploy);
     btnTrainingBout.addEventListener("click", startTrainingBout);
@@ -4624,7 +5282,31 @@
 
     var btnSceneNext = $("#btnSceneNext");
     if (btnSceneNext) {
-      btnSceneNext.addEventListener("click", showNextSceneStep);
+      btnSceneNext.addEventListener("click", function () {
+        if (state.cutscene.active) return;
+        _showNextSceneStepDOM();
+      });
+    }
+
+    var cutsceneAdv = $("#cutsceneAdvance");
+    if (cutsceneAdv) {
+      function onCutsceneAdvance(e) {
+        e.preventDefault();
+        var cs = state.cutscene;
+        if (!cs.active) return;
+        if (cs.awaitingEntry) return;
+        var choicesVis = $("#cutsceneChoices");
+        if (choicesVis && !choicesVis.classList.contains("is-hidden")) return;
+        if (cs.bubbleRevealed < cs.bubbleText.length) {
+          cs.bubbleRevealed = cs.bubbleText.length;
+        } else {
+          showNextSceneStep();
+        }
+      }
+      cutsceneAdv.addEventListener("click", onCutsceneAdvance);
+      cutsceneAdv.addEventListener("keydown", function (e) {
+        if (e.key === "Enter" || e.key === " ") onCutsceneAdvance(e);
+      });
     }
 
     var btnNewCampaign = $("#btnNewCampaign");

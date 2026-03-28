@@ -65,6 +65,70 @@ var TEAM_PAL = {
     gold_dark: "#787020",
     accent: "#607060",
   },
+  npc_cassius: {
+    main: "#7a6848", main_mid: "#5c4e38", light: "#b8a878", dark: "#3c3020",
+    iron: "#a8a098", iron_dark: "#787068", iron_hi: "#c8c0b8",
+    skin: "#e0b890", skin_shade: "#c49870", skin_hi: "#f0d0b0",
+    leather: "#6b4c38", leather_hi: "#907058", leather_dark: "#3c2818",
+    hair: "#5c4028", cloth: "#8a7858", gold: "#c8a838", gold_dark: "#886820",
+    accent: "#d0a840",
+  },
+  npc_livia: {
+    main: "#6858a0", main_mid: "#504078", light: "#a898d0", dark: "#302048",
+    iron: "#c0b8d0", iron_dark: "#908898", iron_hi: "#d8d0e8",
+    skin: "#f0d0b0", skin_shade: "#d0b090", skin_hi: "#fff0e0",
+    leather: "#584050", leather_hi: "#786070", leather_dark: "#382030",
+    hair: "#282028", cloth: "#7868b0", gold: "#d0b850", gold_dark: "#907830",
+    accent: "#8878c0",
+  },
+  npc_lurco: {
+    main: "#584038", main_mid: "#402820", light: "#886858", dark: "#281810",
+    iron: "#a09088", iron_dark: "#706058", iron_hi: "#c0b0a8",
+    skin: "#d8a878", skin_shade: "#b88858", skin_hi: "#f0c898",
+    leather: "#483020", leather_hi: "#685040", leather_dark: "#201008",
+    hair: "#382018", cloth: "#685040", gold: "#e0b830", gold_dark: "#a07820",
+    accent: "#c08830",
+  },
+  npc_official: {
+    main: "#384050", main_mid: "#283040", light: "#607080", dark: "#182028",
+    iron: "#909898", iron_dark: "#687078", iron_hi: "#b0b8c0",
+    skin: "#d8b088", skin_shade: "#b89068", skin_hi: "#f0d0a8",
+    leather: "#403830", leather_hi: "#605848", leather_dark: "#201810",
+    hair: "#383030", cloth: "#485060", gold: "#b0a040", gold_dark: "#787028",
+    accent: "#506878",
+  },
+  npc_nero: {
+    main: "#682878", main_mid: "#481858", light: "#a058b8", dark: "#280838",
+    iron: "#d8c8e0", iron_dark: "#a898b0", iron_hi: "#f0e8f8",
+    skin: "#e8c8a0", skin_shade: "#c8a880", skin_hi: "#f8e0c0",
+    leather: "#503848", leather_hi: "#705868", leather_dark: "#301828",
+    hair: "#d8b040", cloth: "#7838a0", gold: "#f0d040", gold_dark: "#b89020",
+    accent: "#9848c0",
+  },
+  npc_aemilia: {
+    main: "#e0d8c8", main_mid: "#c0b8a8", light: "#f0e8e0", dark: "#a09888",
+    iron: "#d0c8c0", iron_dark: "#a8a098", iron_hi: "#e8e0d8",
+    skin: "#e8c8a8", skin_shade: "#c8a888", skin_hi: "#f8e0c8",
+    leather: "#887868", leather_hi: "#a89888", leather_dark: "#685848",
+    hair: "#f0e0c0", cloth: "#e8e0d0", gold: "#d8c060", gold_dark: "#a08838",
+    accent: "#c8b898",
+  },
+  npc_varro: {
+    main: "#5a6048", main_mid: "#404838", light: "#808870", dark: "#283020",
+    iron: "#989890", iron_dark: "#707068", iron_hi: "#b8b8b0",
+    skin: "#d8b890", skin_shade: "#b89870", skin_hi: "#f0d0b0",
+    leather: "#584830", leather_hi: "#786848", leather_dark: "#302818",
+    hair: "#584838", cloth: "#687058", gold: "#b8a040", gold_dark: "#807028",
+    accent: "#708060",
+  },
+  npc_dis_pater: {
+    main: "#181820", main_mid: "#101018", light: "#383848", dark: "#080810",
+    iron: "#484858", iron_dark: "#282838", iron_hi: "#686878",
+    skin: "#404050", skin_shade: "#303040", skin_hi: "#505060",
+    leather: "#202028", leather_hi: "#303038", leather_dark: "#101018",
+    hair: "#101018", cloth: "#202030", gold: "#584880", gold_dark: "#382858",
+    accent: "#7050b0",
+  },
 };
 
 /**
@@ -1012,5 +1076,425 @@ var SPRITE_RECTS = {
     [33, 57, 10, 2, "dark"],
     [21, 58, 8, 1, "iron_dark"],
     [34, 58, 8, 1, "iron_dark"],
+  ],
+
+  /* ══════ NPC: Cassius ══════ lanista — light tunic, short cape, determined */
+  cassius: [
+    // cape
+    [16, 22, 6, 18, "accent"],
+    [14, 24, 3, 14, "gold_dark"],
+    [15, 23, 2, 16, "gold"],
+    // head
+    [24, 2, 14, 2, "hair"],
+    [23, 3, 16, 2, "hair"],
+    [22, 5, 18, 5, "skin"],
+    [22, 5, 1, 5, "skin_shade"],
+    [39, 5, 1, 5, "skin_shade"],
+    [23, 5, 16, 1, "skin_hi"],
+    [25, 1, 12, 2, "hair"],
+    [26, 0, 10, 2, "hair"],
+    // eyes
+    [25, 8, 4, 2, "white"],
+    [34, 8, 4, 2, "white"],
+    [27, 8, 2, 2, "accent"],
+    [36, 8, 2, 2, "accent"],
+    [27, 9, 1, 1, "black"],
+    [36, 9, 1, 1, "black"],
+    // mouth
+    [30, 12, 2, 1, "skin_shade"],
+    // neck
+    [28, 14, 6, 2, "skin"],
+    // torso — tunic
+    [22, 16, 18, 18, "cloth"],
+    [22, 16, 18, 1, "light"],
+    [22, 16, 1, 18, "main_mid"],
+    [39, 16, 1, 18, "main_mid"],
+    [28, 18, 6, 2, "gold"],
+    [28, 18, 6, 1, "gold_dark"],
+    // belt
+    [22, 32, 18, 2, "leather"],
+    [22, 32, 18, 1, "leather_hi"],
+    [30, 32, 2, 2, "gold"],
+    // arms
+    [17, 18, 5, 12, "skin"],
+    [17, 18, 1, 12, "skin_shade"],
+    [40, 18, 5, 12, "skin"],
+    [44, 18, 1, 12, "skin_shade"],
+    [17, 16, 5, 3, "cloth"],
+    [40, 16, 5, 3, "cloth"],
+    // legs
+    [22, 34, 8, 14, "cloth"],
+    [32, 34, 8, 14, "cloth"],
+    [22, 34, 1, 14, "main_mid"],
+    [29, 34, 2, 14, "main_mid"],
+    [39, 34, 1, 14, "main_mid"],
+    // sandals
+    [22, 56, 8, 2, "leather_dark"],
+    [32, 56, 8, 2, "leather_dark"],
+    [22, 56, 8, 1, "leather"],
+    [32, 56, 8, 1, "leather"],
+  ],
+
+  /* ══════ NPC: Livia ══════ senator's wife — stola, palla, elegant */
+  livia: [
+    // hair
+    [24, 0, 14, 4, "hair"],
+    [23, 2, 16, 3, "hair"],
+    // head
+    [22, 5, 18, 5, "skin"],
+    [22, 5, 1, 5, "skin_shade"],
+    [39, 5, 1, 5, "skin_shade"],
+    [23, 5, 16, 1, "skin_hi"],
+    // hair sides
+    [20, 4, 3, 8, "hair"],
+    [39, 4, 3, 8, "hair"],
+    // eyes
+    [25, 8, 4, 2, "white"],
+    [34, 8, 4, 2, "white"],
+    [27, 8, 2, 2, "accent"],
+    [36, 8, 2, 2, "accent"],
+    [27, 9, 1, 1, "black"],
+    [36, 9, 1, 1, "black"],
+    // mouth
+    [30, 12, 2, 1, "skin_shade"],
+    // neck + necklace
+    [28, 14, 6, 2, "skin"],
+    [27, 14, 8, 1, "gold"],
+    // stola (main dress)
+    [20, 16, 22, 28, "main"],
+    [20, 16, 22, 1, "light"],
+    [20, 16, 1, 28, "dark"],
+    [41, 16, 1, 28, "dark"],
+    // palla drape
+    [16, 16, 5, 26, "light"],
+    [14, 18, 3, 22, "main_mid"],
+    // belt/sash
+    [20, 28, 22, 2, "gold"],
+    [20, 28, 22, 1, "gold_dark"],
+    // dress folds
+    [25, 30, 1, 14, "dark"],
+    [31, 30, 1, 14, "dark"],
+    [37, 30, 1, 14, "dark"],
+    // arms
+    [17, 18, 4, 10, "skin"],
+    [17, 18, 1, 10, "skin_shade"],
+    [41, 18, 4, 10, "skin"],
+    [44, 18, 1, 10, "skin_shade"],
+    // hem
+    [20, 43, 22, 1, "gold"],
+    // feet
+    [22, 55, 8, 3, "leather"],
+    [32, 55, 8, 3, "leather"],
+    [22, 55, 8, 1, "leather_hi"],
+    [32, 55, 8, 1, "leather_hi"],
+  ],
+
+  /* ══════ NPC: Lurco ══════ rival lanista — stocky, ornate dark tunic */
+  lurco: [
+    // head
+    [23, 3, 16, 2, "hair"],
+    [22, 5, 18, 5, "skin"],
+    [22, 5, 1, 5, "skin_shade"],
+    [39, 5, 1, 5, "skin_shade"],
+    [23, 5, 16, 1, "skin_hi"],
+    [25, 1, 12, 3, "hair"],
+    // eyes
+    [25, 8, 4, 2, "white"],
+    [34, 8, 4, 2, "white"],
+    [27, 8, 2, 2, "dark"],
+    [36, 8, 2, 2, "dark"],
+    [27, 9, 1, 1, "black"],
+    [36, 9, 1, 1, "black"],
+    // mouth/beard
+    [28, 12, 6, 2, "hair"],
+    [27, 13, 8, 2, "hair"],
+    // neck
+    [28, 14, 6, 2, "skin"],
+    // torso — ornate tunic
+    [20, 16, 22, 20, "main"],
+    [20, 16, 22, 1, "main_mid"],
+    [20, 16, 1, 20, "dark"],
+    [41, 16, 1, 20, "dark"],
+    // gold trim
+    [20, 16, 22, 2, "gold"],
+    [20, 16, 22, 1, "gold_dark"],
+    [25, 20, 12, 2, "gold"],
+    [25, 20, 12, 1, "gold_dark"],
+    // belt
+    [20, 34, 22, 2, "leather"],
+    [20, 34, 22, 1, "leather_hi"],
+    [30, 34, 2, 2, "gold"],
+    // arms — thick
+    [15, 18, 6, 14, "main"],
+    [15, 18, 1, 14, "dark"],
+    [41, 18, 6, 14, "main"],
+    [46, 18, 1, 14, "dark"],
+    [16, 28, 4, 6, "skin"],
+    [42, 28, 4, 6, "skin"],
+    // legs
+    [22, 36, 8, 14, "cloth"],
+    [32, 36, 8, 14, "cloth"],
+    [22, 36, 1, 14, "dark"],
+    [29, 36, 2, 14, "dark"],
+    [39, 36, 1, 14, "dark"],
+    // sandals
+    [22, 56, 8, 2, "leather_dark"],
+    [32, 56, 8, 2, "leather_dark"],
+  ],
+
+  /* ══════ NPC: Official ══════ arena official — dark tunic, authoritative */
+  official: [
+    // head
+    [24, 2, 14, 2, "hair"],
+    [23, 3, 16, 2, "hair"],
+    [22, 5, 18, 5, "skin"],
+    [22, 5, 1, 5, "skin_shade"],
+    [39, 5, 1, 5, "skin_shade"],
+    [23, 5, 16, 1, "skin_hi"],
+    // eyes
+    [25, 8, 4, 2, "white"],
+    [34, 8, 4, 2, "white"],
+    [27, 8, 2, 2, "main"],
+    [36, 8, 2, 2, "main"],
+    [27, 9, 1, 1, "black"],
+    [36, 9, 1, 1, "black"],
+    // mouth
+    [30, 12, 2, 1, "skin_shade"],
+    // neck
+    [28, 14, 6, 2, "skin"],
+    // torso — dark official tunic
+    [22, 16, 18, 18, "main"],
+    [22, 16, 18, 1, "light"],
+    [22, 16, 1, 18, "dark"],
+    [39, 16, 1, 18, "dark"],
+    // shoulder stripe
+    [22, 16, 18, 1, "accent"],
+    [22, 18, 18, 1, "accent"],
+    // belt
+    [22, 32, 18, 2, "leather"],
+    [22, 32, 18, 1, "leather_hi"],
+    [30, 32, 2, 2, "iron"],
+    // arms
+    [18, 18, 4, 10, "main"],
+    [40, 18, 4, 10, "main"],
+    [19, 26, 3, 6, "skin"],
+    [41, 26, 3, 6, "skin"],
+    // scroll in hand
+    [42, 24, 3, 8, "iron_hi"],
+    [42, 24, 1, 8, "iron"],
+    // legs
+    [22, 34, 8, 14, "dark"],
+    [32, 34, 8, 14, "dark"],
+    [22, 34, 1, 14, "main_mid"],
+    [29, 34, 2, 14, "main_mid"],
+    [39, 34, 1, 14, "main_mid"],
+    // sandals
+    [22, 56, 8, 2, "leather_dark"],
+    [32, 56, 8, 2, "leather_dark"],
+    [22, 56, 8, 1, "leather"],
+    [32, 56, 8, 1, "leather"],
+  ],
+
+  /* ══════ NPC: Nero ══════ emperor — purple toga, gold laurels */
+  nero: [
+    // laurel crown
+    [24, 0, 14, 2, "gold"],
+    [22, 1, 2, 3, "gold"],
+    [38, 1, 2, 3, "gold"],
+    [25, 0, 12, 1, "gold_dark"],
+    // head
+    [23, 2, 16, 3, "hair"],
+    [22, 5, 18, 5, "skin"],
+    [22, 5, 1, 5, "skin_shade"],
+    [39, 5, 1, 5, "skin_shade"],
+    [23, 5, 16, 1, "skin_hi"],
+    // eyes
+    [25, 8, 4, 2, "white"],
+    [34, 8, 4, 2, "white"],
+    [27, 8, 2, 2, "accent"],
+    [36, 8, 2, 2, "accent"],
+    [27, 9, 1, 1, "black"],
+    [36, 9, 1, 1, "black"],
+    // mouth
+    [30, 12, 2, 1, "skin_shade"],
+    // neck
+    [28, 14, 6, 2, "skin"],
+    // toga — imperial purple
+    [18, 16, 26, 28, "main"],
+    [18, 16, 26, 1, "light"],
+    [18, 16, 1, 28, "dark"],
+    [43, 16, 1, 28, "dark"],
+    // toga drape folds
+    [24, 18, 1, 24, "dark"],
+    [30, 18, 1, 24, "dark"],
+    [36, 18, 1, 24, "dark"],
+    // gold trim
+    [18, 16, 26, 2, "gold"],
+    [18, 42, 26, 2, "gold"],
+    // imperial brooch
+    [28, 18, 6, 3, "gold"],
+    [29, 19, 4, 1, "gold_dark"],
+    // arms draped
+    [14, 20, 5, 14, "main"],
+    [14, 20, 1, 14, "dark"],
+    [43, 20, 5, 14, "main"],
+    [47, 20, 1, 14, "dark"],
+    [15, 30, 3, 6, "skin"],
+    [44, 30, 3, 6, "skin"],
+    // feet
+    [22, 55, 8, 3, "gold_dark"],
+    [32, 55, 8, 3, "gold_dark"],
+    [22, 55, 8, 1, "gold"],
+    [32, 55, 8, 1, "gold"],
+  ],
+
+  /* ══════ NPC: Aemilia ══════ priestess — white temple robes, hooded */
+  aemilia: [
+    // hood
+    [22, 0, 18, 6, "main"],
+    [21, 2, 20, 4, "main"],
+    [22, 0, 18, 1, "light"],
+    [22, 0, 1, 6, "main_mid"],
+    [39, 0, 1, 6, "main_mid"],
+    // face inside hood
+    [24, 5, 14, 5, "skin"],
+    [24, 5, 1, 5, "skin_shade"],
+    [37, 5, 1, 5, "skin_shade"],
+    [25, 5, 12, 1, "skin_hi"],
+    // eyes
+    [26, 8, 3, 2, "white"],
+    [34, 8, 3, 2, "white"],
+    [27, 8, 2, 2, "accent"],
+    [35, 8, 2, 2, "accent"],
+    [28, 9, 1, 1, "black"],
+    [36, 9, 1, 1, "black"],
+    // mouth
+    [30, 12, 2, 1, "skin_shade"],
+    // neck
+    [28, 14, 6, 2, "skin"],
+    // robes
+    [20, 14, 22, 32, "main"],
+    [20, 14, 22, 1, "light"],
+    [20, 14, 1, 32, "main_mid"],
+    [41, 14, 1, 32, "main_mid"],
+    // robe folds
+    [26, 20, 1, 26, "main_mid"],
+    [31, 20, 1, 26, "main_mid"],
+    [36, 20, 1, 26, "main_mid"],
+    // sash
+    [20, 26, 22, 2, "gold"],
+    [20, 26, 22, 1, "gold_dark"],
+    // sleeves (long)
+    [16, 18, 5, 16, "main"],
+    [16, 18, 1, 16, "main_mid"],
+    [41, 18, 5, 16, "main"],
+    [45, 18, 1, 16, "main_mid"],
+    // hands
+    [17, 32, 3, 3, "skin"],
+    [42, 32, 3, 3, "skin"],
+    // hem
+    [20, 45, 22, 1, "gold"],
+    // feet (hidden beneath robes)
+    [24, 56, 6, 2, "leather"],
+    [32, 56, 6, 2, "leather"],
+  ],
+
+  /* ══════ NPC: Varro ══════ merchant/informant — practical tunic, hood */
+  varro: [
+    // hood
+    [23, 0, 16, 5, "main"],
+    [22, 2, 18, 3, "main"],
+    [23, 0, 16, 1, "main_mid"],
+    [22, 2, 1, 3, "dark"],
+    [39, 2, 1, 3, "dark"],
+    // face
+    [24, 5, 14, 5, "skin"],
+    [24, 5, 1, 5, "skin_shade"],
+    [37, 5, 1, 5, "skin_shade"],
+    [25, 5, 12, 1, "skin_hi"],
+    // eyes
+    [26, 8, 3, 2, "white"],
+    [34, 8, 3, 2, "white"],
+    [27, 8, 2, 2, "accent"],
+    [35, 8, 2, 2, "accent"],
+    [28, 9, 1, 1, "black"],
+    [36, 9, 1, 1, "black"],
+    // stubble
+    [28, 12, 6, 1, "skin_shade"],
+    // neck
+    [28, 14, 6, 2, "skin"],
+    // tunic
+    [22, 16, 18, 18, "cloth"],
+    [22, 16, 18, 1, "main"],
+    [22, 16, 1, 18, "dark"],
+    [39, 16, 1, 18, "dark"],
+    // vest over tunic
+    [24, 16, 14, 16, "main"],
+    [24, 16, 14, 1, "main_mid"],
+    [24, 16, 1, 16, "dark"],
+    [37, 16, 1, 16, "dark"],
+    // belt + pouch
+    [22, 32, 18, 2, "leather"],
+    [22, 32, 18, 1, "leather_hi"],
+    [36, 33, 4, 4, "leather_dark"],
+    [36, 33, 4, 1, "leather"],
+    // arms
+    [18, 18, 4, 10, "cloth"],
+    [40, 18, 4, 10, "cloth"],
+    [19, 26, 3, 6, "skin"],
+    [41, 26, 3, 6, "skin"],
+    // legs
+    [22, 34, 8, 14, "leather"],
+    [32, 34, 8, 14, "leather"],
+    [22, 34, 1, 14, "leather_dark"],
+    [29, 34, 2, 14, "leather_dark"],
+    [39, 34, 1, 14, "leather_dark"],
+    // boots
+    [22, 54, 8, 4, "leather_dark"],
+    [32, 54, 8, 4, "leather_dark"],
+    [22, 54, 8, 1, "leather"],
+    [32, 54, 8, 1, "leather"],
+  ],
+
+  /* ══════ NPC: Dis Pater ══════ god of underworld — spectral, dark, tall */
+  dis_pater: [
+    // spectral aura
+    [18, 4, 26, 40, "dark"],
+    [16, 8, 30, 34, "dark"],
+    // head — skull-like
+    [24, 2, 14, 4, "skin"],
+    [23, 4, 16, 6, "skin"],
+    [22, 6, 18, 4, "skin"],
+    [22, 6, 1, 4, "skin_shade"],
+    [39, 6, 1, 4, "skin_shade"],
+    // eye sockets — glowing
+    [25, 7, 4, 3, "accent"],
+    [34, 7, 4, 3, "accent"],
+    [26, 8, 2, 2, "light"],
+    [35, 8, 2, 2, "light"],
+    // mouth
+    [28, 12, 6, 1, "main"],
+    [29, 13, 4, 1, "dark"],
+    // robes
+    [20, 14, 22, 34, "main"],
+    [20, 14, 1, 34, "cloth"],
+    [41, 14, 1, 34, "cloth"],
+    [20, 14, 22, 1, "cloth"],
+    // inner robe glow
+    [26, 20, 10, 20, "accent"],
+    [27, 21, 8, 18, "main"],
+    // robe folds
+    [24, 18, 1, 28, "cloth"],
+    [31, 18, 1, 28, "cloth"],
+    [38, 18, 1, 28, "cloth"],
+    // arms — skeletal
+    [16, 20, 5, 16, "main"],
+    [16, 20, 1, 16, "cloth"],
+    [41, 20, 5, 16, "main"],
+    [45, 20, 1, 16, "cloth"],
+    [17, 34, 3, 4, "skin"],
+    [42, 34, 3, 4, "skin"],
+    // no feet — robes trail to ground
+    [22, 46, 18, 2, "cloth"],
   ],
 };

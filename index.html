@@ -85,11 +85,12 @@
             <div id="tileInfo" class="tile-info is-hidden" role="status" aria-live="polite" aria-atomic="true"></div>
             <div id="forecastTooltip" class="forecast-tooltip is-hidden" role="tooltip"></div>
             <div class="camera-controls" role="toolbar" aria-label="Camera controls">
-              <button type="button" id="btnRotL" class="cam-btn" aria-label="Rotate left (Q)" title="Rotate left (Q)">↺</button>
-              <button type="button" id="btnZoomIn" class="cam-btn" aria-label="Zoom in" title="Zoom in">+</button>
-              <button type="button" id="btnZoomOut" class="cam-btn" aria-label="Zoom out" title="Zoom out">−</button>
-              <button type="button" id="btnRotR" class="cam-btn" aria-label="Rotate right (E)" title="Rotate right (E)">↻</button>
-              <button type="button" id="btnCamReset" class="cam-btn cam-btn--small" aria-label="Reset camera" title="Reset camera">⌂</button>
+              <button type="button" id="btnRotL" class="cam-btn" aria-label="Rotate left (Q)" title="Rotate left (Q)">↺<kbd>Q</kbd></button>
+              <button type="button" id="btnZoomIn" class="cam-btn" aria-label="Zoom in (+)" title="Zoom in (+)">+<kbd>+</kbd></button>
+              <button type="button" id="btnZoomOut" class="cam-btn" aria-label="Zoom out (-)" title="Zoom out (-)">−<kbd>-</kbd></button>
+              <button type="button" id="btnRotR" class="cam-btn" aria-label="Rotate right (E)" title="Rotate right (E)">↻<kbd>E</kbd></button>
+              <button type="button" id="btnCamReset" class="cam-btn cam-btn--small" aria-label="Reset camera (R)" title="Reset camera (R)">⌂<kbd>R</kbd></button>
+              <button type="button" id="btnMute" class="cam-btn cam-btn--small" aria-label="Toggle mute (M)" title="Toggle mute (M)">♪<kbd>M</kbd></button>
             </div>
           </div>
         </div>
@@ -98,10 +99,10 @@
   </div>
 
   <!-- Title screen overlay -->
-  <div id="titleOverlay" class="title-overlay" role="dialog" aria-label="Title screen" aria-modal="true">
+  <div id="titleOverlay" class="title-overlay" role="dialog" aria-labelledby="titleHeading" aria-modal="true">
     <div class="title-panel">
       <div class="title-panel__crest" aria-hidden="true">⚔</div>
-      <h1 class="title-panel__name">Geminus Ratio</h1>
+      <h2 id="titleHeading" class="title-panel__name">Geminus Ratio</h2>
       <p class="title-panel__sub">Ludus Tactics</p>
       <div class="title-panel__buttons">
         <button type="button" id="btnContinueCampaign" class="btn btn--gold is-hidden">Continue Campaign</button>
@@ -112,7 +113,7 @@
   </div>
 
   <!-- Scene / dialogue overlay -->
-  <div id="sceneOverlay" class="scene-overlay is-hidden" role="dialog" aria-label="Story scene" aria-modal="true">
+  <div id="sceneOverlay" class="scene-overlay is-hidden" role="dialog" aria-labelledby="sceneSpeaker" aria-modal="true">
     <div class="scene-panel">
       <p id="sceneSpeaker" class="scene-speaker" aria-live="polite"></p>
       <p id="sceneText" class="scene-text" aria-live="polite"></p>
@@ -121,8 +122,12 @@
     </div>
   </div>
 
+  <!-- Cutscene click-to-advance overlay -->
+  <div id="cutsceneAdvance" class="cutscene-advance is-hidden" role="button" tabindex="0" aria-label="Click to advance dialogue"></div>
+  <div id="cutsceneChoices" class="cutscene-choices is-hidden" role="group" aria-label="Story choices"></div>
+
   <!-- Result overlay -->
-  <div id="resultOverlay" class="result-overlay is-hidden" role="dialog" aria-label="Battle result" aria-modal="true">
+  <div id="resultOverlay" class="result-overlay is-hidden" role="dialog" aria-labelledby="resultTitle" aria-modal="true">
     <div class="result-panel">
       <h2 id="resultTitle" class="result-title" aria-live="assertive"></h2>
       <div id="resultBody" class="result-body"></div>

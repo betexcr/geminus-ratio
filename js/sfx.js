@@ -6,15 +6,22 @@
 
 var SFX = (function () {
   var ctx = null;
+  var masterGain = null;
+  var _noiseBuffer = null;
+  var _muted = false;
 
   function ensure() {
     if (!ctx) {
       try { ctx = new (window.AudioContext || window.webkitAudioContext)(); }
       catch (e) { return null; }
+      masterGain = ctx.createGain();
+      masterGain.connect(ctx.destination);
     }
-    if (ctx.state === "suspended") ctx.resume();
+    if (ctx.state === "suspended") ctx.resume().catch(function () {});
     return ctx;
   }
+
+  function dest() { return masterGain || ctx.destination; }
 
   function tone(freq, type, duration, volume) {
     var c = ensure();
@@ -26,26 +33,34 @@ var SFX = (function () {
     gain.gain.setValueAtTime(volume || 0.15, c.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + duration);
     osc.connect(gain);
-    gain.connect(c.destination);
+    gain.connect(dest());
     osc.start(c.currentTime);
     osc.stop(c.currentTime + duration);
+    osc.onended = function () { osc.disconnect(); gain.disconnect(); };
+  }
+
+  function getNoiseBuffer(c, len) {
+    if (_noiseBuffer && _noiseBuffer.length >= len) return _noiseBuffer;
+    var buf = c.createBuffer(1, Math.max(len, Math.round(c.sampleRate * 0.15)), c.sampleRate);
+    var data = buf.getChannelData(0);
+    for (var i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * 0.5;
+    _noiseBuffer = buf;
+    return buf;
   }
 
   function noise(duration, volume) {
     var c = ensure();
     if (!c) return;
     var len = Math.round(c.sampleRate * duration);
-    var buf = c.createBuffer(1, len, c.sampleRate);
-    var data = buf.getChannelData(0);
-    for (var i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * 0.5;
     var src = c.createBufferSource();
-    src.buffer = buf;
+    src.buffer = getNoiseBuffer(c, len);
     var gain = c.createGain();
     gain.gain.setValueAtTime(volume || 0.12, c.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + duration);
     src.connect(gain);
-    gain.connect(c.destination);
-    src.start(c.currentTime);
+    gain.connect(dest());
+    src.start(c.currentTime, 0, duration);
+    src.onended = function () { src.disconnect(); gain.disconnect(); };
   }
 
   return {
@@ -67,9 +82,10 @@ var SFX = (function () {
       gain.gain.setValueAtTime(0.08, c.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.08);
       osc.connect(gain);
-      gain.connect(c.destination);
+      gain.connect(dest());
       osc.start(c.currentTime);
       osc.stop(c.currentTime + 0.1);
+      osc.onended = function () { osc.disconnect(); gain.disconnect(); };
     },
 
     ability: function () {
@@ -98,5 +114,19 @@ var SFX = (function () {
     },
 
     click: function () { tone(2000, "square", 0.015, 0.06); },
+
+    setVolume: function (v) {
+      if (!masterGain) ensure();
+      if (masterGain) masterGain.gain.value = Math.max(0, Math.min(1, v));
+    },
+
+    mute: function () {
+      _muted = !_muted;
+      if (!masterGain) ensure();
+      if (masterGain) masterGain.gain.value = _muted ? 0 : 1;
+      return _muted;
+    },
+
+    isMuted: function () { return _muted; },
   };
 })();

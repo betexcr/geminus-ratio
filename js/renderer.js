@@ -71,7 +71,6 @@ var IsoRenderer = (function () {
     this.cols = 12;
     this.rows = 10;
     this.spriteCache = {};
-    this._hoveredCell = null;
     this._pulsePhase = 0;
     this._outlineCache = {};
     this.floatingTexts = [];
@@ -90,6 +89,12 @@ var IsoRenderer = (function () {
     this._panStartY = 0;
     this._panOriginX = 0;
     this._panOriginY = 0;
+    var _rmq = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)");
+    this.reducedMotion = _rmq ? _rmq.matches : false;
+    if (_rmq && _rmq.addEventListener) {
+      var self = this;
+      _rmq.addEventListener("change", function (e) { self.reducedMotion = e.matches; });
+    }
   }
 
   IsoRenderer.prototype.resize = function (cols, rows) {
@@ -111,10 +116,6 @@ var IsoRenderer = (function () {
     this.canvas.width = Math.round(cssW * dpr);
     this.canvas.height = Math.round(cssH * dpr);
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-    var gridW = (d.cols + d.rows) * (TILE_W / 2);
-    var maxH = 2;
-    var gridH = (d.cols + d.rows) * (TILE_H / 2) + maxH * HEIGHT_PX + DRAW_SPRITE_H;
 
     this.originX = cssW / 2 - (d.cols - d.rows) * (TILE_W / 4);
     this.originY = cssH / 2 - (d.cols + d.rows) * (TILE_H / 4) + DRAW_SPRITE_H * 0.25;
@@ -513,6 +514,7 @@ var IsoRenderer = (function () {
 
   IsoRenderer.prototype.draw = function (params) {
     var ctx = this.ctx;
+    ctx.imageSmoothingEnabled = false;
     var heights = params.heights;
     var zones = params.zones;
     var highlights = params.highlights || {};
@@ -524,7 +526,7 @@ var IsoRenderer = (function () {
     var darkSky = params.darkSky || false;
 
     this._lastHeights = heights;
-    this._pulsePhase += 0.06;
+    if (!this.reducedMotion) this._pulsePhase += 0.06;
 
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -558,6 +560,16 @@ var IsoRenderer = (function () {
       }
     }
     drawList.sort(function (a, b) { return a.depth - b.depth; });
+
+    // Pre-build unit position map for O(1) per-tile lookups
+    var _unitMap = {};
+    for (var _ui = 0; _ui < units.length; _ui++) {
+      var _uu = units[_ui];
+      if (_uu.hp <= 0 && !_uu._deathAnim) continue;
+      var _ux = Math.round((_uu.animX != null) ? _uu.animX : _uu.x);
+      var _uy = Math.round((_uu.animY != null) ? _uu.animY : _uu.y);
+      _unitMap[_ux + "," + _uy] = _uu;
+    }
 
     for (var di = 0; di < drawList.length; di++) {
       var dc = drawList[di].c;
@@ -653,17 +665,7 @@ var IsoRenderer = (function () {
         }
       }
 
-      var unit = null;
-      for (var ui = 0; ui < units.length; ui++) {
-        var uu = units[ui];
-        if (uu.hp <= 0 && !uu._deathAnim) continue;
-        var ux = (uu.animX != null) ? uu.animX : uu.x;
-        var uy = (uu.animY != null) ? uu.animY : uu.y;
-        if (Math.round(ux) === dc && Math.round(uy) === dr) {
-          unit = uu;
-          break;
-        }
-      }
+      var unit = _unitMap[dc + "," + dr] || null;
       if (unit) {
         var unitH = heights[dr][dc];
         var unitAnimX = (unit.animX != null) ? unit.animX : unit.x;
@@ -713,8 +715,31 @@ var IsoRenderer = (function () {
     // Floating damage numbers
     this._drawFloatingTexts(ctx);
 
+    // Cutscene speech bubble (inside camera transform) — non-narration only
+    var _deferredBubble = null;
+    if (params.cutsceneBubble) {
+      var cb = params.cutsceneBubble;
+      if (cb.style === "narration") {
+        _deferredBubble = cb;
+      } else {
+        this._drawSpeechBubble(ctx, cb.cx, cb.cy, cb.text, cb.revealed, cb.style);
+      }
+    }
+
     // Close camera transform
     ctx.restore();
+
+    // Letterbox bars (outside camera transform)
+    this._lastLetterbox = params.letterbox || 0;
+    if (params.letterbox) {
+      this._drawLetterbox(ctx, params.letterbox);
+    }
+
+    // Narration bubble drawn on top of letterbox so it stays readable
+    if (_deferredBubble) {
+      var nb = _deferredBubble;
+      this._drawSpeechBubble(ctx, nb.cx, nb.cy, nb.text, nb.revealed, nb.style);
+    }
   };
 
   function _hlBaseColor(type) {
@@ -739,15 +764,15 @@ var IsoRenderer = (function () {
     ctx.save();
     ctx.globalAlpha = 0.35 * deathAlpha;
     ctx.beginPath();
-    ctx.ellipse(cx, cy + 2, 16, 6, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy + 6, 16, 6, 0, 0, Math.PI * 2);
     ctx.fillStyle = "#000";
     ctx.fill();
     ctx.restore();
 
     var dx = cx - DRAW_SPRITE_W / 2;
-    var feetRatio = 60 / 80;
+    var feetRatio = 54 / 80;
     var bob = 0;
-    if (!unit.exhausted && deathAlpha >= 1) {
+    if (!this.reducedMotion && !unit.exhausted && deathAlpha >= 1) {
       bob = Math.sin(this._pulsePhase * 0.5 + (unit.x || 0) * 1.7 + (unit.y || 0) * 2.3) * 1.0;
     }
     var dy = cy - DRAW_SPRITE_H * feetRatio + bob;
@@ -781,6 +806,8 @@ var IsoRenderer = (function () {
     }
 
     ctx.drawImage(bitmap, dx, dy, DRAW_SPRITE_W, DRAW_SPRITE_H);
+
+    if (unit.isCinematic) { ctx.restore(); return; }
 
     // HP bar (thicker, with gradient fill)
     var barW = DRAW_SPRITE_W * 0.78;
@@ -891,12 +918,147 @@ var IsoRenderer = (function () {
     }
 
     octx.globalCompositeOperation = "source-in";
-    octx.fillStyle = team === "player" ? "#88ccff" : "#ff8860";
+    octx.fillStyle = (team === "player" || team === "gifted") ? "#88ccff" : "#ff8860";
     octx.fillRect(0, 0, oc.width, oc.height);
     octx.globalCompositeOperation = "source-over";
 
     this._outlineCache[gKey] = oc;
     return oc;
+  };
+
+  // -- Speech bubbles --
+
+  IsoRenderer.prototype._drawSpeechBubble = function (ctx, cx, cy, text, revealed, style) {
+    if (!text) return;
+
+    var isNarration = (style === "narration");
+    var maxW = isNarration ? 420 : 300;
+    var padX = isNarration ? 18 : 14;
+    var padY = isNarration ? 14 : 10;
+    var lineH = isNarration ? 28 : 22;
+    var fontSize = isNarration ? "20px" : "16px";
+    var font = (style === "internal")
+      ? "italic " + fontSize + " 'Cinzel', serif"
+      : fontSize + " 'Cinzel', serif";
+    ctx.save();
+    ctx.font = font;
+
+    var visibleText = text.substring(0, revealed);
+    var words = visibleText.split(" ");
+    var lines = [];
+    var cur = "";
+    for (var wi = 0; wi < words.length; wi++) {
+      var test = cur ? (cur + " " + words[wi]) : words[wi];
+      if (ctx.measureText(test).width > maxW) {
+        if (cur) lines.push(cur);
+        cur = words[wi];
+      } else {
+        cur = test;
+      }
+    }
+    if (cur) lines.push(cur);
+    if (lines.length === 0) lines.push("");
+
+    var boxW = 0;
+    for (var li = 0; li < lines.length; li++) {
+      var lw = ctx.measureText(lines[li]).width;
+      if (lw > maxW) lw = maxW;
+      if (lw > boxW) boxW = lw;
+    }
+    boxW = boxW + padX * 2;
+    var boxH = lines.length * lineH + padY * 2;
+
+    var bx, by;
+    var useScreenSpace = (style === "narration");
+    if (useScreenSpace) {
+      ctx.save();
+      var dpr = window.devicePixelRatio || 1;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      var sw = this.canvas.width / dpr;
+      var letterboxH = this._lastLetterbox ? Math.round(this.canvas.height / dpr * 0.12 * this._lastLetterbox) : 0;
+      bx = sw / 2 - boxW / 2;
+      by = letterboxH + 16;
+    } else {
+      bx = cx - boxW / 2;
+      by = cy - DRAW_SPRITE_H - boxH - 12;
+    }
+
+    var rad = 8;
+
+    if (style === "internal") {
+      ctx.fillStyle = "rgba(20, 16, 30, 0.85)";
+    } else if (style === "narration") {
+      ctx.fillStyle = "rgba(10, 8, 20, 0.9)";
+    } else {
+      ctx.fillStyle = "rgba(255, 250, 240, 0.95)";
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(bx + rad, by);
+    ctx.lineTo(bx + boxW - rad, by);
+    ctx.quadraticCurveTo(bx + boxW, by, bx + boxW, by + rad);
+    ctx.lineTo(bx + boxW, by + boxH - rad);
+    ctx.quadraticCurveTo(bx + boxW, by + boxH, bx + boxW - rad, by + boxH);
+    ctx.lineTo(bx + rad, by + boxH);
+    ctx.quadraticCurveTo(bx, by + boxH, bx, by + boxH - rad);
+    ctx.lineTo(bx, by + rad);
+    ctx.quadraticCurveTo(bx, by, bx + rad, by);
+    ctx.closePath();
+    ctx.fill();
+
+    if (style !== "narration") {
+      ctx.strokeStyle = (style === "internal") ? "rgba(120, 100, 180, 0.6)" : "rgba(80, 60, 40, 0.5)";
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+
+    if (style === "dialogue") {
+      ctx.fillStyle = "rgba(255, 250, 240, 0.95)";
+      ctx.beginPath();
+      ctx.moveTo(cx - 6, by + boxH);
+      ctx.lineTo(cx, by + boxH + 10);
+      ctx.lineTo(cx + 6, by + boxH);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = "rgba(80, 60, 40, 0.5)";
+      ctx.stroke();
+    }
+
+    if (style === "internal" || style === "narration") {
+      ctx.fillStyle = "#f0d890";
+    } else {
+      ctx.fillStyle = "#1a1408";
+    }
+    ctx.font = font;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    for (var li2 = 0; li2 < lines.length; li2++) {
+      ctx.fillText(lines[li2], bx + padX, by + padY + li2 * lineH);
+    }
+
+    if (revealed < text.length) {
+      var cursorX = bx + padX + ctx.measureText(lines[lines.length - 1]).width + 2;
+      var cursorY = by + padY + (lines.length - 1) * lineH;
+      ctx.globalAlpha = 0.5 + 0.5 * Math.sin(Date.now() / 150);
+      ctx.fillStyle = (style === "dialogue") ? "#1a1408" : "#f0d890";
+      ctx.fillRect(cursorX, cursorY, 2, lineH - 2);
+    }
+
+    if (useScreenSpace) ctx.restore();
+    ctx.restore();
+  };
+
+  IsoRenderer.prototype._drawLetterbox = function (ctx, amount) {
+    if (amount <= 0) return;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    var w = this.canvas.width;
+    var h = this.canvas.height;
+    var barH = Math.round(h * 0.12 * amount);
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, w, barH);
+    ctx.fillRect(0, h - barH, w, barH);
+    ctx.restore();
   };
 
   // -- Sprite caching --
@@ -922,6 +1084,7 @@ var IsoRenderer = (function () {
       delete self._outlineCache[key + "_outline"];
       delete self._outlineCache[key + "_glow_player"];
       delete self._outlineCache[key + "_glow_enemy"];
+      delete self._outlineCache[key + "_glow_gifted"];
       URL.revokeObjectURL(url);
     };
     img.src = url;
@@ -957,9 +1120,8 @@ var IsoRenderer = (function () {
   // -- Floating damage/heal text --
 
   IsoRenderer.prototype.spawnText = function (col, row, h, text, color) {
-    var p = this.tileToScreen(col, row, h);
     this.floatingTexts.push({
-      x: p.x, y: p.y - DRAW_SPRITE_H * 0.5,
+      col: col, row: row, h: h,
       text: text, color: color || "#fff",
       age: 0, maxAge: 50
     });
@@ -970,6 +1132,8 @@ var IsoRenderer = (function () {
       var ft = this.floatingTexts[i];
       ft.age++;
       if (ft.age > ft.maxAge) { this.floatingTexts.splice(i, 1); continue; }
+      var p = this.tileToScreen(ft.col, ft.row, ft.h);
+      var baseY = p.y - DRAW_SPRITE_H * 0.5;
       var t = ft.age / ft.maxAge;
       var alpha = t < 0.7 ? 1 : 1 - (t - 0.7) / 0.3;
       var rise = t * 28;
@@ -980,9 +1144,9 @@ var IsoRenderer = (function () {
       ctx.textBaseline = "middle";
       ctx.strokeStyle = "#000";
       ctx.lineWidth = 3;
-      ctx.strokeText(ft.text, ft.x, ft.y - rise);
+      ctx.strokeText(ft.text, p.x, baseY - rise);
       ctx.fillStyle = ft.color;
-      ctx.fillText(ft.text, ft.x, ft.y - rise);
+      ctx.fillText(ft.text, p.x, baseY - rise);
       ctx.restore();
     }
   };

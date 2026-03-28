@@ -190,9 +190,9 @@ html, body {
 .class-row {
   display: grid;
   grid-template-columns: auto 1fr auto;
-  gap: 0.5rem;
+  gap: 0.35rem;
   align-items: center;
-  padding: 0.45rem 0.5rem;
+  padding: 0.3rem 0.4rem;
   background: #141210;
   border: 2px solid #3a3020;
   border-left: 4px solid var(--fft-gold-dim);
@@ -205,6 +205,10 @@ html, body {
   border-left-color: var(--fft-cyan);
   background: #1c1814;
 }
+.class-row:active {
+  transform: scale(0.98);
+  background: #201c16;
+}
 
 .class-row.is-selected {
   border-color: var(--fft-cyan-dim);
@@ -213,8 +217,8 @@ html, body {
 }
 
 .class-row__sprite {
-  width: 48px;
-  height: 60px;
+  width: 36px;
+  height: 45px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -226,8 +230,8 @@ html, body {
 }
 
 .class-row__sprite svg {
-  width: 40px;
-  height: 50px;
+  width: 32px;
+  height: 40px;
   image-rendering: pixelated;
   display: block;
 }
@@ -362,8 +366,8 @@ html, body {
 .deploy-card {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.35rem 0.5rem;
+  gap: 0.35rem;
+  padding: 0.25rem 0.4rem;
   background: #141210;
   border: 2px solid #3a3020;
   border-left: 4px solid #3a3020;
@@ -392,10 +396,17 @@ html, body {
 }
 
 .deploy-card__sprite {
-  width: 32px;
-  height: 40px;
+  width: 36px;
+  height: 45px;
   flex-shrink: 0;
   image-rendering: pixelated;
+}
+
+.deploy-card__sprite.unit-sprite-svg,
+svg.deploy-card__sprite {
+  width: 36px;
+  height: 45px;
+  display: block;
 }
 
 .deploy-card__info {
@@ -451,11 +462,6 @@ html, body {
   color: var(--fft-cyan);
   background: linear-gradient(180deg, #2a3838 0%, #1a2020 100%);
 }
-.btn:focus-visible {
-  outline: 2px solid var(--fft-cyan);
-  outline-offset: 2px;
-}
-
 .btn:disabled {
   opacity: 0.35;
   cursor: not-allowed;
@@ -643,6 +649,7 @@ html, body {
   width: 100% !important;
   height: 100% !important;
   image-rendering: crisp-edges;
+  touch-action: none;
 }
 
 .camera-controls {
@@ -666,8 +673,23 @@ html, body {
   cursor: pointer;
   padding: 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 0;
+  overflow: hidden;
+}
+
+.cam-btn kbd {
+  font-family: var(--font-fft);
+  font-size: 0.5rem;
+  line-height: 1;
+  opacity: 0.5;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: -1px 0 0;
+  color: var(--fft-gold);
 }
 
 .cam-btn:hover {
@@ -677,6 +699,10 @@ html, body {
 .cam-btn:focus-visible {
   outline: 2px solid var(--fft-gold);
   outline-offset: 2px;
+}
+.cam-btn:active {
+  transform: scale(0.9);
+  background: rgba(60, 50, 30, 0.9);
 }
 
 .cam-btn--small {
@@ -769,7 +795,39 @@ html, body {
 .log-entry--heal { color: #70d870; }
 .log-entry--buff { color: var(--fft-cyan); }
 .log-entry--system { color: var(--fft-gold); }
-.log-entry--enemy { color: #d87868; }
+.log-entry--tutorial {
+  color: #f0d890;
+  font-weight: bold;
+  border-left: 3px solid var(--fft-gold);
+  padding-left: 0.5rem;
+  margin: 0.3rem 0;
+}
+
+/* ---- Cutscene overlays ---- */
+.cutscene-advance {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  cursor: pointer;
+}
+.cutscene-advance.is-hidden { display: none; }
+
+.cutscene-choices {
+  position: fixed;
+  bottom: 14%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 95;
+  display: flex;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  pointer-events: auto;
+}
+.cutscene-choices.is-hidden { display: none; }
+.cutscene-choices .btn {
+  min-width: 10rem;
+}
 
 /* ---- Tile info tooltip ---- */
 .tile-info {
@@ -786,6 +844,8 @@ html, body {
   pointer-events: none;
   max-width: 14rem;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ---- Damage forecast tooltip ---- */

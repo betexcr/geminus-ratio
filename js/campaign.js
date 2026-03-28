@@ -1,12 +1,49 @@
 /**
  * Geminus Ratio — Campaign Data & State
- * Defines all 13 missions, persistent campaign state, and helper functions.
+ * Defines all 14 missions (tutorial + 13 story), persistent campaign state, and helper functions.
  * Loaded before game.js — exposes globals: CAMPAIGN_MISSIONS, campaignState, Campaign
  */
 
 /* eslint-disable no-unused-vars */
 
 var CAMPAIGN_MISSIONS = [
+
+  // ─── TUTORIAL ─────────────────────────────────────────────────────
+
+  {
+    id: 0,
+    title: "The Practice Yard",
+    act: 1,
+    tutorial: true,
+    ritualMeter: 0,
+    budget: 80,
+    enemyLevel: 1,
+    unlockedClasses: ["murmillo", "retiarius", "thraex"],
+    enemies: [
+      { classId: "samnite" },
+      { classId: "thraex" },
+    ],
+    terrain: [],
+    mapModifiers: [],
+    winCondition: "defeat_all",
+    victoryBonus: 10,
+    perfectBonus: 5,
+    flagsToSet: ["tutorial_complete"],
+    freeRecruits: [{ name: "Tiro", classId: "murmillo" }],
+    skipLudus: false,
+    carryHp: false,
+    preScene: [
+      { speaker: null, text: "Before dawn, the ludus of Publius stirs. A small yard of packed sand, cracked wooden posts, and a handful of fighters who dream of more." },
+      { speaker: "CASSIUS", text: "The men need drilling before I spend a single denarius on the arena circuit. Let's see what they're made of.", style: "internal" },
+      { speaker: null, text: "Cassius arranges a practice bout — two of the house fighters will stand in as opponents. No crowd, no glory. Just steel and sweat." },
+    ],
+    postScene: [
+      { speaker: "CASSIUS", text: "Not bad. We won't embarrass ourselves, at least.", style: "internal" },
+      { speaker: null, text: "A rider dismounts at the gate. He carries a sealed tablet stamped with the Colosseum's sigil." },
+      { speaker: null, text: "The Ludi Aeternales have been announced. Every ludus in the empire is summoned." },
+    ],
+    choices: [],
+  },
 
   // ─── ACT I: THE TOURNAMENT ────────────────────────────────────────
 
@@ -227,6 +264,15 @@ var CAMPAIGN_MISSIONS = [
       { speaker: null, text: "That night, Cassius dreams of the dark room. The stone floor. The breathing. He wakes with the taste of iron in his mouth." },
     ],
     choices: [
+      {
+        id: "livia_alliance_late",
+        condition: "!livia_allied_early",
+        prompt: "Livia approaches after the match. \"You saw what they did to that man. I can help you — but I need your help too.\"",
+        options: [
+          { label: "\"After what I just saw… I'm in.\"", flag: "livia_allied_late" },
+          { label: "\"I work alone.\"", flag: null },
+        ],
+      },
       {
         id: "livia_twin",
         prompt: "Livia is watching. She noticed your reaction to the Editor's champion.",
@@ -739,7 +785,7 @@ var Campaign = {
     return this.getFlag(cond);
   },
 
-  saveSurvivors: function (units, carryHp) {
+  saveSurvivors: function (units, carryHp, skipDeathCount) {
     var survivors = [];
     for (var i = 0; i < units.length; i++) {
       var u = units[i];
@@ -754,6 +800,10 @@ var Campaign = {
           level: u.level || 1,
           xp: u.xp || 0,
           kills: u.kills || 0,
+          bonusHp:  u.bonusHp  || 0,
+          bonusAtk: u.bonusAtk || 0,
+          bonusDef: u.bonusDef || 0,
+          bonusSpd: u.bonusSpd || 0,
         };
         if (u.gifted) entry.gifted = true;
         survivors.push(entry);
@@ -764,9 +814,11 @@ var Campaign = {
       var d = units[j];
       if (d.team === "player" && d.hp <= 0) {
         dead.push(d);
-        campaignState.totalDeaths++;
-        if (d.displayName) {
-          campaignState.flags[d.displayName.toLowerCase() + "_alive"] = false;
+        if (!skipDeathCount) {
+          campaignState.totalDeaths++;
+          if (d.displayName) {
+            campaignState.flags[d.displayName.toLowerCase() + "_alive"] = false;
+          }
         }
       }
     }
@@ -789,10 +841,6 @@ var Campaign = {
       }
       campaignState.ritualMeter = m.ritualMeter;
 
-      if (m.id === 5 && !this.getFlag("livia_allied_early")) {
-        this.setFlag("livia_allied_late");
-      }
-
       campaignState.missionIndex++;
     }
 
@@ -804,7 +852,7 @@ var Campaign = {
   },
 
   getEndingScenes: function (key) {
-    var m13 = CAMPAIGN_MISSIONS[12];
+    var m13 = CAMPAIGN_MISSIONS[13];
     if (!m13 || !m13.endingScenes) return [];
     return m13.endingScenes[key] || [];
   },
@@ -818,6 +866,7 @@ var Campaign = {
     campaignState.ritualMeter = 0;
     campaignState.totalDeaths = 0;
     campaignState.endingKey = null;
+    campaignState._preBattleCount = 0;
   },
 
   start: function () {
@@ -853,7 +902,7 @@ var Campaign = {
 
   // ─── Persistence (localStorage) ──────────────────────────────────
 
-  _SAVE_KEY: "geminus_campaign_v1",
+  _SAVE_KEY: "geminus_campaign_v2",
 
   saveToDisk: function () {
     if (!campaignState.active) return;
@@ -880,15 +929,22 @@ var Campaign = {
       if (!raw) return false;
       var data = JSON.parse(raw);
       if (!data || !data.active) return false;
+      var idx = parseInt(data.missionIndex, 10) || 0;
+      if (idx < 0 || idx >= CAMPAIGN_MISSIONS.length) return false;
+      var roster = Array.isArray(data.survivingRoster) ? data.survivingRoster : [];
+      roster = roster.filter(function (s) {
+        return s && typeof s.classId === "string";
+      });
+      if (typeof data.flags !== "object" || data.flags === null) data.flags = {};
       campaignState.active = true;
-      campaignState.missionIndex = data.missionIndex || 0;
-      campaignState.denarii = data.denarii || 0;
-      campaignState.flags = data.flags || {};
-      campaignState.survivingRoster = data.survivingRoster || [];
-      campaignState.ritualMeter = data.ritualMeter || 0;
-      campaignState.totalDeaths = data.totalDeaths || 0;
+      campaignState.missionIndex = idx;
+      campaignState.denarii = parseInt(data.denarii, 10) || 0;
+      campaignState.flags = data.flags;
+      campaignState.survivingRoster = roster;
+      campaignState.ritualMeter = parseInt(data.ritualMeter, 10) || 0;
+      campaignState.totalDeaths = parseInt(data.totalDeaths, 10) || 0;
       campaignState.endingKey = data.endingKey || null;
-      campaignState._preBattleCount = data._preBattleCount || 0;
+      campaignState._preBattleCount = parseInt(data._preBattleCount, 10) || 0;
       return true;
     } catch (e) { return false; }
   },
@@ -902,7 +958,10 @@ var Campaign = {
       var raw = localStorage.getItem(this._SAVE_KEY);
       if (!raw) return false;
       var data = JSON.parse(raw);
-      return !!(data && data.active);
+      if (!data || !data.active) return false;
+      var idx = parseInt(data.missionIndex, 10) || 0;
+      if (idx < 0 || idx >= CAMPAIGN_MISSIONS.length) return false;
+      return true;
     } catch (e) { return false; }
   },
 };
