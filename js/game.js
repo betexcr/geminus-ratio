@@ -542,6 +542,13 @@
   const btnZoomOut = $("#btnZoomOut");
   const btnCamReset = $("#btnCamReset");
 
+  var _srEl = document.getElementById("srAnnounce");
+  function announce(msg) {
+    if (!_srEl) return;
+    _srEl.textContent = "";
+    setTimeout(function() { _srEl.textContent = msg; }, 50);
+  }
+
   function log(msg, type) {
     var cls = "log-entry";
     if (type) cls += " log-entry--" + type;
@@ -1066,6 +1073,7 @@
 
   function renderBoard() {
     if (!renderer) return;
+    renderer._recalcLayout();
     const unitData = state.units
       .filter((u) => u.hp > 0 || u._deathAnim != null)
       .map((u) => ({
@@ -1149,7 +1157,9 @@
       const slot = document.createElement("div");
       var ctTeamClass = u.gifted ? "fft-ct-slot--gifted" : (u.team === "player" ? "fft-ct-slot--player" : "fft-ct-slot--enemy");
       slot.className = "fft-ct-slot " + ctTeamClass;
+      var slotDesc = (u.displayName || def.name) + ", " + u.team + ", HP " + u.hp + " of " + u.maxHp + ", CT " + Math.round(u.ct);
       slot.title = def.name + " · CT " + Math.round(u.ct);
+      slot.setAttribute("aria-label", slotDesc);
       var sprTeam = u.gifted ? "gifted" : (u.team === "player" ? "player" : "enemy");
       const mini = gladiatorSpriteSvg(
         u.classId,
@@ -1203,6 +1213,7 @@
     for (const c of displayClasses) {
       const row = document.createElement("div");
       row.className = "class-row" + (state.selectedClassId === c.id ? " is-selected" : "");
+      row.setAttribute("role", "listitem");
 
       // Sprite preview thumbnail
       const thumb = document.createElement("div");
@@ -1239,6 +1250,7 @@
       addBtn.className = "btn";
       addBtn.textContent = "Hire";
       addBtn.style.margin = "0";
+      addBtn.setAttribute("aria-label", "Hire " + c.name + " for " + c.cost + " denarii");
       addBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         hireClass(c.id);
@@ -1262,10 +1274,13 @@
       li.appendChild(miniSpr);
       const nameSpan = document.createElement("span");
       nameSpan.className = "pick-name";
+      var labelSpan = document.createElement("span");
+      labelSpan.className = "pick-name-text";
       var label = def.name;
       if (pick.displayName) label = pick.displayName + " (" + def.name + ")";
       if (pick.isFree) label += " [free]";
-      nameSpan.textContent = label;
+      labelSpan.textContent = label;
+      nameSpan.appendChild(labelSpan);
       li.appendChild(nameSpan);
       if (campaignState.active) {
         var lvl = pick.level || 1;
@@ -1276,7 +1291,9 @@
       }
       const rm = document.createElement("button");
       rm.type = "button";
+      rm.className = "btn-dismiss";
       rm.textContent = "Dismiss";
+      rm.setAttribute("aria-label", "Dismiss " + label);
       rm.addEventListener("click", () => {
         state.picks.splice(idx, 1);
         refreshRosterUI();
@@ -1309,9 +1326,7 @@
     state.picks.push(newPick);
     log("Hired " + newPick.displayName + " the " + c.name + ".");
     refreshRosterUI();
-    if (campaignState.active) {
-      promptFighterName(newPick);
-    }
+    promptFighterName(newPick);
   }
 
   function promptFighterName(pick) {
@@ -1326,12 +1341,14 @@
     input.value = pick.displayName || "";
     input.placeholder = classById(pick.classId).name;
     input.maxLength = 16;
+    input.setAttribute("aria-label", "Name for " + classById(pick.classId).name);
     nameSpan.appendChild(input);
     var reroll = document.createElement("button");
     reroll.type = "button";
     reroll.className = "btn-reroll";
     reroll.textContent = "\u2684";
     reroll.title = "Randomize name";
+    reroll.setAttribute("aria-label", "Randomize fighter name");
     reroll.addEventListener("click", function(e) {
       e.stopPropagation();
       var newName = randomRomanName();
@@ -1990,7 +2007,9 @@
     showUnitPanel(actor);
     setBattleButtons(actor);
     renderBoard();
-    log("Turn: " + classById(actor.classId).name + " — issue orders.", "system");
+    var turnMsg = "Turn: " + (actor.displayName ? actor.displayName + " the " : "") + classById(actor.classId).name + " — issue orders.";
+    log(turnMsg, "system");
+    announce(turnMsg + " HP " + actor.hp + " of " + actor.maxHp);
   }
 
   // -- Tile info & forecast --
@@ -2089,11 +2108,14 @@
   function showAbilityMenu(u) {
     var abList = unitAbilities(u);
     abilityMenu.innerHTML = "";
+    var menuIdx = 0;
     abList.forEach(function (ab, idx) {
       if (ab.type === "passive") return;
+      menuIdx++;
       const btn = document.createElement("button");
       btn.className = "ability-menu__btn";
-      btn.innerHTML = ab.name + "<small>" + ab.desc + "</small>";
+      btn.setAttribute("role", "menuitem");
+      btn.innerHTML = "<kbd>" + menuIdx + "</kbd> " + ab.name + "<small>" + ab.desc + "</small>";
       btn.addEventListener("click", function () {
         hideAbilityMenu();
         state.selectedAbilityIndex = idx;
@@ -2176,6 +2198,17 @@
 
     log("Guard.");
     clearPlayerTurn();
+  }
+
+  function cancelTargeting() {
+    if (state.battleMode === "idle") return;
+    state.battleMode = "idle";
+    state.highlightCells.clear();
+    state.selectedAbilityIndex = -1;
+    hideForecast();
+    var u = state.activeUnit;
+    if (u && u.team === "player") { showUnitPanel(u); setBattleButtons(u); }
+    renderBoard();
   }
 
   function beginMoveMode() {
@@ -3194,11 +3227,14 @@
     resultOverlay.classList.add(won ? "result-overlay--victory" : "result-overlay--defeat");
 
     var mission = campaignState.active ? Campaign.getMission() : null;
+    var titleText;
     if (state.trainingBout) {
-      resultTitle.textContent = won ? "TRAINING — VICTORY" : "TRAINING — DEFEAT";
+      titleText = won ? "TRAINING — VICTORY" : "TRAINING — DEFEAT";
     } else {
-      resultTitle.textContent = won ? "VICTORIA!" : "DEFEAT";
+      titleText = won ? "VICTORIA!" : "DEFEAT";
     }
+    resultTitle.textContent = titleText;
+    announce(titleText);
 
     var pAlive = state.units.filter(function (u) { return u.team === "player" && u.hp > 0; }).length;
     var pTotal = state.units.filter(function (u) { return u.team === "player"; }).length;
@@ -3231,6 +3267,7 @@
     if (btnRetry) {
       btnRetry.classList.toggle("is-hidden", !campaignState.active || won);
     }
+    setTimeout(function() { ($("#btnResultContinue") || resultOverlay).focus(); }, 100);
   }
 
   function closeResultAndReset() {
@@ -3529,7 +3566,7 @@
       btnNext.classList.add("is-hidden");
       sceneChoices.classList.remove("is-hidden");
       sceneChoices.innerHTML = "";
-
+      var _focusFirst = true;
       for (var i = 0; i < step.choice.options.length; i++) {
         (function (opt) {
           var btn = document.createElement("button");
@@ -3550,6 +3587,7 @@
             showNextSceneStep();
           });
           sceneChoices.appendChild(btn);
+          if (_focusFirst) { setTimeout(function() { btn.focus(); }, 100); _focusFirst = false; }
         })(step.choice.options[i]);
       }
       return;
@@ -3561,13 +3599,17 @@
     sceneText.className = "scene-text" + (step.style === "internal" ? " scene-text--internal" : "");
     sceneChoices.classList.add("is-hidden");
     btnNext.classList.remove("is-hidden");
+    setTimeout(function() { btnNext.focus(); }, 100);
   }
 
   // ─── Title Screen & Campaign Init ─────────────────────────────────
 
   function showTitleScreen() {
     var overlay = $("#titleOverlay");
-    if (overlay) overlay.classList.remove("is-hidden");
+    if (overlay) {
+      overlay.classList.remove("is-hidden");
+      setTimeout(function() { ($("#btnNewCampaign") || overlay).focus(); }, 100);
+    }
     panelRoster.classList.add("is-hidden");
     panelDeploy.classList.add("is-hidden");
     panelBattle.classList.add("is-hidden");
@@ -4423,15 +4465,27 @@
       renderBoard();
     }, { passive: false });
 
-    // Rotation via Q / E keys
     window.addEventListener("keydown", function (e) {
       if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
-      if (e.key === "q" || e.key === "Q") {
-        renderer.rotate(-1);
-        renderBoard();
-      } else if (e.key === "e" || e.key === "E") {
-        renderer.rotate(1);
-        renderBoard();
+      var key = e.key.toLowerCase();
+
+      // Camera rotation
+      if (key === "q") { renderer.rotate(-1); renderBoard(); return; }
+      if (key === "e") { renderer.rotate(1); renderBoard(); return; }
+
+      // Battle shortcuts (M)ove, (A)ttack, a(B)ility, (W)ait, E(sc)ape to cancel
+      if (state.phase === "battle" && state.activeUnit && state.activeUnit.team === "player") {
+        if (key === "m" && !btnMove.disabled) { btnMove.click(); return; }
+        if (key === "a" && !btnAttack.disabled) { btnAttack.click(); return; }
+        if (key === "b" && !btnAbility.disabled) { btnAbility.click(); return; }
+        if (key === "w" && !btnWait.disabled) { btnWait.click(); return; }
+        if (key === "escape") { cancelTargeting(); hideAbilityMenu(); return; }
+        // Number keys 1-9 to pick ability from the menu
+        if (key >= "1" && key <= "9" && !abilityMenu.classList.contains("is-hidden")) {
+          var idx = parseInt(key) - 1;
+          var btns = abilityMenu.querySelectorAll(".ability-menu__btn:not(:disabled)");
+          if (idx < btns.length) { btns[idx].click(); return; }
+        }
       }
     });
 

@@ -101,26 +101,23 @@ var IsoRenderer = (function () {
   IsoRenderer.prototype._recalcLayout = function () {
     var d = this._rotatedDims();
     var dpr = window.devicePixelRatio || 1;
-    var padX = 40;
-    var padTop = 90;
-    var padBot = 70;
-    var totalW = (d.cols + d.rows) * (TILE_W / 2) + padX * 2;
-    var maxH = 2;
-    var totalH =
-      (d.cols + d.rows) * (TILE_H / 2) +
-      maxH * HEIGHT_PX +
-      padTop +
-      padBot +
-      DRAW_SPRITE_H;
 
-    this.canvas.width = Math.round(totalW * dpr);
-    this.canvas.height = Math.round(totalH * dpr);
-    this.canvas.style.width = totalW + "px";
-    this.canvas.style.height = totalH + "px";
+    var wrap = this.canvas.parentElement;
+    var cssW = wrap ? wrap.clientWidth : 800;
+    var cssH = wrap ? wrap.clientHeight : 600;
+    if (cssW < 1) cssW = 800;
+    if (cssH < 1) cssH = 600;
+
+    this.canvas.width = Math.round(cssW * dpr);
+    this.canvas.height = Math.round(cssH * dpr);
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-    this.originX = d.rows * (TILE_W / 2) + padX;
-    this.originY = padTop + maxH * HEIGHT_PX + DRAW_SPRITE_H * 0.5;
+    var gridW = (d.cols + d.rows) * (TILE_W / 2);
+    var maxH = 2;
+    var gridH = (d.cols + d.rows) * (TILE_H / 2) + maxH * HEIGHT_PX + DRAW_SPRITE_H;
+
+    this.originX = cssW / 2 - (d.cols - d.rows) * (TILE_W / 4);
+    this.originY = cssH / 2 - (d.cols + d.rows) * (TILE_H / 4) + DRAW_SPRITE_H * 0.25;
   };
 
   // Remap grid coordinates for 90° rotation steps
@@ -165,9 +162,9 @@ var IsoRenderer = (function () {
 
   // Convert CSS-space mouse coords to the pre-zoom/pan "world" coords
   IsoRenderer.prototype._cssToWorld = function (sx, sy) {
-    var rect = this.canvas.getBoundingClientRect();
-    var cw = rect.width;
-    var ch = rect.height;
+    var dpr = window.devicePixelRatio || 1;
+    var cw = this.canvas.width / dpr;
+    var ch = this.canvas.height / dpr;
     var wcx = cw / 2 + this.panX;
     var wcy = ch / 2 + this.panY;
     var wx = (sx - cw / 2) / this.zoom + wcx;
@@ -531,13 +528,14 @@ var IsoRenderer = (function () {
 
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    ctx.fillStyle = "#060810";
+    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     ctx.restore();
 
     // Apply camera zoom + pan
-    var cw = parseFloat(this.canvas.style.width);
-    var ch = parseFloat(this.canvas.style.height);
     var dpr = window.devicePixelRatio || 1;
+    var cw = this.canvas.width / dpr;
+    var ch = this.canvas.height / dpr;
     ctx.save();
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     var cx = cw / 2 + this.panX;

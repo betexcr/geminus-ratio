@@ -13,45 +13,47 @@
   <link rel="stylesheet" href="css/main.css" />
 </head>
 <body class="theme-fft">
+  <a href="#main-content" class="sr-only" id="skipLink">Skip to content</a>
   <div id="app">
-    <header class="banner">
+    <header class="banner" role="banner">
       <div class="banner__crest" aria-hidden="true">⚔</div>
       <div class="banner__text">
         <h1>Geminus Ratio</h1>
         <p class="tagline">Rome · Ludus · Tactics</p>
       </div>
-      <div class="banner__phase" id="phaseLabel">Ludus</div>
+      <div class="banner__phase" id="phaseLabel" aria-live="polite">Ludus</div>
     </header>
+    <div id="srAnnounce" aria-live="assertive" aria-atomic="true" class="sr-only"></div>
 
-    <main class="layout">
-      <aside class="panel panel--left">
-        <div id="campaignHud" class="campaign-hud is-hidden"></div>
-        <section id="panelRoster" class="panel__section">
+    <main class="layout" id="main-content">
+      <aside class="panel panel--left" role="complementary" aria-label="Game controls">
+        <div id="campaignHud" class="campaign-hud is-hidden" role="status"></div>
+        <section id="panelRoster" class="panel__section" aria-label="Roster management">
           <h2>Hire for the bout</h2>
           <p class="budget"><span id="budgetLabel">Denarii</span>: <strong id="budgetValue">0</strong> / <span id="budgetMax">0</span></p>
           <p class="hint">Each class has different stats, move, jump, and a unique arena ability.</p>
-          <div id="classList" class="class-list"></div>
+          <div id="classList" class="class-list" role="list" aria-label="Available fighter classes"></div>
           <div class="roster-summary">
             <h3>Your lanista’s picks</h3>
-            <ul id="pickedList" class="picked"></ul>
+            <ul id="pickedList" class="picked" aria-label="Selected fighters"></ul>
             <button type="button" id="btnClearRoster" class="btn btn--ghost">Clear roster</button>
             <button type="button" id="btnToDeploy" class="btn btn--gold" disabled>To the gates</button>
             <button type="button" id="btnTrainingBout" class="btn btn--training is-hidden">Training Bout</button>
           </div>
         </section>
 
-        <section id="panelDeploy" class="panel__section is-hidden">
+        <section id="panelDeploy" class="panel__section is-hidden" aria-label="Deployment">
           <h2>Deploy</h2>
           <p class="hint">Click a <em>blue</em> gate tile, then a fighter below to place. Ready when all are placed.</p>
-          <ul id="deployQueue" class="deploy-queue"></ul>
+          <ul id="deployQueue" class="deploy-queue" aria-label="Deployment queue"></ul>
           <button type="button" id="btnToBattle" class="btn btn--gold" disabled>Enter arena</button>
           <button type="button" id="btnBackLudus" class="btn btn--ghost">Back to Ludus</button>
         </section>
 
-        <section id="panelBattle" class="panel__section is-hidden">
+        <section id="panelBattle" class="panel__section is-hidden" aria-label="Battle">
           <h2 id="battleTitle">Arena</h2>
-          <p id="turnInfo" class="turn-info"></p>
-          <div id="unitCard" class="unit-card is-hidden">
+          <p id="turnInfo" class="turn-info" aria-live="polite" aria-atomic="true"></p>
+          <div id="unitCard" class="unit-card is-hidden" role="region" aria-label="Active unit stats">
             <h3 id="ucName"></h3>
             <p id="ucClass"></p>
             <dl class="stat-grid">
@@ -64,30 +66,30 @@
             </dl>
             <p class="ability" id="ucAbility"></p>
           </div>
-          <div class="battle-actions" id="battleActions">
-            <button type="button" id="btnMove" class="btn" disabled>Move</button>
-            <button type="button" id="btnAttack" class="btn" disabled>Attack</button>
-            <button type="button" id="btnAbility" class="btn btn--accent" disabled>Ability</button>
-            <button type="button" id="btnWait" class="btn btn--ghost" disabled>Wait</button>
-            <div id="abilityMenu" class="ability-menu is-hidden"></div>
+          <div class="battle-actions" id="battleActions" role="toolbar" aria-label="Battle actions">
+            <button type="button" id="btnMove" class="btn" disabled aria-label="Move (M)"><kbd>M</kbd> Move</button>
+            <button type="button" id="btnAttack" class="btn" disabled aria-label="Attack (A)"><kbd>A</kbd> Attack</button>
+            <button type="button" id="btnAbility" class="btn btn--accent" disabled aria-label="Ability (B)"><kbd>B</kbd> Ability</button>
+            <button type="button" id="btnWait" class="btn btn--ghost" disabled aria-label="Wait (W)"><kbd>W</kbd> Wait</button>
+            <div id="abilityMenu" class="ability-menu is-hidden" role="menu" aria-label="Abilities"></div>
           </div>
-          <div id="logFeed" class="log-feed"></div>
+          <div id="logFeed" class="log-feed" role="log" aria-label="Combat log" aria-live="polite" aria-relevant="additions"></div>
         </section>
       </aside>
 
-      <section class="stage-wrap">
+      <section class="stage-wrap" aria-label="Arena view">
         <div class="fft-battlefield">
           <aside class="fft-ct-strip" id="ctStrip" aria-label="Upcoming turns" hidden></aside>
           <div class="iso-canvas-wrap">
-            <canvas id="isoCanvas" class="iso-canvas" aria-label="Battle grid"></canvas>
-            <div id="tileInfo" class="tile-info is-hidden"></div>
-            <div id="forecastTooltip" class="forecast-tooltip is-hidden"></div>
-            <div class="camera-controls">
-              <button type="button" id="btnRotL" class="cam-btn" title="Rotate left (Q)">↺</button>
-              <button type="button" id="btnZoomIn" class="cam-btn" title="Zoom in">+</button>
-              <button type="button" id="btnZoomOut" class="cam-btn" title="Zoom out">−</button>
-              <button type="button" id="btnRotR" class="cam-btn" title="Rotate right (E)">↻</button>
-              <button type="button" id="btnCamReset" class="cam-btn cam-btn--small" title="Reset camera">⌂</button>
+            <canvas id="isoCanvas" class="iso-canvas" role="img" aria-label="Isometric battle grid — use Q/E to rotate, scroll to zoom"></canvas>
+            <div id="tileInfo" class="tile-info is-hidden" role="status" aria-live="polite" aria-atomic="true"></div>
+            <div id="forecastTooltip" class="forecast-tooltip is-hidden" role="tooltip"></div>
+            <div class="camera-controls" role="toolbar" aria-label="Camera controls">
+              <button type="button" id="btnRotL" class="cam-btn" aria-label="Rotate left (Q)" title="Rotate left (Q)">↺</button>
+              <button type="button" id="btnZoomIn" class="cam-btn" aria-label="Zoom in" title="Zoom in">+</button>
+              <button type="button" id="btnZoomOut" class="cam-btn" aria-label="Zoom out" title="Zoom out">−</button>
+              <button type="button" id="btnRotR" class="cam-btn" aria-label="Rotate right (E)" title="Rotate right (E)">↻</button>
+              <button type="button" id="btnCamReset" class="cam-btn cam-btn--small" aria-label="Reset camera" title="Reset camera">⌂</button>
             </div>
           </div>
         </div>
@@ -96,7 +98,7 @@
   </div>
 
   <!-- Title screen overlay -->
-  <div id="titleOverlay" class="title-overlay">
+  <div id="titleOverlay" class="title-overlay" role="dialog" aria-label="Title screen" aria-modal="true">
     <div class="title-panel">
       <div class="title-panel__crest" aria-hidden="true">⚔</div>
       <h1 class="title-panel__name">Geminus Ratio</h1>
@@ -109,19 +111,19 @@
   </div>
 
   <!-- Scene / dialogue overlay -->
-  <div id="sceneOverlay" class="scene-overlay is-hidden">
+  <div id="sceneOverlay" class="scene-overlay is-hidden" role="dialog" aria-label="Story scene" aria-modal="true">
     <div class="scene-panel">
-      <p id="sceneSpeaker" class="scene-speaker"></p>
-      <p id="sceneText" class="scene-text"></p>
-      <div id="sceneChoices" class="scene-choices is-hidden"></div>
+      <p id="sceneSpeaker" class="scene-speaker" aria-live="polite"></p>
+      <p id="sceneText" class="scene-text" aria-live="polite"></p>
+      <div id="sceneChoices" class="scene-choices is-hidden" role="group" aria-label="Story choices"></div>
       <button type="button" id="btnSceneNext" class="btn btn--gold">Continue</button>
     </div>
   </div>
 
   <!-- Result overlay -->
-  <div id="resultOverlay" class="result-overlay is-hidden">
+  <div id="resultOverlay" class="result-overlay is-hidden" role="dialog" aria-label="Battle result" aria-modal="true">
     <div class="result-panel">
-      <h2 id="resultTitle" class="result-title"></h2>
+      <h2 id="resultTitle" class="result-title" aria-live="assertive"></h2>
       <div id="resultBody" class="result-body"></div>
       <div id="resultButtons" class="result-buttons">
         <button type="button" id="btnResultContinue" class="btn btn--gold">Continue</button>
