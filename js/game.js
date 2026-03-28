@@ -1349,11 +1349,17 @@
     reroll.textContent = "\u2684";
     reroll.title = "Randomize name";
     reroll.setAttribute("aria-label", "Randomize fighter name");
+    var _skipBlur = false;
+    reroll.addEventListener("mousedown", function(e) {
+      e.preventDefault();
+    });
     reroll.addEventListener("click", function(e) {
       e.stopPropagation();
       var newName = randomRomanName();
       input.value = newName;
       pick.displayName = newName;
+      input.focus();
+      input.select();
     });
     nameSpan.appendChild(reroll);
     input.focus();
@@ -1409,8 +1415,28 @@
     }
   }
 
+  function snapshotPicksToRoster() {
+    if (!campaignState.active) return;
+    campaignState.survivingRoster = state.picks.map(function (p) {
+      return {
+        uid: p.uid,
+        classId: p.classId,
+        name: p.displayName || null,
+        hp: p.hp || classById(p.classId).hp,
+        maxHp: p.maxHp || classById(p.classId).hp,
+        isFree: p.isFree || false,
+        level: p.level || 1,
+        xp: p.xp || 0,
+        kills: p.kills || 0,
+        gifted: p.gifted || false,
+      };
+    });
+    Campaign.saveToDisk();
+  }
+
   function startDeploy() {
     if (!state.picks.length) return;
+    snapshotPicksToRoster();
     state.trainingBout = false;
     var mission = campaignState.active ? Campaign.getMission() : null;
     var nextBout = state.boutNumber + 1;
@@ -3297,7 +3323,7 @@
       state.trainingBout = false;
       resetMapMods();
       loadMissionIntoLudus();
-      return;
+      return; // saveToDisk called inside loadMissionIntoLudus
     }
 
     var result = state.endingATriggered ? "victory" : checkVictory();
@@ -3417,6 +3443,8 @@
     updateCampaignHud();
     showPhasePanels();
 
+    Campaign.saveToDisk();
+
     if (mission.skipLudus) {
       autoDeployAndStart();
     } else {
@@ -3495,6 +3523,7 @@
   }
 
   function showCampaignComplete() {
+    Campaign.clearSave();
     resultOverlay.classList.remove("is-hidden", "result-overlay--victory", "result-overlay--defeat");
     resultOverlay.classList.add("result-overlay--victory");
 
@@ -3606,9 +3635,14 @@
 
   function showTitleScreen() {
     var overlay = $("#titleOverlay");
+    var btnContinue = $("#btnContinueCampaign");
+    if (btnContinue) {
+      btnContinue.classList.toggle("is-hidden", !Campaign.hasSave());
+    }
     if (overlay) {
       overlay.classList.remove("is-hidden");
-      setTimeout(function() { ($("#btnNewCampaign") || overlay).focus(); }, 100);
+      var focusBtn = (btnContinue && !btnContinue.classList.contains("is-hidden")) ? btnContinue : $("#btnNewCampaign");
+      setTimeout(function() { (focusBtn || overlay).focus(); }, 100);
     }
     panelRoster.classList.add("is-hidden");
     panelDeploy.classList.add("is-hidden");
@@ -3642,6 +3676,16 @@
     } else {
       loadMissionIntoLudus();
     }
+  }
+
+  function continueCampaign() {
+    if (!Campaign.loadFromDisk()) {
+      startCampaign();
+      return;
+    }
+    hideTitleScreen();
+    budgetCurrent = Campaign.getBudget();
+    loadMissionIntoLudus();
   }
 
   function startSkirmish() {
@@ -4563,8 +4607,13 @@
 
     var btnNewCampaign = $("#btnNewCampaign");
     var btnSkirmish = $("#btnSkirmish");
-    if (btnNewCampaign) btnNewCampaign.addEventListener("click", startCampaign);
+    var btnContinueCampaign = $("#btnContinueCampaign");
+    if (btnNewCampaign) btnNewCampaign.addEventListener("click", function () {
+      Campaign.clearSave();
+      startCampaign();
+    });
     if (btnSkirmish) btnSkirmish.addEventListener("click", startSkirmish);
+    if (btnContinueCampaign) btnContinueCampaign.addEventListener("click", continueCampaign);
 
     budgetMax.textContent = String(budgetCurrent);
     showTitleScreen();

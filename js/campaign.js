@@ -850,4 +850,59 @@ var Campaign = {
     var names = { 1: "Act I: The Tournament", 2: "Act II: The Descent", 3: "Act III: The Ratio" };
     return names[m.act] || "";
   },
+
+  // ─── Persistence (localStorage) ──────────────────────────────────
+
+  _SAVE_KEY: "geminus_campaign_v1",
+
+  saveToDisk: function () {
+    if (!campaignState.active) return;
+    try {
+      var data = {
+        active: campaignState.active,
+        missionIndex: campaignState.missionIndex,
+        denarii: campaignState.denarii,
+        flags: campaignState.flags,
+        survivingRoster: campaignState.survivingRoster,
+        ritualMeter: campaignState.ritualMeter,
+        totalDeaths: campaignState.totalDeaths,
+        endingKey: campaignState.endingKey,
+        _preBattleCount: campaignState._preBattleCount || 0,
+        savedAt: Date.now(),
+      };
+      localStorage.setItem(this._SAVE_KEY, JSON.stringify(data));
+    } catch (e) { /* storage full or private mode */ }
+  },
+
+  loadFromDisk: function () {
+    try {
+      var raw = localStorage.getItem(this._SAVE_KEY);
+      if (!raw) return false;
+      var data = JSON.parse(raw);
+      if (!data || !data.active) return false;
+      campaignState.active = true;
+      campaignState.missionIndex = data.missionIndex || 0;
+      campaignState.denarii = data.denarii || 0;
+      campaignState.flags = data.flags || {};
+      campaignState.survivingRoster = data.survivingRoster || [];
+      campaignState.ritualMeter = data.ritualMeter || 0;
+      campaignState.totalDeaths = data.totalDeaths || 0;
+      campaignState.endingKey = data.endingKey || null;
+      campaignState._preBattleCount = data._preBattleCount || 0;
+      return true;
+    } catch (e) { return false; }
+  },
+
+  clearSave: function () {
+    try { localStorage.removeItem(this._SAVE_KEY); } catch (e) { /* ok */ }
+  },
+
+  hasSave: function () {
+    try {
+      var raw = localStorage.getItem(this._SAVE_KEY);
+      if (!raw) return false;
+      var data = JSON.parse(raw);
+      return !!(data && data.active);
+    } catch (e) { return false; }
+  },
 };
