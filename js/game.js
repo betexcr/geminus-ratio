@@ -1362,11 +1362,33 @@
       input.select();
     });
     nameSpan.appendChild(reroll);
+
+    var dismissBtn = existing.querySelector(".btn-dismiss");
+    var origText, origLabel, origHandler;
+    if (dismissBtn) {
+      origText = dismissBtn.textContent;
+      origLabel = dismissBtn.getAttribute("aria-label");
+      origHandler = dismissBtn.onclick;
+      dismissBtn.textContent = "Accept";
+      dismissBtn.setAttribute("aria-label", "Accept name");
+      dismissBtn.className = "btn-accept";
+      dismissBtn.onclick = null;
+      dismissBtn.addEventListener("click", function acceptClick() {
+        input.blur();
+        dismissBtn.removeEventListener("click", acceptClick);
+      }, { once: true });
+    }
+
     input.focus();
     input.select();
     function finalize() {
       var val = input.value.trim();
       if (val) pick.displayName = val;
+      if (dismissBtn) {
+        dismissBtn.textContent = origText;
+        dismissBtn.setAttribute("aria-label", origLabel || "");
+        dismissBtn.className = "btn-dismiss";
+      }
       refreshRosterUI();
     }
     input.addEventListener("blur", finalize);

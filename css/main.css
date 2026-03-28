@@ -338,6 +338,18 @@ html, body {
 
 .picked li > button.btn-dismiss:hover { color: #ff9088; }
 
+.picked li > button.btn-accept {
+  background: none;
+  border: none;
+  color: #80d060;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-family: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.picked li > button.btn-accept:hover { color: #a0f080; }
+
 .deploy-queue {
   list-style: none;
   padding: 0;
