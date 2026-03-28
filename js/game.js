@@ -1464,18 +1464,28 @@
         badge.textContent = "Lv." + lvl;
         li.appendChild(badge);
       }
-      const rm = document.createElement("button");
-      rm.type = "button";
-      rm.className = "btn-dismiss";
-      rm.textContent = "Dismiss";
-      rm.setAttribute("aria-label", "Dismiss " + label);
-      rm.addEventListener("click", () => {
-        var spliceIdx = state.picks.findIndex(function(p) { return p.uid === pick.uid; });
-        if (spliceIdx >= 0) state.picks.splice(spliceIdx, 1);
-        refreshRosterUI();
-        if (campaignState.active) Campaign.saveToDisk();
-      });
-      li.appendChild(rm);
+      if (pick.isFree && campaignState.active) {
+        var kept = document.createElement("span");
+        kept.className = "btn-dismiss";
+        kept.textContent = "Assigned";
+        kept.style.opacity = "0.4";
+        kept.style.cursor = "default";
+        kept.style.textDecoration = "none";
+        li.appendChild(kept);
+      } else {
+        const rm = document.createElement("button");
+        rm.type = "button";
+        rm.className = "btn-dismiss";
+        rm.textContent = "Dismiss";
+        rm.setAttribute("aria-label", "Dismiss " + label);
+        rm.addEventListener("click", () => {
+          var spliceIdx = state.picks.findIndex(function(p) { return p.uid === pick.uid; });
+          if (spliceIdx >= 0) state.picks.splice(spliceIdx, 1);
+          refreshRosterUI();
+          if (campaignState.active) Campaign.saveToDisk();
+        });
+        li.appendChild(rm);
+      }
       pickedListEl.appendChild(li);
     });
 
@@ -1649,27 +1659,39 @@
   }
 
   function startDeploy() {
-    if (!state.picks.length) return;
-    snapshotPicksToRoster();
-    state.trainingBout = false;
-    var mission = campaignState.active ? Campaign.getMission() : null;
-    var nextBout = state.boutNumber + 1;
-    var hSeed = mission ? mission.id * 97 + 42 : (nextBout * 71 + 42);
-    state._mapSeed = hSeed;
-    state.height = buildHeightField(hSeed);
-    state.terrain = buildTerrainMap(hSeed, mission ? mission.terrain : null);
-    state.phase = "deploy";
-    state.deployTemplate = state.picks.map((p) => ({ ...p }));
-    state.units = [];
-    state.deploySelectedIndex = 0;
-    placeEnemies();
-    showPhasePanels();
-    refreshDeployUI();
-    renderBoard();
-    log("Place your fighters on the blue gate tiles.");
-    state.tutorialStep = 10;
-    tutorialTip(10, "Click a blue-highlighted tile at the bottom of the arena to place a fighter. Click a placed fighter to recall them.");
-    tutorialTip(11, "Once all fighters are placed, click \"Enter arena\" to begin the battle.");
+    if (!state.picks.length) {
+      log("Hire at least one fighter before deploying.", "system");
+      return;
+    }
+    try {
+      snapshotPicksToRoster();
+      state.trainingBout = false;
+      var mission = campaignState.active ? Campaign.getMission() : null;
+      var nextBout = state.boutNumber + 1;
+      var hSeed = mission ? mission.id * 97 + 42 : (nextBout * 71 + 42);
+      state._mapSeed = hSeed;
+      state.height = buildHeightField(hSeed);
+      state.terrain = buildTerrainMap(hSeed, mission ? mission.terrain : null);
+      state.phase = "deploy";
+      state.deployTemplate = state.picks.map((p) => ({ ...p }));
+      state.units = [];
+      state.deploySelectedIndex = 0;
+      placeEnemies();
+      showPhasePanels();
+      refreshDeployUI();
+      renderBoard();
+      log("Place your fighters on the blue gate tiles.");
+      state.tutorialStep = 10;
+      tutorialTip(10, "Click a blue-highlighted tile at the bottom of the arena to place a fighter. Click a placed fighter to recall them.");
+      tutorialTip(11, "Once all fighters are placed, click \"Enter arena\" to begin the battle.");
+    } catch (e) {
+      console.error("startDeploy failed:", e);
+      log("Deploy error — retrying. (" + e.message + ")", "system");
+      state.phase = "ludus";
+      showPhasePanels();
+      refreshRosterUI();
+      renderBoard();
+    }
   }
 
   function placeEnemies() {
@@ -3672,6 +3694,13 @@
     var mission = Campaign.getMission();
     if (!mission) return;
 
+    // Defensive: ensure cutscene overlays are cleaned up
+    if (state.cutscene.active) teardownCutscene();
+    var _advEl = $("#cutsceneAdvance");
+    if (_advEl) _advEl.classList.add("is-hidden");
+    var _choEl = $("#cutsceneChoices");
+    if (_choEl) _choEl.classList.add("is-hidden");
+
     resetMapMods();
     state.phase = "ludus";
     state.units = [];
@@ -3993,13 +4022,19 @@
     var startTime = null;
     var dur = 600;
     function tick(ts) {
-      if (!startTime) startTime = ts;
-      var t = Math.min(1, (ts - startTime) / dur);
-      for (var i = 0; i < actors.length; i++) {
-        actors[i]._deathAnim = 1 - t;
+      var t;
+      try {
+        if (!startTime) startTime = ts;
+        t = Math.min(1, (ts - startTime) / dur);
+        for (var i = 0; i < actors.length; i++) {
+          actors[i]._deathAnim = 1 - t;
+        }
+        cs.letterbox = 1 - t;
+        renderBoard();
+      } catch (e) {
+        console.error("Cutscene fade error:", e);
+        t = 1;
       }
-      cs.letterbox = 1 - t;
-      renderBoard();
       if (t >= 1) {
         onDone();
       } else {
@@ -5254,11 +5289,24 @@
 
     btnClearRoster.addEventListener("click", () => {
       state.picks = [];
-      refreshRosterUI();
       if (campaignState.active) {
         campaignState.survivingRoster = [];
+        // Re-add free recruits so the player always has a baseline roster
+        var recruits = Campaign.getFreeRecruits();
+        for (var fi = 0; fi < recruits.length; fi++) {
+          var fr = recruits[fi];
+          var recruitPick = {
+            uid: "free_" + fr.classId + "_" + fi,
+            classId: fr.classId,
+            displayName: fr.name,
+            isFree: true,
+          };
+          if (fr.gifted) recruitPick.gifted = true;
+          state.picks.push(recruitPick);
+        }
         Campaign.saveToDisk();
       }
+      refreshRosterUI();
     });
     btnToDeploy.addEventListener("click", startDeploy);
     btnTrainingBout.addEventListener("click", startTrainingBout);
