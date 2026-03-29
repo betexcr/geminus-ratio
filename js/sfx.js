@@ -130,5 +130,75 @@ var SFX = (function () {
     },
 
     isMuted: function () { return _muted; },
+
+    // -- Ambient audio subsystem --
+    _ambientNodes: null,
+    _ambientProfile: null,
+
+    startAmbient: function (profile) {
+      if (this._ambientProfile === profile && this._ambientNodes) return;
+      this.stopAmbient();
+      var c = ensure();
+      if (!c) return;
+      this._ambientProfile = profile;
+
+      var profiles = {
+        ludus:    { gain: 0.025, lpFreq: 400,  swellGain: 0.015, swellInterval: 6000 },
+        battle:   { gain: 0.055, lpFreq: 800,  swellGain: 0.04,  swellInterval: 3000 },
+        cutscene: { gain: 0.012, lpFreq: 200,  swellGain: 0,     swellInterval: 0 }
+      };
+      var p = profiles[profile] || profiles.ludus;
+
+      var bufLen = c.sampleRate * 4;
+      var buf = c.createBuffer(1, bufLen, c.sampleRate);
+      var data = buf.getChannelData(0);
+      for (var i = 0; i < bufLen; i++) data[i] = (Math.random() * 2 - 1);
+      var fadeSamples = Math.floor(c.sampleRate * 0.05);
+      for (var fi = 0; fi < fadeSamples; fi++) {
+        var t = fi / fadeSamples;
+        data[fi] *= t;
+        data[bufLen - 1 - fi] *= t;
+      }
+
+      var src = c.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+
+      var lp = c.createBiquadFilter();
+      lp.type = "lowpass";
+      lp.frequency.value = p.lpFreq;
+
+      var gain = c.createGain();
+      gain.gain.value = p.gain;
+
+      src.connect(lp);
+      lp.connect(gain);
+      gain.connect(dest());
+      src.start();
+
+      var swellTimer = null;
+      if (p.swellGain > 0 && p.swellInterval > 0) {
+        swellTimer = setInterval(function () {
+          if (_muted) return;
+          var now = c.currentTime;
+          gain.gain.setValueAtTime(p.gain, now);
+          gain.gain.linearRampToValueAtTime(p.gain + p.swellGain, now + 0.6);
+          gain.gain.linearRampToValueAtTime(p.gain, now + 1.8);
+        }, p.swellInterval + Math.random() * 2000);
+      }
+
+      this._ambientNodes = { src: src, lp: lp, gain: gain, swellTimer: swellTimer };
+    },
+
+    stopAmbient: function () {
+      if (!this._ambientNodes) return;
+      try { this._ambientNodes.src.stop(); } catch (e) {}
+      try { this._ambientNodes.src.disconnect(); } catch (e) {}
+      try { this._ambientNodes.lp.disconnect(); } catch (e) {}
+      try { this._ambientNodes.gain.disconnect(); } catch (e) {}
+      if (this._ambientNodes.swellTimer) clearInterval(this._ambientNodes.swellTimer);
+      this._ambientNodes = null;
+      this._ambientProfile = null;
+    },
   };
 })();

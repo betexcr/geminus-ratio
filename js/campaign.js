@@ -722,6 +722,39 @@ var CAMPAIGN_MISSIONS = [
 
 ];
 
+// ─── Post-Battle Vignettes ──────────────────────────────────────────
+
+var VIGNETTE_POOL = [
+  { id: "v_mur_ret", classA: "murmillo", classB: "retiarius", condition: "both_survived",
+    lines: [{ speaker: "A", text: "Good net work out there. Almost tangled me with that last throw." }, { speaker: "B", text: "Almost? I had you dead to rights — you just move too fast in that armor." }] },
+  { id: "v_mur_hop", classA: "murmillo", classB: "hoplomachus", condition: "both_survived",
+    lines: [{ speaker: "A", text: "That shield wall of yours — I thought nothing would get through." }, { speaker: "B", text: "Nothing does. Except maybe your stubbornness." }] },
+  { id: "v_ret_dim", classA: "retiarius", classB: "dimachaerus", condition: "both_survived",
+    lines: [{ speaker: "A", text: "Two blades against a net and trident. Seems unfair." }, { speaker: "B", text: "For you, maybe. I only need one to cut your net." }] },
+  { id: "v_sec_thr", classA: "secutor", classB: "thraex", condition: "both_survived",
+    lines: [{ speaker: "A", text: "You're fast. Dangerously fast." }, { speaker: "B", text: "Speed is all I have. Unlike you with your wall of iron." }] },
+  { id: "v_hop_sag", classA: "hoplomachus", classB: "sagittarius", condition: "both_survived",
+    lines: [{ speaker: "B", text: "I kept count. Seven arrows, seven hits." }, { speaker: "A", text: "And I kept seven enemies off your back. You're welcome." }] },
+  { id: "v_dim_ess", classA: "dimachaerus", classB: "essedarius", condition: "both_survived",
+    lines: [{ speaker: "A", text: "Your charge nearly trampled our own side." }, { speaker: "B", text: "Nearly. That's what makes it exciting." }] },
+  { id: "v_laq_ves", classA: "laquearius", classB: "vestige", condition: "both_survived",
+    lines: [{ speaker: "A", text: "You went down — I saw it. Then you just... stood back up." }, { speaker: "B", text: "Death and I have an arrangement. She waits." }] },
+  { id: "v_mur_sag", classA: "murmillo", classB: "sagittarius", condition: "both_survived",
+    lines: [{ speaker: "A", text: "Stay behind me next time. Arrows don't stop swords." }, { speaker: "B", text: "They do when they hit first." }] },
+  { id: "v_thr_laq", classA: "thraex", classB: "laquearius", condition: "both_survived",
+    lines: [{ speaker: "A", text: "That lasso trick — where did you learn that?" }, { speaker: "B", text: "The streets. Everything's a weapon when you grow up hungry." }] },
+  { id: "v_sec_hop", classA: "secutor", classB: "hoplomachus", condition: "both_survived",
+    lines: [{ speaker: "B", text: "You pursued that retreating gladiator across the whole arena." }, { speaker: "A", text: "Once I start running, I don't stop until they do." }] },
+  { id: "v_ret_sag", classA: "retiarius", classB: "sagittarius", condition: "both_survived",
+    lines: [{ speaker: "A", text: "We make a good pair — you pin them down, I reel them in." }, { speaker: "B", text: "Just don't reel me in by accident. Again." }] },
+  { id: "v_dim_mur", classA: "dimachaerus", classB: "murmillo", condition: "both_survived",
+    lines: [{ speaker: "A", text: "How do you fight with just one blade? Feels like you're missing a hand." }, { speaker: "B", text: "That missing hand holds a shield. Ask the enemies it stopped." }] },
+  { id: "v_scaeva", classA: "murmillo", classB: null, condition: "scaeva_allied",
+    lines: [{ speaker: "A", text: "Scaeva fought beside us today. Something changed in his eyes." }, { speaker: "A", text: "Whatever the arena made him into — maybe we can unmake it." }] },
+  { id: "v_livia", classA: "thraex", classB: null, condition: "livia_allied",
+    lines: [{ speaker: "A", text: "Livia's blade is faster than anything I've seen in the ludus." }, { speaker: "A", text: "She fights like she has nothing left to lose." }] },
+];
+
 // ─── Campaign State ─────────────────────────────────────────────────
 
 var campaignState = {
@@ -786,21 +819,32 @@ var Campaign = {
     return this.getFlag(cond);
   },
 
-  saveSurvivors: function (units, carryHp, skipDeathCount) {
+  saveSurvivors: function (units, carryHp, skipDeathCount, deployedUids) {
     var survivors = [];
     for (var i = 0; i < units.length; i++) {
       var u = units[i];
-      if (u.team === "player" && u.hp > 0) {
+      if (u.team === "player" && (u.hp > 0 || skipDeathCount)) {
+        var totalKills = (u.kills || 0);
+        var title = null;
+        if (totalKills >= 25) title = "Legend";
+        else if (totalKills >= 15) title = "Champion";
+        else if (totalKills >= 8) title = "Veteran";
+        else if (totalKills >= 3) title = "Blooded";
+        var ndc = u.nearDeathCount || 0;
+        if (u.hp > 0 && u.hp < u.maxHp * 0.25) ndc++;
         var entry = {
           uid: u.uid || ("surv_" + i),
           classId: u.classId,
           name: u.displayName || null,
-          hp: carryHp ? u.hp : u.maxHp,
+          hp: (carryHp && !skipDeathCount) ? u.hp : u.maxHp,
           maxHp: u.maxHp,
           isFree: u.isFree || false,
           level: u.level || 1,
           xp: u.xp || 0,
           kills: u.kills || 0,
+          battlesSurvived: (u.battlesSurvived || 0) + (skipDeathCount ? 0 : 1),
+          nearDeathCount: ndc,
+          title: title,
           bonusHp:  u.bonusHp  || 0,
           bonusAtk: u.bonusAtk || 0,
           bonusDef: u.bonusDef || 0,
@@ -824,6 +868,26 @@ var Campaign = {
       }
     }
     campaignState.survivingRoster = survivors;
+
+    // Bond pair tracking (skip for training bouts; only count deployed units)
+    if (!skipDeathCount) {
+      if (!campaignState.flags._bondCounts) campaignState.flags._bondCounts = {};
+      if (!campaignState.flags._bondPairs) campaignState.flags._bondPairs = [];
+      var bondPool = deployedUids
+        ? survivors.filter(function (s) { return deployedUids[s.uid]; })
+        : survivors;
+      for (var pi = 0; pi < bondPool.length; pi++) {
+        for (var pj = pi + 1; pj < bondPool.length; pj++) {
+          var pairKey = bondPool[pi].uid + "|" + bondPool[pj].uid;
+          campaignState.flags._bondCounts[pairKey] = (campaignState.flags._bondCounts[pairKey] || 0) + 1;
+          if (campaignState.flags._bondCounts[pairKey] >= 3) {
+            var exists = campaignState.flags._bondPairs.some(function(bp) { return bp === pairKey; });
+            if (!exists) campaignState.flags._bondPairs.push(pairKey);
+          }
+        }
+      }
+    }
+
     return { survivors: survivors, dead: dead };
   },
 
@@ -903,7 +967,16 @@ var Campaign = {
 
   // ─── Persistence (localStorage) ──────────────────────────────────
 
-  _SAVE_KEY: "geminus_campaign_v2",
+  _SAVE_KEY_PREFIX: "geminus_campaign_v2",
+  _activeSlot: 0,
+
+  _slotKey: function (slot) {
+    if (slot == null) slot = this._activeSlot;
+    return this._SAVE_KEY_PREFIX + "_slot_" + slot;
+  },
+
+  setSlot: function (slot) { this._activeSlot = slot; },
+  getSlot: function () { return this._activeSlot; },
 
   saveToDisk: function () {
     if (!campaignState.active) return;
@@ -920,13 +993,15 @@ var Campaign = {
         _preBattleCount: campaignState._preBattleCount || 0,
         savedAt: Date.now(),
       };
-      localStorage.setItem(this._SAVE_KEY, JSON.stringify(data));
+      localStorage.setItem(this._slotKey(), JSON.stringify(data));
+      localStorage.setItem("geminus_last_slot", String(this._activeSlot));
     } catch (e) { /* storage full or private mode */ }
   },
 
-  loadFromDisk: function () {
+  loadFromDisk: function (slot) {
+    if (slot != null) this._activeSlot = slot;
     try {
-      var raw = localStorage.getItem(this._SAVE_KEY);
+      var raw = localStorage.getItem(this._slotKey());
       if (!raw) return false;
       var data = JSON.parse(raw);
       if (!data || !data.active) return false;
@@ -950,13 +1025,15 @@ var Campaign = {
     } catch (e) { return false; }
   },
 
-  clearSave: function () {
-    try { localStorage.removeItem(this._SAVE_KEY); } catch (e) { /* ok */ }
+  clearSave: function (slot) {
+    var key = this._slotKey(slot != null ? slot : this._activeSlot);
+    try { localStorage.removeItem(key); } catch (e) { /* ok */ }
   },
 
-  hasSave: function () {
+  hasSave: function (slot) {
+    var key = this._slotKey(slot != null ? slot : this._activeSlot);
     try {
-      var raw = localStorage.getItem(this._SAVE_KEY);
+      var raw = localStorage.getItem(key);
       if (!raw) return false;
       var data = JSON.parse(raw);
       if (!data || !data.active) return false;
@@ -964,5 +1041,35 @@ var Campaign = {
       if (idx < 0 || idx > CAMPAIGN_MISSIONS.length) return false;
       return true;
     } catch (e) { return false; }
+  },
+
+  getSlotSummary: function (slot) {
+    var key = this._slotKey(slot);
+    try {
+      var raw = localStorage.getItem(key);
+      if (!raw) return null;
+      var data = JSON.parse(raw);
+      if (!data || !data.active) return null;
+      var mi = parseInt(data.missionIndex, 10) || 0;
+      var m = CAMPAIGN_MISSIONS[mi];
+      return {
+        slot: slot,
+        missionName: m ? ("M" + m.id + ": " + m.title) : "Completed",
+        savedAt: data.savedAt || 0,
+        rosterSize: (data.survivingRoster || []).length,
+      };
+    } catch (e) { return null; }
+  },
+
+  migrateOldSave: function () {
+    try {
+      var oldKey = "geminus_campaign_v2";
+      var raw = localStorage.getItem(oldKey);
+      if (!raw) return;
+      if (!this.hasSave(0)) {
+        localStorage.setItem(this._slotKey(0), raw);
+      }
+      localStorage.removeItem(oldKey);
+    } catch (e) { /* ok */ }
   },
 };

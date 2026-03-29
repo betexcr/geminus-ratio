@@ -610,6 +610,25 @@ svg.deploy-card__sprite {
   box-shadow: inset 0 0 8px rgba(74, 88, 72, 0.2);
 }
 
+.fft-ct-slot--preview {
+  opacity: 0.45;
+  transform: scale(0.85);
+}
+
+.ct-preview-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding-top: 0.25rem;
+  border-top: 1px dashed rgba(255, 220, 120, 0.25);
+  margin-top: 0.25rem;
+}
+
+.ct-preview-row .fft-ct-slot {
+  width: 3.2rem;
+  min-height: 1.4rem;
+}
+
 .fft-ct-slot__sprite {
   width: 100%;
   height: 100%;
@@ -1133,6 +1152,15 @@ svg.deploy-card__sprite {
   }
 }
 
+.battle-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.battle-actions .btn {
+  margin: 0;
+}
+
 /* ---- Keyboard Hints ---- */
 .battle-actions kbd {
   display: inline-block;
@@ -1192,6 +1220,197 @@ svg.deploy-card__sprite {
   outline: 2px solid var(--fft-gold);
   outline-offset: 2px;
   box-shadow: 0 0 8px rgba(232,192,64,0.4);
+}
+
+/* -- Save slot picker -- */
+.slot-picker {
+  margin-top: 1rem;
+  text-align: center;
+}
+.slot-picker__title {
+  font-family: var(--font-title);
+  color: var(--fft-gold);
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+}
+.slot-picker__slots {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+.slot-picker__btn {
+  width: 130px;
+  min-height: 70px;
+  font-size: 0.7rem;
+  line-height: 1.3;
+  text-align: center;
+  background: var(--fft-window-inner);
+  border: 1px solid var(--fft-gold-dim);
+  color: var(--fft-text);
+}
+.slot-picker__btn:hover:not(:disabled) {
+  border-color: var(--fft-gold);
+  background: rgba(232, 192, 64, 0.08);
+}
+
+/* -- Skirmish settings -- */
+.skirmish-panel {
+  max-width: 340px;
+}
+.skirmish-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin: 1rem 0;
+}
+.skirmish-fields label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-fft);
+  font-size: 0.8rem;
+  color: var(--fft-text);
+}
+.skirmish-fields input[type="range"] {
+  flex: 1;
+  accent-color: var(--fft-gold);
+}
+.skirmish-fields select, .input--text {
+  background: var(--fft-window-inner);
+  color: var(--fft-text);
+  border: 1px solid var(--fft-gold-dim);
+  font-family: var(--font-fft);
+  font-size: 0.75rem;
+  padding: 2px 4px;
+  border-radius: 2px;
+}
+
+/* -- Roster stats panel -- */
+.roster-stats-panel {
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background: var(--fft-window-inner);
+  border: 1px solid var(--fft-gold-dim);
+  border-radius: 2px;
+  overflow-x: auto;
+}
+.roster-stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-fft);
+  font-size: 0.7rem;
+  color: var(--fft-text);
+}
+.roster-stats-table th {
+  text-align: left;
+  padding: 2px 4px;
+  border-bottom: 1px solid var(--fft-gold-dim);
+  color: var(--fft-gold);
+  font-weight: normal;
+}
+.roster-stats-table td {
+  padding: 2px 4px;
+}
+.roster-stats--gifted td:first-child {
+  color: #88aa77;
+}
+
+/* -- Log overlay -- */
+.log-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 10001;
+  background: rgba(12, 10, 8, 0.92);
+  display: flex;
+  flex-direction: column;
+}
+.log-overlay__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--fft-gold-dim);
+  font-family: var(--font-title);
+  font-size: 1.1rem;
+  color: var(--fft-gold);
+}
+.log-overlay__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.5rem 1rem;
+}
+.log-overlay__body .log-entry {
+  padding: 2px 0;
+}
+
+/* -- Ability tags in ludus -- */
+.class-row__abilities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 4px;
+  margin-top: 2px;
+}
+.ability-tag {
+  display: inline-block;
+  font-family: var(--font-fft);
+  font-size: 0.65rem;
+  padding: 1px 5px;
+  border: 1px solid rgba(232, 192, 64, 0.3);
+  border-radius: 2px;
+  color: var(--fft-gold);
+  background: rgba(232, 192, 64, 0.06);
+  cursor: help;
+  white-space: nowrap;
+}
+.ability-tag:hover,
+.ability-tag:focus-visible {
+  background: rgba(232, 192, 64, 0.15);
+  border-color: var(--fft-gold);
+  outline: none;
+}
+.ability-tip {
+  display: none;
+  position: fixed;
+  min-width: 180px;
+  max-width: 260px;
+  padding: 6px 9px;
+  font-size: 0.62rem;
+  line-height: 1.4;
+  color: #f0e8d0;
+  background: #1a1714;
+  border: 1px solid var(--fft-gold);
+  border-radius: 3px;
+  white-space: pre-line;
+  text-align: left;
+  z-index: 10002;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.6);
+}
+.ability-tip::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+}
+.ability-tip--above::after {
+  top: 100%;
+  border-top-color: var(--fft-gold);
+}
+.ability-tip--below::after {
+  bottom: 100%;
+  border-bottom-color: var(--fft-gold);
+}
+.ability-tip.is-visible {
+  display: block;
+}
+
+.btn--small {
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  margin-top: 4px;
 }
 
 @media (prefers-reduced-motion: reduce) {

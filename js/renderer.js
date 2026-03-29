@@ -695,11 +695,13 @@ var IsoRenderer = (function () {
 
     if (darkSky) {
       ctx.save();
+      var _dpr = window.devicePixelRatio || 1;
+      ctx.setTransform(_dpr, 0, 0, _dpr, 0, 0);
       ctx.globalCompositeOperation = "multiply";
       ctx.fillStyle = "rgba(20, 15, 30, 0.18)";
       var logW = this.canvas.clientWidth || this.canvas.width;
       var logH = this.canvas.clientHeight || this.canvas.height;
-      ctx.fillRect(-logW, -logH, logW * 3, logH * 3);
+      ctx.fillRect(0, 0, logW, logH);
       ctx.restore();
       var tRng = _seedRng(3, 7);
       for (var ti = 0; ti < 4; ti++) {
@@ -746,6 +748,49 @@ var IsoRenderer = (function () {
       var nb = _deferredBubble;
       this._drawSpeechBubble(ctx, nb.cx, nb.cy, nb.text, nb.revealed, nb.style);
     }
+
+    // Off-screen unit indicators
+    if (params.units && params.units.length && !params.letterbox) {
+      this._drawOffscreenIndicators(ctx, params.units, params.heights);
+    }
+  };
+
+  IsoRenderer.prototype._drawOffscreenIndicators = function (ctx, units, heights) {
+    var dpr = window.devicePixelRatio || 1;
+    ctx.save();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var sw = this.canvas.width / dpr;
+    var sh = this.canvas.height / dpr;
+    var margin = 16;
+    var z = this.zoom || 1;
+    var px = this.panX || 0;
+    var py = this.panY || 0;
+    for (var i = 0; i < units.length; i++) {
+      var u = units[i];
+      if (u.hp <= 0) continue;
+      var h = (heights && heights[u.y] && heights[u.y][u.x]) || 0;
+      var tp = this.tileToScreen(u.x, u.y, h);
+      var sx = z * tp.x + (sw / 2) * (1 - z) - z * px;
+      var sy = z * tp.y + (sh / 2) * (1 - z) - z * py;
+      if (sx >= margin && sx <= sw - margin && sy >= margin && sy <= sh - margin) continue;
+      var cx = Math.max(margin, Math.min(sw - margin, sx));
+      var cy = Math.max(margin, Math.min(sh - margin, sy));
+      var color = u.team === "player" ? "#64aaff" : (u.gifted ? "#88aa77" : "#ff5a44");
+      var angle = Math.atan2(sy - sh / 2, sx - sw / 2);
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(angle);
+      ctx.beginPath();
+      ctx.moveTo(6, 0);
+      ctx.lineTo(-4, -4);
+      ctx.lineTo(-4, 4);
+      ctx.closePath();
+      ctx.fillStyle = color;
+      ctx.globalAlpha = 0.7;
+      ctx.fill();
+      ctx.restore();
+    }
+    ctx.restore();
   };
 
   function _hlBaseColor(type) {
@@ -793,6 +838,17 @@ var IsoRenderer = (function () {
       ctx.translate(sprCx, sprFoot);
       ctx.scale(1, deathScale);
       ctx.translate(-sprCx, -sprFoot);
+    }
+
+    // Breathing scale idle animation
+    if (!this.reducedMotion && !unit.exhausted && deathAlpha >= 1) {
+      var _bid = typeof unit.id === "number" ? unit.id : ((unit.id || "").charCodeAt(0) || 0);
+      var breathPhase = this._pulsePhase * 0.3 + _bid * 2.1;
+      var breathScale = 1 + 0.012 * Math.sin(breathPhase);
+      var breathFoot = dy + DRAW_SPRITE_H;
+      ctx.translate(cx, breathFoot);
+      ctx.scale(1, breathScale);
+      ctx.translate(-cx, -breathFoot);
     }
 
     // PS1 sprite outline: draw tinted copies at 4 offsets

@@ -39,7 +39,9 @@
             <button type="button" id="btnClearRoster" class="btn btn--ghost">Clear roster</button>
             <button type="button" id="btnToDeploy" class="btn btn--gold" disabled>To the gates</button>
             <button type="button" id="btnTrainingBout" class="btn btn--training is-hidden">Training Bout</button>
+            <button type="button" id="btnRosterStats" class="btn btn--ghost btn--small is-hidden" aria-expanded="false" aria-controls="rosterStatsPanel">Roster Stats</button>
           </div>
+          <div id="rosterStatsPanel" class="roster-stats-panel is-hidden" role="region" aria-label="Roster statistics"></div>
         </section>
 
         <section id="panelDeploy" class="panel__section is-hidden" aria-label="Deployment">
@@ -71,9 +73,11 @@
             <button type="button" id="btnAttack" class="btn" disabled aria-label="Attack (A)"><kbd>A</kbd> Attack</button>
             <button type="button" id="btnAbility" class="btn btn--accent" disabled aria-label="Ability (B)"><kbd>B</kbd> Ability</button>
             <button type="button" id="btnWait" class="btn btn--ghost" disabled aria-label="Wait (W)"><kbd>W</kbd> Wait</button>
+            <button type="button" id="btnUndo" class="btn btn--ghost" disabled aria-label="Undo Move (U)"><kbd>U</kbd> Undo</button>
             <div id="abilityMenu" class="ability-menu is-hidden" role="menu" aria-label="Abilities"></div>
           </div>
           <div id="logFeed" class="log-feed" role="log" aria-label="Combat log" aria-live="polite" aria-relevant="additions"></div>
+          <button type="button" id="btnLogExpand" class="btn btn--ghost btn--small" aria-label="Expand full log" aria-expanded="false" aria-controls="logOverlay">Full Log</button>
         </section>
       </aside>
 
@@ -108,6 +112,51 @@
         <button type="button" id="btnContinueCampaign" class="btn btn--gold is-hidden">Continue Campaign</button>
         <button type="button" id="btnNewCampaign" class="btn btn--gold">New Campaign</button>
         <button type="button" id="btnSkirmish" class="btn btn--ghost">Skirmish</button>
+      </div>
+      <div id="slotPicker" class="slot-picker is-hidden" aria-label="Save slot selection">
+        <p class="slot-picker__title">Choose a Save Slot</p>
+        <div class="slot-picker__slots" id="slotPickerSlots"></div>
+        <button type="button" id="btnSlotBack" class="btn btn--ghost btn--small">Back</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Skirmish settings overlay -->
+  <div id="skirmishSettings" class="title-overlay is-hidden" role="dialog" aria-labelledby="skirmishHeading" aria-modal="true">
+    <div class="title-panel skirmish-panel">
+      <h2 id="skirmishHeading" class="title-panel__name">Skirmish Settings</h2>
+      <div class="skirmish-fields">
+        <label>Enemies <input type="range" id="skEnemyCount" min="2" max="6" value="3"><span id="skEnemyVal">3</span></label>
+        <label>Budget <input type="range" id="skBudget" min="80" max="200" step="10" value="140"><span id="skBudgetVal">140</span></label>
+        <label>Map Size
+          <select id="skMapSize">
+            <option value="small">Small (8×7)</option>
+            <option value="medium" selected>Medium (12×10)</option>
+            <option value="large">Large (14×12)</option>
+          </select>
+        </label>
+        <label>Terrain
+          <select id="skTerrain">
+            <option value="sparse">Sparse</option>
+            <option value="normal" selected>Normal</option>
+            <option value="dense">Dense</option>
+          </select>
+        </label>
+        <label>Map Template
+          <select id="skTemplate">
+            <option value="" selected>Random</option>
+            <option value="pit">The Pit</option>
+            <option value="bridge">Bridge of Chains</option>
+            <option value="tiers">Colosseum Tiers</option>
+            <option value="flooded">Flooded Arena</option>
+            <option value="pillared">Pillared Hall</option>
+          </select>
+        </label>
+        <label>Seed <input type="text" id="skSeed" placeholder="random" class="input--text" maxlength="12"></label>
+      </div>
+      <div class="title-panel__buttons">
+        <button type="button" id="btnSkirmishStart" class="btn btn--gold">Start</button>
+        <button type="button" id="btnSkirmishBack" class="btn btn--ghost">Back</button>
       </div>
     </div>
   </div>

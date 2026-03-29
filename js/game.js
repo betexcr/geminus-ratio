@@ -5,11 +5,21 @@
 (function () {
   "use strict";
 
-  const BOARD_W = 12;
-  const BOARD_H = 10;
+  var BOARD_W = 12;
+  var BOARD_H = 10;
   const MAX_ROSTER = 6;
   const BUDGET_MAX_DEFAULT = 140;
   var budgetCurrent = BUDGET_MAX_DEFAULT;
+
+  var skirmishConfig = {
+    enemyCount: 3,
+    budget: BUDGET_MAX_DEFAULT,
+    mapSize: "medium",
+    terrainDensity: "normal",
+    seed: null,
+    template: null,
+  };
+  var MAP_SIZES = { small: { w: 8, h: 7 }, medium: { w: 12, h: 10 }, large: { w: 14, h: 12 } };
   var MAP_MODIFIER_DEFS = {
     cursed_3:  { type: "cursed", count: 3, dmg: 3 },
     cursed_4:  { type: "cursed", count: 4, dmg: 3 },
@@ -432,19 +442,84 @@
     return "sand";
   }
 
+  var MAP_TEMPLATES = {
+    pit: {
+      name: "The Pit",
+      heightFn: function (x, y, w, h) {
+        var cx = w / 2, cy = h / 2;
+        var d = Math.abs(x - cx) + Math.abs(y - cy);
+        var maxD = cx + cy - 2;
+        if (d < 3) return 0;
+        return Math.min(2, Math.floor((d / maxD) * 3));
+      },
+      terrainFn: function () { return null; }
+    },
+    bridge: {
+      name: "Bridge of Chains",
+      heightFn: function (x, y, w, h) {
+        var midX = Math.floor(w / 2);
+        if (Math.abs(x - midX) <= 1) return 1;
+        return 0;
+      },
+      terrainFn: function (x, y, w, h) {
+        var midX = Math.floor(w / 2);
+        if (Math.abs(x - midX) > 1 && y > 0 && y < h - 1) return "water_deep";
+        return null;
+      }
+    },
+    tiers: {
+      name: "Colosseum Tiers",
+      heightFn: function (x, y, w, h) {
+        var ring = Math.min(x, y, w - 1 - x, h - 1 - y);
+        return Math.min(2, ring);
+      },
+      terrainFn: function () { return null; }
+    },
+    flooded: {
+      name: "Flooded Arena",
+      heightFn: function (x, y, w, h) {
+        var cx = w / 2, cy = h / 2;
+        var d = Math.sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy));
+        return d < 3 ? 1 : 0;
+      },
+      terrainFn: function (x, y, w, h) {
+        var cx = w / 2, cy = h / 2;
+        var d = Math.sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy));
+        if (d >= 3 && y > 0 && y < h - 1) return "water_shallow";
+        return null;
+      }
+    },
+    pillared: {
+      name: "Pillared Hall",
+      heightFn: function (x, y) {
+        if (x % 3 === 1 && y % 3 === 1) return 2;
+        return 0;
+      },
+      terrainFn: function (x, y) {
+        if (x % 3 === 1 && y % 3 === 1) return "building";
+        return null;
+      }
+    }
+  };
+
   /** Pseudo-random arena height (0–2). */
-  function buildHeightField(seed) {
+  function buildHeightField(seed, template) {
+    var tmpl = template ? MAP_TEMPLATES[template] : null;
     const H = [];
     const rnd = seedRng(seed);
     for (let y = 0; y < BOARD_H; y++) {
       const row = [];
       for (let x = 0; x < BOARD_W; x++) {
-        const edge = x === 0 || x === BOARD_W - 1 || y === 0 || y === BOARD_H - 1;
-        const centerBias = Math.abs(x - BOARD_W / 2) + Math.abs(y - BOARD_H / 2);
-        let h = Math.floor(rnd() * 3);
-        if (edge) h = Math.min(h, 1);
-        if (centerBias < 4 && rnd() > 0.55) h = Math.min(h + 1, 2);
-        row.push(h);
+        if (tmpl && tmpl.heightFn) {
+          row.push(tmpl.heightFn(x, y, BOARD_W, BOARD_H));
+        } else {
+          const edge = x === 0 || x === BOARD_W - 1 || y === 0 || y === BOARD_H - 1;
+          const centerBias = Math.abs(x - BOARD_W / 2) + Math.abs(y - BOARD_H / 2);
+          let h = Math.floor(rnd() * 3);
+          if (edge) h = Math.min(h, 1);
+          if (centerBias < 4 && rnd() > 0.55) h = Math.min(h + 1, 2);
+          row.push(h);
+        }
       }
       H.push(row);
     }
@@ -463,8 +538,22 @@
     return T;
   }
 
-  function buildTerrainMap(seed, terrainSpec) {
+  function buildTerrainMap(seed, terrainSpec, template) {
     var T = buildEmptyTerrain();
+    var tmpl = template ? MAP_TEMPLATES[template] : null;
+    if (tmpl && tmpl.terrainFn) {
+      for (var ty = 0; ty < BOARD_H; ty++) {
+        for (var tx = 0; tx < BOARD_W; tx++) {
+          var tt = tmpl.terrainFn(tx, ty, BOARD_W, BOARD_H);
+          if (tt) {
+            T[ty][tx] = tt;
+            if (tt === "building") state.height[ty][tx] = 2;
+            if (tt === "water_deep" || tt === "water_shallow") state.height[ty][tx] = 0;
+          }
+        }
+      }
+      return T;
+    }
     if (terrainSpec && terrainSpec.length) {
       for (var i = 0; i < terrainSpec.length; i++) {
         var s = terrainSpec[i];
@@ -476,7 +565,8 @@
       }
     } else if (seed != null) {
       var rng = seedRng(seed * 311 + 7);
-      var count = 2 + Math.floor(rng() * 3);
+      var densityMult = skirmishConfig.terrainDensity === "sparse" ? 0.5 : (skirmishConfig.terrainDensity === "dense" ? 1.8 : 1);
+      var count = Math.round((2 + Math.floor(rng() * 3)) * densityMult);
       for (var b = 0; b < count; b++) {
         var bx, by;
         for (var att = 0; att < 20; att++) {
@@ -489,8 +579,8 @@
           state.height[by][bx] = 2;
         }
       }
-      if (rng() < 0.35) {
-        var wCount = 1 + Math.floor(rng() * 3);
+      if (rng() < 0.35 * densityMult) {
+        var wCount = Math.round((1 + Math.floor(rng() * 3)) * densityMult);
         for (var w = 0; w < wCount; w++) {
           var wx, wy;
           for (var watt = 0; watt < 20; watt++) {
@@ -537,11 +627,13 @@
     highlightCells: new Set(),
     hasMoved: false,
     hasActed: false,
+    preMovePos: null,
     selectedAbilityIndex: -1,
     turnCount: 0,
     totalDamageDealt: 0,
     animating: false,
     boutNumber: 0,
+    battleLog: [],
     _mapSeed: 0,
     mapMods: {
       cursedTiles: new Set(),
@@ -620,6 +712,7 @@
   const btnAttack = $("#btnAttack");
   const btnAbility = $("#btnAbility");
   const btnWait = $("#btnWait");
+  const btnUndo = $("#btnUndo");
   const abilityMenu = $("#abilityMenu");
   const logFeed = $("#logFeed");
   const tileInfoEl = $("#tileInfo");
@@ -651,12 +744,61 @@
       else if (/brace|testudo|riposte|umbra|wall/i.test(msg)) cls += " log-entry--buff";
       else if (/\d+ /.test(msg) && /hit|strike|deal|cut|pierce/i.test(msg)) cls += " log-entry--dmg";
     }
+    state.battleLog.push({ msg: msg, type: type || null, turn: state.turnCount });
+    if (state.battleLog.length > 500) state.battleLog.shift();
     var p = document.createElement("p");
     p.className = cls;
     p.textContent = msg;
     logFeed.appendChild(p);
     while (logFeed.children.length > 40) logFeed.removeChild(logFeed.firstChild);
     logFeed.scrollTop = logFeed.scrollHeight;
+  }
+
+  function toggleFullLog() {
+    var overlay = document.getElementById("logOverlay");
+    var trigger = document.getElementById("btnLogExpand");
+    if (overlay) {
+      overlay.remove();
+      if (trigger) { trigger.setAttribute("aria-expanded", "false"); trigger.focus(); }
+      return;
+    }
+    overlay = document.createElement("div");
+    overlay.id = "logOverlay";
+    overlay.className = "log-overlay";
+    overlay.setAttribute("role", "dialog");
+    overlay.setAttribute("aria-modal", "true");
+    overlay.setAttribute("aria-label", "Full battle log");
+    var header = document.createElement("div");
+    header.className = "log-overlay__header";
+    header.innerHTML = '<span>Full Battle Log</span><button type="button" class="btn btn--ghost" aria-label="Close log">✕</button>';
+    header.querySelector("button").onclick = function () {
+      overlay.remove();
+      if (trigger) { trigger.setAttribute("aria-expanded", "false"); trigger.focus(); }
+    };
+    overlay.appendChild(header);
+    var body = document.createElement("div");
+    body.className = "log-overlay__body";
+    for (var i = 0; i < state.battleLog.length; i++) {
+      var entry = state.battleLog[i];
+      var p = document.createElement("p");
+      var eCls = "log-entry";
+      if (entry.type) eCls += " log-entry--" + entry.type;
+      p.className = eCls;
+      p.textContent = entry.msg;
+      body.appendChild(p);
+    }
+    overlay.appendChild(body);
+    document.getElementById("app").appendChild(overlay);
+    body.scrollTop = body.scrollHeight;
+    overlay.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") {
+        overlay.remove();
+        if (trigger) { trigger.setAttribute("aria-expanded", "false"); trigger.focus(); }
+      }
+    });
+    overlay.tabIndex = -1;
+    overlay.focus();
+    if (trigger) trigger.setAttribute("aria-expanded", "true");
   }
 
   function isTutorial() {
@@ -846,6 +988,8 @@
     eagle:    { glyph: "E", color: "#aaff44", label: "Eagle Eye" },
     fortress: { glyph: "F", color: "#8888ff", label: "Fortress Stance" },
     momentum: { glyph: "!", color: "#ffdd44", label: "Momentum" },
+    bond:     { glyph: "♥", color: "#ff88cc", label: "Bonded +1 DEF" },
+    scarred:  { glyph: "×", color: "#cc4444", label: "Scarred" },
   };
 
   function getUnitStatusIcons(u) {
@@ -870,7 +1014,27 @@
     if (u.eagleEyeHits > 0) icons.push(STATUS_DEFS.eagle);
     if (u.fortressRooted > 0) icons.push(STATUS_DEFS.fortress);
     if (u.momentumBonus > 0) icons.push(STATUS_DEFS.momentum);
+    if (u.bondBuff) icons.push(STATUS_DEFS.bond);
+    if ((u.nearDeathCount || 0) >= 2) icons.push(STATUS_DEFS.scarred);
     return icons;
+  }
+
+  function updateBondBuff(u) {
+    u.bondBuff = false;
+    if (!campaignState.active) return;
+    var bonds = campaignState.flags._bondPairs;
+    if (!bonds || !bonds.length || !u.uid) return;
+    var adj = state.units.filter(function (a) {
+      return a.hp > 0 && a.id !== u.id && a.team === u.team && Math.abs(a.x - u.x) + Math.abs(a.y - u.y) === 1;
+    });
+    for (var bi = 0; bi < bonds.length; bi++) {
+      var pair = bonds[bi].split("|");
+      if (pair.indexOf(u.uid) === -1) continue;
+      var otherUid = pair[0] === u.uid ? pair[1] : pair[0];
+      for (var ai = 0; ai < adj.length; ai++) {
+        if (adj[ai].uid === otherUid) { u.bondBuff = true; return; }
+      }
+    }
   }
 
   function cellKey(x, y) {
@@ -890,7 +1054,7 @@
   }
 
   function unitAtk(u)  { return Math.max(1, (u.giftedAtk || classById(u.classId).atk) + levelBonus(u, "Atk") + (u.blindRushAtk || 0) + (u.atkBonus || 0) + (u.momentumBonus || 0) + (u.battleHardenedTurns > 0 ? (u.battleHardenedAtk || 0) : 0) - (u.shadowMendAtkPenalty || 0) - (u.atkDebuffAmt && u.atkDebuffTurns > 0 ? u.atkDebuffAmt : 0)); }
-  function unitDef(u)  { return Math.max(0, (u.giftedDef || classById(u.classId).def) + levelBonus(u, "Def") + (u.phalanxBonus || 0) + (u.battleHardenedTurns > 0 ? (u.battleHardenedDef || 0) : 0) - (u.blindRushDef || 0)); }
+  function unitDef(u)  { return Math.max(0, (u.giftedDef || classById(u.classId).def) + levelBonus(u, "Def") + (u.phalanxBonus || 0) + (u.battleHardenedTurns > 0 ? (u.battleHardenedDef || 0) : 0) - (u.blindRushDef || 0) + (u.bondBuff ? 1 : 0)); }
   function unitSpd(u)  { return Math.max(1, (u.giftedSpd || classById(u.classId).spd) + levelBonus(u, "Spd") - (u.crowdSpdDebuff || 0)); }
   function unitMove(u) { return u.giftedMove || classById(u.classId).move; }
   function unitJump(u) { return u.giftedJump || classById(u.classId).jump; }
@@ -1157,6 +1321,9 @@
       battleHardenedDef: 0,
       momentumBonus: 0,
       shadowMendAtkPenalty: 0,
+      bondBuff: false,
+      nearDeathCount: 0,
+      title: null,
     };
   }
 
@@ -1354,10 +1521,64 @@
     }
   }
 
+  function previewCtStrip(action) {
+    var el = document.getElementById("ctStrip");
+    if (!el) return;
+    var preview = el.querySelector(".ct-preview-row");
+    if (preview) preview.remove();
+    var au = state.activeUnit;
+    if (!au || state.phase !== "battle") return;
+    var alive = state.units.filter(function (u) { return u.hp > 0; });
+    var clones = alive.map(function (u) {
+      return { id: u.id, ct: u.ct, classId: u.classId, team: u.team, gifted: u.gifted, displayName: u.displayName, level: u.level, hp: u.hp, maxHp: u.maxHp, _spd: unitSpd(u) };
+    });
+    var ac = clones.find(function (c) { return c.id === au.id; });
+    if (!ac) return;
+    var sorted = [];
+    for (var guard = 0; guard < 200; guard++) {
+      for (var ci = 0; ci < clones.length; ci++) clones[ci].ct += clones[ci]._spd;
+      var ready = null;
+      for (var ri = 0; ri < clones.length; ri++) {
+        if (clones[ri].ct >= 100 && (!ready || clones[ri].ct > ready.ct)) ready = clones[ri];
+      }
+      if (ready) {
+        ready.ct -= 100;
+        sorted.push(ready);
+        if (sorted.length >= 6) break;
+      }
+    }
+    var row = document.createElement("div");
+    row.className = "ct-preview-row";
+    for (var si = 0; si < sorted.length; si++) {
+      var u = sorted[si];
+      var def = classById(u.classId);
+      var slot = document.createElement("div");
+      var tCls = u.gifted ? "fft-ct-slot--gifted" : (u.team === "player" ? "fft-ct-slot--player" : "fft-ct-slot--enemy");
+      slot.className = "fft-ct-slot fft-ct-slot--preview " + tCls;
+      slot.title = (action === "wait" ? "After Wait: " : "After Act: ") + def.name;
+      var n = document.createElement("span");
+      n.className = "fft-ct-slot__n";
+      n.textContent = (u.displayName || def.name).substring(0, 6);
+      slot.appendChild(n);
+      row.appendChild(slot);
+    }
+    el.appendChild(row);
+  }
+
+  function clearCtPreview() {
+    var el = document.getElementById("ctStrip");
+    if (!el) return;
+    var preview = el.querySelector(".ct-preview-row");
+    if (preview) preview.remove();
+  }
+
   function showPhasePanels() {
     syncBodyPhaseClass();
     refreshCtStrip();
     const p = state.phase;
+    if (p === "ludus") SFX.startAmbient("ludus");
+    else if (p === "battle") SFX.startAmbient("battle");
+    else SFX.startAmbient("ludus");
     var phaseText = p === "ludus" ? "Ludus" : p === "deploy" ? "Gates" : "Arena";
     if (campaignState.active) {
       var m = Campaign.getMission();
@@ -1367,6 +1588,38 @@
     panelRoster.classList.toggle("is-hidden", p !== "ludus");
     panelDeploy.classList.toggle("is-hidden", p !== "deploy");
     panelBattle.classList.toggle("is-hidden", p !== "battle");
+  }
+
+  var _abilityTipEl = null;
+  function _showAbilityTip(e) {
+    var tag = e.currentTarget;
+    if (!tag._tipText) return;
+    if (!_abilityTipEl) {
+      _abilityTipEl = document.createElement("span");
+      _abilityTipEl.className = "ability-tip";
+      document.body.appendChild(_abilityTipEl);
+    }
+    _abilityTipEl.textContent = tag._tipText;
+    _abilityTipEl.classList.remove("ability-tip--above", "ability-tip--below");
+    _abilityTipEl.style.left = "0";
+    _abilityTipEl.style.top = "0";
+    _abilityTipEl.classList.add("is-visible");
+    var rect = tag.getBoundingClientRect();
+    var tipRect = _abilityTipEl.getBoundingClientRect();
+    var above = rect.top - tipRect.height - 8;
+    if (above < 4) {
+      _abilityTipEl.classList.add("ability-tip--below");
+      _abilityTipEl.style.top = (rect.bottom + 8) + "px";
+    } else {
+      _abilityTipEl.classList.add("ability-tip--above");
+      _abilityTipEl.style.top = above + "px";
+    }
+    var left = rect.left + rect.width / 2 - tipRect.width / 2;
+    left = Math.max(4, Math.min(left, window.innerWidth - tipRect.width - 4));
+    _abilityTipEl.style.left = left + "px";
+  }
+  function _hideAbilityTip() {
+    if (_abilityTipEl) _abilityTipEl.classList.remove("is-visible");
   }
 
   function refreshRosterUI() {
@@ -1408,9 +1661,27 @@
         '<div class="class-row__stats">HP ' + c.hp + ' · ATK ' + c.atk +
         ' · DEF ' + c.def + ' · SPD ' + c.spd +
         ' · Move ' + c.move + ' · Jump ' + c.jump + "</div>" +
-        '<div class="class-row__meta">' +
-        c.abilities.map(function (a) { return a.name; }).join(", ") +
-        "</div>";
+        '<div class="class-row__abilities"></div>';
+      var abilitiesDiv = left.querySelector(".class-row__abilities");
+      c.abilities.forEach(function (a) {
+        var tag = document.createElement("span");
+        tag.className = "ability-tag";
+        tag.setAttribute("tabindex", "0");
+        tag.textContent = a.name;
+        var tipParts = [];
+        if (a.type) tipParts.push(a.type.charAt(0).toUpperCase() + a.type.slice(1));
+        if (a.range) tipParts.push("Range " + a.range);
+        if (a.mult) tipParts.push("×" + a.mult + " dmg");
+        if (a.fixedDmg) tipParts.push(a.fixedDmg + " true dmg");
+        if (a.healAmt) tipParts.push("Heal " + a.healAmt);
+        if (a.levelReq && a.levelReq > 1) tipParts.push("Lv" + a.levelReq);
+        tag._tipText = (a.desc || a.name) + (tipParts.length ? "\n" + tipParts.join(" · ") : "");
+        tag.addEventListener("mouseenter", _showAbilityTip);
+        tag.addEventListener("mouseleave", _hideAbilityTip);
+        tag.addEventListener("focus", _showAbilityTip);
+        tag.addEventListener("blur", _hideAbilityTip);
+        abilitiesDiv.appendChild(tag);
+      });
       left.addEventListener("click", () => {
         state.selectedClassId = c.id;
         refreshRosterUI();
@@ -1501,6 +1772,71 @@
         btnTrainingBout.classList.add("is-hidden");
       }
     }
+    var btnStats = document.getElementById("btnRosterStats");
+    if (btnStats) {
+      btnStats.classList.toggle("is-hidden", !campaignState.active);
+    }
+  }
+
+  function toggleRosterStats() {
+    var panel = document.getElementById("rosterStatsPanel");
+    var btn = document.getElementById("btnRosterStats");
+    if (!panel) return;
+    if (!panel.classList.contains("is-hidden")) {
+      panel.classList.add("is-hidden");
+      if (btn) btn.setAttribute("aria-expanded", "false");
+      return;
+    }
+    panel.innerHTML = "";
+    var roster = campaignState.survivingRoster;
+    if (!roster || !roster.length) {
+      panel.textContent = "No roster data yet.";
+      panel.classList.remove("is-hidden");
+      if (btn) btn.setAttribute("aria-expanded", "true");
+      return;
+    }
+    var table = document.createElement("table");
+    table.className = "roster-stats-table";
+    var thead = document.createElement("thead");
+    thead.innerHTML = "<tr><th>Name</th><th>Class</th><th>Lv</th><th>Kills</th><th>Battles</th><th>Title</th></tr>";
+    table.appendChild(thead);
+    var tbody = document.createElement("tbody");
+    for (var i = 0; i < roster.length; i++) {
+      var s = roster[i];
+      var def = classById(s.classId);
+      var tr = document.createElement("tr");
+      var dName = s.name || (s.displayName || def.name);
+      var titleStr = s.title || "—";
+      if ((s.nearDeathCount || 0) >= 2) titleStr += " (Scarred)";
+      tr.innerHTML = "<td>" + dName + "</td><td>" + def.name + "</td><td>" + (s.level || 1) + "</td><td>" + (s.kills || 0) + "</td><td>" + (s.battlesSurvived || 0) + "</td><td>" + titleStr + "</td>";
+      if (s.gifted) tr.classList.add("roster-stats--gifted");
+      tbody.appendChild(tr);
+    }
+    table.appendChild(tbody);
+
+    panel.appendChild(table);
+
+    // Show bonded pairs
+    var bonds = campaignState.flags._bondPairs || [];
+    if (bonds.length > 0) {
+      var bondDiv = document.createElement("div");
+      bondDiv.style.marginTop = "0.5rem";
+      bondDiv.style.fontSize = "0.7rem";
+      bondDiv.style.color = "var(--fft-gold)";
+      bondDiv.innerHTML = "<strong>Bonded Pairs:</strong> ";
+      for (var bp = 0; bp < bonds.length; bp++) {
+        var pair = bonds[bp].split("|");
+        var n1 = "", n2 = "";
+        for (var ri = 0; ri < roster.length; ri++) {
+          if (roster[ri].uid === pair[0]) n1 = roster[ri].name || classById(roster[ri].classId).name;
+          if (roster[ri].uid === pair[1]) n2 = roster[ri].name || classById(roster[ri].classId).name;
+        }
+        if (n1 && n2) bondDiv.innerHTML += (bp > 0 ? ", " : "") + n1 + " & " + n2;
+      }
+      panel.appendChild(bondDiv);
+    }
+    panel.classList.remove("is-hidden");
+    if (btn) btn.setAttribute("aria-expanded", "true");
   }
 
   function hireClass(classId) {
@@ -1672,10 +2008,20 @@
       state.trainingBout = false;
       var mission = campaignState.active ? Campaign.getMission() : null;
       var nextBout = state.boutNumber + 1;
-      var hSeed = mission ? mission.id * 97 + 42 : (nextBout * 71 + 42);
+      var hSeed;
+      if (mission) {
+        hSeed = mission.id * 97 + 42;
+      } else if (skirmishConfig.seed) {
+        var h = 0;
+        for (var si = 0; si < skirmishConfig.seed.length; si++) h = ((h << 5) - h + skirmishConfig.seed.charCodeAt(si)) | 0;
+        hSeed = Math.abs(h);
+      } else {
+        hSeed = nextBout * 71 + 42;
+      }
       state._mapSeed = hSeed;
-      state.height = buildHeightField(hSeed);
-      state.terrain = buildTerrainMap(hSeed, mission ? mission.terrain : null);
+      var tmplKey = (!mission && !campaignState.active && skirmishConfig.template) ? skirmishConfig.template : null;
+      state.height = buildHeightField(hSeed, tmplKey);
+      state.terrain = buildTerrainMap(hSeed, mission ? mission.terrain : null, tmplKey);
       state.phase = "deploy";
       state.deployTemplate = state.picks.map((p) => ({ ...p }));
       state.units = [];
@@ -1707,7 +2053,7 @@
     }
 
     var playerCount = Math.min(6, state.picks.length);
-    var enemyCount = playerCount;
+    var enemyCount = campaignState.active ? playerCount : (skirmishConfig.enemyCount || playerCount);
     var playerSpent = state.picks.reduce(function (s, p) { return s + classById(p.classId).cost; }, 0);
     var enemyBudget = Math.round(playerSpent * 1.15);
 
@@ -1790,6 +2136,9 @@
     unit.level = pick.level || 1;
     unit.xp = pick.xp || 0;
     unit.kills = pick.kills || 0;
+    unit.nearDeathCount = pick.nearDeathCount || 0;
+    unit.title = pick.title || null;
+    unit.battlesSurvived = pick.battlesSurvived || 0;
     if (pick.bonusHp != null) {
       unit.bonusHp  = pick.bonusHp  || 0;
       unit.bonusAtk = pick.bonusAtk || 0;
@@ -2183,13 +2532,15 @@
     state.boutNumber++;
     var mission = campaignState.active ? Campaign.getMission() : null;
     var hSeed = state._mapSeed;
-    state.height = buildHeightField(hSeed);
+    var tmplKey = (!mission && !campaignState.active && skirmishConfig.template) ? skirmishConfig.template : null;
+    state.height = buildHeightField(hSeed, tmplKey);
     state.phase = "battle";
     state.activeUnit = null;
     state.battleMode = "idle";
     state.highlightCells.clear();
     state.turnCount = 0;
     state.totalDamageDealt = 0;
+    state.battleLog = [];
     state.titusForgottenName = false;
     state.endingATriggered = false;
     state.titusTurnCounter = 0;
@@ -2198,7 +2549,7 @@
       campaignState._preBattleCount = state.units.filter(function (u) { return u.team === "player"; }).length;
     }
     initMapModifiers(mission);
-    state.terrain = buildTerrainMap(hSeed, mission ? mission.terrain : null);
+    state.terrain = buildTerrainMap(hSeed, mission ? mission.terrain : null, tmplKey);
     applyCrowdMadnessAtBattleStart();
     showPhasePanels();
     unitCard.classList.add("is-hidden");
@@ -2232,6 +2583,7 @@
       }
     };
     btnWait.onclick = () => waitAction();
+    btnUndo.onclick = () => undoMove();
   }
 
   function tickMarkDebuffIfNeeded(u) {
@@ -2315,10 +2667,11 @@
     state.hasMoved = false;
     state.hasActed = false;
     state.selectedAbilityIndex = -1;
+    updateBondBuff(actor);
     showUnitPanel(actor);
     setBattleButtons(actor);
     renderBoard();
-    var turnMsg = "Turn: " + (actor.displayName ? actor.displayName + " the " : "") + classById(actor.classId).name + " — issue orders.";
+    var turnMsg = "Turn: " + (actor.displayName ? actor.displayName + " the " : "") + classById(actor.classId).name + (actor.title ? " the " + actor.title : "") + " — issue orders.";
     log(turnMsg, "system");
     announce(turnMsg + " HP " + actor.hp + " of " + actor.maxHp);
     if (state.tutorialStep < 20) state.tutorialStep = 20;
@@ -2389,7 +2742,9 @@
   function showUnitPanel(u) {
     const def = classById(u.classId);
     unitCard.classList.remove("is-hidden");
-    var uNameStr = u.displayName ? u.displayName + " (" + def.name + ")" : def.name;
+    var uNameStr = u.displayName ? u.displayName : def.name;
+    if (u.title) uNameStr += " the " + u.title;
+    if (u.displayName) uNameStr += " (" + def.name + ")";
     if (campaignState.active && u.level > 1) uNameStr += " Lv." + u.level;
     ucName.textContent = uNameStr;
     ucClass.textContent = def.role;
@@ -2424,6 +2779,7 @@
     btnAttack.disabled = !alive || state.hasActed;
     btnAbility.disabled = !alive || state.hasActed;
     btnWait.disabled = !alive;
+    btnUndo.disabled = !(alive && state.hasMoved && !state.hasActed && state.preMovePos);
     hideAbilityMenu();
   }
 
@@ -2435,6 +2791,7 @@
       if (ab.type === "passive") return;
       menuIdx++;
       const btn = document.createElement("button");
+      btn.type = "button";
       btn.className = "ability-menu__btn";
       btn.setAttribute("role", "menuitem");
       btn.innerHTML = "<kbd>" + menuIdx + "</kbd> " + ab.name + "<small>" + ab.desc + "</small>";
@@ -2465,6 +2822,7 @@
     state.highlightCells.clear();
     state.hasMoved = false;
     state.hasActed = false;
+    state.preMovePos = null;
     state.selectedAbilityIndex = -1;
     hideForecast();
     unitCard.classList.add("is-hidden");
@@ -2473,6 +2831,7 @@
     btnAttack.disabled = true;
     btnAbility.disabled = true;
     btnWait.disabled = true;
+    btnUndo.disabled = true;
     renderBoard();
     await delay(250);
     tickBattleTurn();
@@ -2490,6 +2849,24 @@
     }
     renderBoard();
     tutorialTip(30, "Good move! Now click Attack (A) to strike an adjacent enemy, or use an Ability (B) if one is available.");
+  }
+
+  function undoMove() {
+    var u = state.activeUnit;
+    if (!u || !state.preMovePos || state.hasActed) return;
+    u.x = state.preMovePos.x;
+    u.y = state.preMovePos.y;
+    u.pursuitBonusDmg = 0;
+    u.momentumBonus = 0;
+    state.hasMoved = false;
+    state.preMovePos = null;
+    state.battleMode = "idle";
+    state.highlightCells.clear();
+    hideForecast();
+    showUnitPanel(u);
+    setBattleButtons(u);
+    renderBoard();
+    log("Move undone.");
   }
 
   function endAction() {
@@ -2620,6 +2997,7 @@
     if (state.battleMode === "move") {
       const k = cellKey(x, y);
       if (!state.highlightCells.has(k)) return;
+      state.preMovePos = { x: u.x, y: u.y };
       state.animating = true;
       var path = computePath(u, x, y);
       await animateMove(u, path);
@@ -3174,6 +3552,7 @@
     } else if (name === "Champion's Resolve") {
       if (u.resolveUsed) {
         log("Champion's Resolve already used this battle.");
+        return;
       } else {
         u.hp = u.maxHp;
         u.resolveUsed = true;
@@ -3625,6 +4004,32 @@
     logFeed.innerHTML = "";
   }
 
+  function pickVignette() {
+    if (!campaignState.active || typeof VIGNETTE_POOL === "undefined") return [];
+    var alive = state.units.filter(function (u) { return u.team === "player" && u.hp > 0; });
+    var classSet = {};
+    for (var ai = 0; ai < alive.length; ai++) classSet[alive[ai].classId] = alive[ai];
+    if (!campaignState.flags._shownVignettes) campaignState.flags._shownVignettes = {};
+    var shown = campaignState.flags._shownVignettes;
+    for (var vi = 0; vi < VIGNETTE_POOL.length; vi++) {
+      var v = VIGNETTE_POOL[vi];
+      if (shown[v.id]) continue;
+      if (v.condition === "both_survived") {
+        if (!classSet[v.classA] || (v.classB && !classSet[v.classB])) continue;
+      } else if (v.condition === "scaeva_allied" && !Campaign.getFlag("scaeva_allied")) continue;
+      else if (v.condition === "livia_allied" && !Campaign.getFlag("livia_allied")) continue;
+      shown[v.id] = true;
+      var unitA = classSet[v.classA];
+      var unitB = v.classB ? classSet[v.classB] : null;
+      var nameA = unitA ? (unitA.displayName || classById(unitA.classId).name) : classById(v.classA).name;
+      var nameB = unitB ? (unitB.displayName || classById(unitB.classId).name) : null;
+      return v.lines.map(function (l) {
+        return { speaker: l.speaker === "A" ? nameA : (l.speaker === "B" ? nameB : l.speaker), text: l.text };
+      });
+    }
+    return [];
+  }
+
   function closeResultCampaign() {
     if (state.trainingBout) {
       Campaign.saveSurvivors(state.units, false, true);
@@ -3653,7 +4058,9 @@
     }
 
     if (won) {
-      Campaign.saveSurvivors(state.units, mission.carryHp);
+      var _deployedUids = {};
+      state.units.forEach(function (u) { if (u.team === "player") _deployedUids[u.uid] = true; });
+      Campaign.saveSurvivors(state.units, mission.carryHp, false, _deployedUids);
 
       if (mission.id === 13) {
         Campaign.advance(true);
@@ -3668,9 +4075,11 @@
         return;
       }
 
+      var vignette = pickVignette();
       var postScene = filterScene(mission.postScene);
-      if (postScene.length > 0) {
-        runScene(postScene, function () {
+      var allSteps = vignette.concat(postScene);
+      if (allSteps.length > 0) {
+        runScene(allSteps, function () {
           loadNextMission();
         });
       } else {
@@ -3918,6 +4327,7 @@
   var _cutsceneUidCounter = 9000;
 
   function stageCutscene(steps) {
+    SFX.startAmbient("cutscene");
     var cs = state.cutscene;
     cs.savedPanX = renderer.panX;
     cs.savedPanY = renderer.panY;
@@ -4274,11 +4684,14 @@
   // ─── Title Screen & Campaign Init ─────────────────────────────────
 
   function showTitleScreen() {
+    Campaign.migrateOldSave();
     var overlay = $("#titleOverlay");
     var btnContinue = $("#btnContinueCampaign");
+    var anySave = Campaign.hasSave(0) || Campaign.hasSave(1) || Campaign.hasSave(2);
     if (btnContinue) {
-      btnContinue.classList.toggle("is-hidden", !Campaign.hasSave());
+      btnContinue.classList.toggle("is-hidden", !anySave);
     }
+    document.getElementById("slotPicker").classList.add("is-hidden");
     if (overlay) {
       overlay.classList.remove("is-hidden");
       var focusBtn = (btnContinue && !btnContinue.classList.contains("is-hidden")) ? btnContinue : $("#btnNewCampaign");
@@ -4289,6 +4702,45 @@
     panelBattle.classList.add("is-hidden");
   }
 
+  function showSlotPicker(mode) {
+    var picker = document.getElementById("slotPicker");
+    var slotsDiv = document.getElementById("slotPickerSlots");
+    var titleEl = picker.querySelector(".slot-picker__title");
+    titleEl.textContent = mode === "new" ? "Pick a Slot for New Campaign" : "Continue Campaign";
+    slotsDiv.innerHTML = "";
+    for (var i = 0; i < 3; i++) {
+      (function (slot) {
+        var summary = Campaign.getSlotSummary(slot);
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "btn slot-picker__btn";
+        if (summary) {
+          var d = new Date(summary.savedAt);
+          btn.innerHTML = "<strong>Slot " + (slot + 1) + "</strong><br>" + summary.missionName + "<br><small>" + summary.rosterSize + " fighters · " + d.toLocaleDateString() + "</small>";
+        } else {
+          btn.innerHTML = "<strong>Slot " + (slot + 1) + "</strong><br><em>Empty</em>";
+        }
+        btn.addEventListener("click", function () {
+          if (mode === "new") {
+            if (summary && !confirm("Overwrite Slot " + (slot + 1) + "?")) return;
+            picker.classList.add("is-hidden");
+            Campaign.setSlot(slot);
+            Campaign.clearSave(slot);
+            startCampaign();
+          } else {
+            if (!summary) return;
+            picker.classList.add("is-hidden");
+            Campaign.setSlot(slot);
+            continueCampaign();
+          }
+        });
+        if (mode === "continue" && !summary) btn.disabled = true;
+        slotsDiv.appendChild(btn);
+      })(i);
+    }
+    picker.classList.remove("is-hidden");
+  }
+
   function hideTitleScreen() {
     var overlay = $("#titleOverlay");
     if (overlay) overlay.classList.add("is-hidden");
@@ -4296,6 +4748,9 @@
 
   function startCampaign() {
     hideTitleScreen();
+    BOARD_W = 12;
+    BOARD_H = 10;
+    if (renderer) renderer.resize(BOARD_W, BOARD_H);
     Campaign.start();
 
     var mission = Campaign.getMission();
@@ -4330,19 +4785,41 @@
       showTitleScreen();
       return;
     }
+    BOARD_W = 12;
+    BOARD_H = 10;
+    if (renderer) renderer.resize(BOARD_W, BOARD_H);
     hideTitleScreen();
     budgetCurrent = Campaign.getBudget();
     loadMissionIntoLudus();
   }
 
+  function showSkirmishSettings() {
+    var title = document.getElementById("titleOverlay");
+    if (title) title.classList.add("is-hidden");
+    document.getElementById("skirmishSettings").classList.remove("is-hidden");
+  }
+
+  function hideSkirmishSettings() {
+    document.getElementById("skirmishSettings").classList.add("is-hidden");
+    var title = document.getElementById("titleOverlay");
+    if (title) title.classList.remove("is-hidden");
+  }
+
   function startSkirmish() {
+    hideSkirmishSettings();
     hideTitleScreen();
     Campaign.reset();
     resetMapMods();
-    budgetCurrent = BUDGET_MAX_DEFAULT;
+    var sz = MAP_SIZES[skirmishConfig.mapSize] || MAP_SIZES.medium;
+    BOARD_W = sz.w;
+    BOARD_H = sz.h;
+    budgetCurrent = skirmishConfig.budget;
     state.phase = "ludus";
     state.picks = [];
     state.units = [];
+    state.height = buildHeightField(42);
+    state.terrain = buildEmptyTerrain();
+    if (renderer) renderer.resize(BOARD_W, BOARD_H);
     updateCampaignHud();
     showPhasePanels();
     refreshRosterUI();
@@ -4811,8 +5288,10 @@
               pushed++;
             }
           }
-          if (pushed) log(eDef.name + " Tremor Press — " + pushed + " foes shoved!");
-          return true;
+          if (pushed) {
+            log(eDef.name + " Tremor Press — " + pushed + " foes shoved!");
+            return true;
+          }
         } else if (Math.random() < 0.25) {
           SFX.ability();
           var sdx = adjTarget.x - enemy.x;
@@ -5200,6 +5679,7 @@
         if (key === "a" && !btnAttack.disabled) { btnAttack.click(); return; }
         if (key === "b" && !btnAbility.disabled) { btnAbility.click(); return; }
         if (key === "w" && !btnWait.disabled) { btnWait.click(); return; }
+        if (key === "u" && !btnUndo.disabled) { btnUndo.click(); return; }
         if (key === "escape") { cancelTargeting(); hideAbilityMenu(); return; }
         // Number keys 1-9 to pick ability from the menu
         if (key >= "1" && key <= "9" && !abilityMenu.classList.contains("is-hidden")) {
@@ -5301,6 +5781,9 @@
       renderBoard();
     });
 
+    btnWait.addEventListener("mouseenter", function () { previewCtStrip("wait"); });
+    btnWait.addEventListener("mouseleave", function () { clearCtPreview(); });
+
     btnMute.addEventListener("click", function () {
       var muted = SFX.mute();
       btnMute.innerHTML = (muted ? "🔇" : "♪") + "<kbd>M</kbd>";
@@ -5336,6 +5819,8 @@
     btnToDeploy.addEventListener("click", startDeploy);
     btnTrainingBout.addEventListener("click", startTrainingBout);
     btnToBattle.addEventListener("click", startBattle);
+    document.getElementById("btnLogExpand").addEventListener("click", toggleFullLog);
+    document.getElementById("btnRosterStats").addEventListener("click", toggleRosterStats);
     btnBackLudus.addEventListener("click", () => {
       state.phase = "ludus";
       state.units = [];
@@ -5386,11 +5871,38 @@
     var btnSkirmish = $("#btnSkirmish");
     var btnContinueCampaign = $("#btnContinueCampaign");
     if (btnNewCampaign) btnNewCampaign.addEventListener("click", function () {
-      Campaign.clearSave();
-      startCampaign();
+      showSlotPicker("new");
     });
-    if (btnSkirmish) btnSkirmish.addEventListener("click", startSkirmish);
-    if (btnContinueCampaign) btnContinueCampaign.addEventListener("click", continueCampaign);
+    if (btnSkirmish) btnSkirmish.addEventListener("click", showSkirmishSettings);
+
+    // Skirmish settings wiring
+    var skEnemyCount = document.getElementById("skEnemyCount");
+    var skBudget = document.getElementById("skBudget");
+    var skMapSize = document.getElementById("skMapSize");
+    var skTerrain = document.getElementById("skTerrain");
+    var skSeed = document.getElementById("skSeed");
+    if (skEnemyCount) {
+      skEnemyCount.addEventListener("input", function () {
+        skirmishConfig.enemyCount = parseInt(this.value) || 3;
+        document.getElementById("skEnemyVal").textContent = this.value;
+      });
+      skBudget.addEventListener("input", function () {
+        skirmishConfig.budget = parseInt(this.value) || BUDGET_MAX_DEFAULT;
+        document.getElementById("skBudgetVal").textContent = this.value;
+      });
+      skMapSize.addEventListener("change", function () { skirmishConfig.mapSize = this.value; });
+      skTerrain.addEventListener("change", function () { skirmishConfig.terrainDensity = this.value; });
+      skSeed.addEventListener("input", function () { skirmishConfig.seed = this.value.trim() || null; });
+      document.getElementById("skTemplate").addEventListener("change", function () { skirmishConfig.template = this.value || null; });
+      document.getElementById("btnSkirmishStart").addEventListener("click", startSkirmish);
+      document.getElementById("btnSkirmishBack").addEventListener("click", hideSkirmishSettings);
+    }
+    if (btnContinueCampaign) btnContinueCampaign.addEventListener("click", function () {
+      showSlotPicker("continue");
+    });
+    document.getElementById("btnSlotBack").addEventListener("click", function () {
+      document.getElementById("slotPicker").classList.add("is-hidden");
+    });
 
     budgetMax.textContent = String(budgetCurrent);
     showTitleScreen();
