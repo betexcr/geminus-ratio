@@ -9,6 +9,7 @@ var SFX = (function () {
   var masterGain = null;
   var _noiseBuffer = null;
   var _muted = false;
+  var _baseGain = 1;
 
   function ensure() {
     if (!ctx) {
@@ -30,7 +31,7 @@ var SFX = (function () {
     var gain = c.createGain();
     osc.type = type;
     osc.frequency.value = freq;
-    gain.gain.setValueAtTime(volume || 0.15, c.currentTime);
+    gain.gain.setValueAtTime(volume != null ? volume : 0.15, c.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + duration);
     osc.connect(gain);
     gain.connect(dest());
@@ -55,7 +56,7 @@ var SFX = (function () {
     var src = c.createBufferSource();
     src.buffer = getNoiseBuffer(c, len);
     var gain = c.createGain();
-    gain.gain.setValueAtTime(volume || 0.12, c.currentTime);
+    gain.gain.setValueAtTime(volume != null ? volume : 0.12, c.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + duration);
     src.connect(gain);
     gain.connect(dest());
@@ -116,14 +117,15 @@ var SFX = (function () {
     click: function () { tone(2000, "square", 0.015, 0.06); },
 
     setVolume: function (v) {
+      _baseGain = Math.max(0, Math.min(1, v));
       if (!masterGain) ensure();
-      if (masterGain) masterGain.gain.value = Math.max(0, Math.min(1, v));
+      if (masterGain && !_muted) masterGain.gain.value = _baseGain;
     },
 
     mute: function () {
       _muted = !_muted;
       if (!masterGain) ensure();
-      if (masterGain) masterGain.gain.value = _muted ? 0 : 1;
+      if (masterGain) masterGain.gain.value = _muted ? 0 : _baseGain;
       return _muted;
     },
 

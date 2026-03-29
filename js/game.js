@@ -1039,12 +1039,13 @@
   }
 
   function applyDamage(u, dmg, attacker) {
-    if (u.markDebuffTurns > 0 && u.dreadMarkDmg) {
-      dmg += u.dreadMarkDmg;
-    }
+    if (u.hp <= 0) return;
     var interceptor = (attacker && attacker.team !== u.team) ? state.units.find(function(a) {
       return a.hp > 0 && a.interceptActive && a.team === u.team && a.id !== u.id && manhattan(a, u) <= 1;
     }) : null;
+    if (!interceptor && u.markDebuffTurns > 0 && u.dreadMarkDmg) {
+      dmg += u.dreadMarkDmg;
+    }
     if (interceptor) {
       interceptor.interceptActive = false;
       interceptor.hp -= dmg;
@@ -1426,6 +1427,9 @@
       addBtn.textContent = "Hire";
       addBtn.style.margin = "0";
       addBtn.setAttribute("aria-label", "Hire " + c.name + " for " + c.cost + " denarii");
+      if (c.cost > state.budget || state.picks.length >= MAX_ROSTER) {
+        addBtn.disabled = true;
+      }
       addBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         hireClass(c.id);
@@ -1501,7 +1505,7 @@
 
   function hireClass(classId) {
     if (state.picks.length >= MAX_ROSTER) {
-      log("Roster full (" + MAX_ROSTER + " fighters max).");
+      log("Roster full (" + MAX_ROSTER + " fighters max).", "system");
       return;
     }
     const c = classById(classId);
@@ -1510,7 +1514,7 @@
       if (!state.picks[i].isFree) spent += classById(state.picks[i].classId).cost;
     }
     if (spent + c.cost > budgetCurrent) {
-      log("Not enough denarii for " + c.name + ".");
+      log("Not enough denarii for " + c.name + ".", "system");
       return;
     }
     var newPick = { uid: "p" + (++state.unitSeq) + "_" + state.picks.length, classId: c.id, displayName: randomRomanName() };
@@ -1695,7 +1699,6 @@
   }
 
   function placeEnemies() {
-    state.boutNumber++;
 
     var mission = campaignState.active ? Campaign.getMission() : null;
     if (mission) {
@@ -1725,7 +1728,8 @@
 
     var usedPositions = {};
     for (var j = 0; j < chosen.length; j++) {
-      var px, py = (rng() < 0.5) ? 0 : 1;
+      var py = (rng() < 0.5) ? 0 : 1;
+      var px;
       do { px = 1 + Math.floor(rng() * (BOARD_W - 2)); }
       while (usedPositions[px + "," + py] || isTileImpassableTerrain(px, py));
       usedPositions[px + "," + py] = true;
@@ -2176,6 +2180,7 @@
 
   function startBattle() {
     if (state.deployTemplate.some((p) => !p.placed)) return;
+    state.boutNumber++;
     var mission = campaignState.active ? Campaign.getMission() : null;
     var hSeed = state._mapSeed;
     state.height = buildHeightField(hSeed);
@@ -2239,13 +2244,16 @@
   function clearTurnBuffs(u) {
     u.tempExtraMove = false;
     u.rallyCharge = false;
-    u.testudoBonus = 0;
+    if (!(u.fortressRooted > 0)) u.testudoBonus = 0;
     u.phalanxBonus = 0;
     u.blindRushAtk = 0;
     u.blindRushDef = 0;
     u.highGroundNext = false;
     u.battleFocusNext = false;
-    u.atkBonus = 0;
+    if (u.atkBonusTurns > 0) {
+      u.atkBonusTurns--;
+      if (u.atkBonusTurns <= 0) u.atkBonus = 0;
+    }
     u.momentumBonus = 0;
     u.shadowMendAtkPenalty = 0;
     if (u.battleHardenedTurns > 0) {
@@ -2265,12 +2273,18 @@
     refreshCtStrip();
     if (actor) clearTurnBuffs(actor);
     if (!actor) {
-      log("Combat over.", "system");
+      log("CT stall — forcing result.", "system");
       renderBoard();
+      await checkVictoryAsync();
       return;
     }
     if (actor.team === "enemy") {
-      await runEnemyTurn(actor);
+      try {
+        await runEnemyTurn(actor);
+      } catch (e) {
+        console.error("runEnemyTurn failed:", e);
+        log("AI error — skipping enemy turn.", "system");
+      }
       if (await checkVictoryAsync()) return;
       await delay(200);
       tickBattleTurn();
@@ -2348,14 +2362,22 @@
     var hitPct = computeHitChance(attacker, target);
     var label = "Attack";
     var dmg, mult = 1, ignDef = 0;
+    var ab = null;
     if (abilityIdx >= 0) {
-      var ab = unitAbilities(attacker)[abilityIdx];
+      ab = unitAbilities(attacker)[abilityIdx];
       if (ab) { label = ab.name; mult = ab.mult || 1; ignDef = ab.ignoreDefPct || 0; }
     }
-    dmg = physicalDamage(attacker, target, mult, ignDef, true);
+    if (ab && ab.effect === "suppress") {
+      dmg = 3;
+    } else if (ab && ab.effect === "grave_pulse") {
+      dmg = 4;
+    } else {
+      dmg = physicalDamage(attacker, target, mult, ignDef, true);
+    }
     var html = '<div class="fc-name">' + def.name + '</div>';
     html += '<div class="fc-hit">Hit: ' + hitPct + '%</div>';
-    html += '<div class="fc-dmg">' + label + ': ~' + dmg + ' dmg</div>';
+    var dmgLabel = (ab && (ab.effect === "suppress" || ab.effect === "grave_pulse")) ? " true dmg" : " dmg";
+    html += '<div class="fc-dmg">' + label + ': ~' + dmg + dmgLabel + '</div>';
     forecastEl.innerHTML = html;
     forecastEl.classList.remove("is-hidden");
   }
@@ -2488,6 +2510,8 @@
         if (dist === 1) {
           state.endingATriggered = true;
           Campaign.setFlag("endingA_triggered");
+          state.activeUnit = null;
+          state.battleMode = "idle";
           log("Cassius reaches out. Titus lowers his blade.", "system");
           log("The twin bond holds. The ritual shatters.", "system");
           showResultOverlay("victory");
@@ -2814,7 +2838,8 @@
         state.highlightCells.clear();
         for (var wws = 0; wws < BOARD_H; wws++) {
           for (var wwsx = 0; wwsx < BOARD_W; wwsx++) {
-            if (manhattan(u, {x: wwsx, y: wws}) === 1 && !occupantAt(wwsx, wws) && !isTileCollapsed(wwsx, wws)) {
+            if (manhattan(u, {x: wwsx, y: wws}) === 1 && !occupantAt(wwsx, wws) && !isTileCollapsed(wwsx, wws)
+                && !isTileImpassableTerrain(wwsx, wws)) {
               state.highlightCells.add(cellKey(wwsx, wws));
             }
           }
@@ -2863,6 +2888,7 @@
         var trx = u.x + dx, tryy = u.y + dy;
         while (inBounds(trx, tryy) && Math.abs(trx - u.x) + Math.abs(tryy - u.y) <= range) {
           if (isTileCollapsed(trx, tryy)) break;
+          if (isTileImpassableTerrain(trx, tryy)) break;
           var trOcc = occupantAt(trx, tryy);
           if (trOcc && trOcc.team !== u.team && trOcc.hp > 0) trHits.push(trOcc);
           if (trOcc) break;
@@ -2885,6 +2911,7 @@
         var supx = u.x + dx, supy = u.y + dy;
         while (inBounds(supx, supy) && Math.abs(supx - u.x) + Math.abs(supy - u.y) <= range) {
           if (isTileCollapsed(supx, supy)) break;
+          if (isTileImpassableTerrain(supx, supy)) break;
           var supOcc = occupantAt(supx, supy);
           if (supOcc && supOcc.team !== u.team && supOcc.hp > 0) supHits.push(supOcc);
           supx += dx; supy += dy;
@@ -2943,7 +2970,7 @@
         var pdy = Math.sign(hit.y - u.y);
         var pnx = hit.x + pdx;
         var pny = hit.y + pdy;
-        if (inBounds(pnx, pny) && !occupantAt(pnx, pny) && !isTileImpassableTerrain(pnx, pny)) {
+        if (inBounds(pnx, pny) && !occupantAt(pnx, pny) && !isTileImpassableTerrain(pnx, pny) && !isTileCollapsed(pnx, pny)) {
           await animateMove(hit, [[pnx, pny]]);
           log("Tremor Thrust pushes back!");
         }
@@ -2951,7 +2978,7 @@
       if (ab.effect === "charge" && hit.hp > 0) {
         var adjX = hit.x - dx;
         var adjY = hit.y - dy;
-        if (inBounds(adjX, adjY) && !occupantAt(adjX, adjY) && !isTileCollapsed(adjX, adjY)) {
+        if (inBounds(adjX, adjY) && !occupantAt(adjX, adjY) && !isTileCollapsed(adjX, adjY) && !isTileImpassableTerrain(adjX, adjY)) {
           await animateMove(u, [[adjX, adjY]]);
           log("Charge closes the gap!");
         }
@@ -3017,7 +3044,8 @@
       for (var sy = 0; sy < BOARD_H; sy++) {
         for (var sx = 0; sx < BOARD_W; sx++) {
           if (manhattan(u, {x: sx, y: sy}) <= stepRange && manhattan(u, {x: sx, y: sy}) > 0
-              && !occupantAt(sx, sy) && inBounds(sx, sy) && !isTileCollapsed(sx, sy)) {
+              && !occupantAt(sx, sy) && inBounds(sx, sy) && !isTileCollapsed(sx, sy)
+              && !isTileImpassableTerrain(sx, sy)) {
             state.highlightCells.add(cellKey(sx, sy));
           }
         }
@@ -3115,6 +3143,7 @@
         var paAlly = occupantAt(pax, pay);
         if (paAlly && paAlly.team === u.team && paAlly.hp > 0 && paAlly.id !== u.id) {
           paAlly.atkBonus += 2;
+          paAlly.atkBonusTurns = 2;
           paAlly.tempExtraMove = true;
           paCount++;
         }
@@ -3132,6 +3161,7 @@
         var ipAlly = occupantAt(ipx, ipy);
         if (ipAlly && ipAlly.team === u.team && ipAlly.hp > 0 && ipAlly.id !== u.id) {
           ipAlly.atkBonus += 2;
+          ipAlly.atkBonusTurns = 2;
           ipCount++;
         }
       }
@@ -3364,7 +3394,7 @@
         await Promise.all([animateHitFlash(tgt), screenShake(80, 2)]);
         log(ab.name + " deals " + dmg + ". (" + hitPct + "% hit)");
         if (tgt.hp <= 0) { await animateDeath(tgt); endAction(); return; }
-        if (inBounds(pnx, pny) && !occupantAt(pnx, pny) && !isTileImpassableTerrain(pnx, pny)) {
+        if (inBounds(pnx, pny) && !occupantAt(pnx, pny) && !isTileImpassableTerrain(pnx, pny) && !isTileCollapsed(pnx, pny)) {
           await animateMove(tgt, [[pnx, pny]]);
         }
       } else if (u.gifted && u.classId === "samnite") {
@@ -4001,17 +4031,7 @@
       return Promise.resolve();
     }
 
-    var walkRaf = null;
-    function walkRender() {
-      if (!state.cutscene.active) return;
-      renderBoard();
-      walkRaf = requestAnimationFrame(walkRender);
-    }
-    walkRaf = requestAnimationFrame(walkRender);
-
-    return animateMove(actor, path).then(function () {
-      if (walkRaf) cancelAnimationFrame(walkRaf);
-    });
+    return animateMove(actor, path);
   }
 
   function _fadeOutCutsceneActors(onDone) {
@@ -4063,16 +4083,16 @@
       var ch = renderer.canvas.height / dpr;
       var bup = renderer.tileToScreen(cs.bubbleUnit.x, cs.bubbleUnit.y,
         state.height[cs.bubbleUnit.y] ? state.height[cs.bubbleUnit.y][cs.bubbleUnit.x] || 0 : 0);
-      cs.targetPanX = -(bup.x - cw / 2);
-      cs.targetPanY = -(bup.y - ch / 2) + 30;
+      cs.targetPanX = bup.x - cw / 2;
+      cs.targetPanY = bup.y - ch / 2 - 20;
     } else {
       cs.targetPanX = 0;
       cs.targetPanY = 0;
     }
 
-    renderer.panX += (cs.targetPanX - renderer.panX) * 0.08;
-    renderer.panY += (cs.targetPanY - renderer.panY) * 0.08;
-    renderer.zoom += (cs.targetZoom - renderer.zoom) * 0.06;
+    renderer.panX += (cs.targetPanX - renderer.panX) * 0.12;
+    renderer.panY += (cs.targetPanY - renderer.panY) * 0.12;
+    renderer.zoom += (cs.targetZoom - renderer.zoom) * 0.10;
 
     renderBoard();
 
@@ -4080,6 +4100,7 @@
   }
 
   function runScene(steps, onComplete) {
+    if (state.cutscene.active) teardownCutscene();
     sceneQueue = steps.slice();
     sceneCallback = onComplete || null;
 
@@ -4164,6 +4185,7 @@
     cs.bubbleRevealed = 0;
     cs.bubbleStyle = step.style || ((speaker && actor) ? "dialogue" : "narration");
     cs.bubbleUnit = actor;
+    if (!cs.rafId) cs.rafId = requestAnimationFrame(tickCutscene);
 
     if (choicesEl) choicesEl.classList.add("is-hidden");
     if (advanceEl) advanceEl.classList.remove("is-hidden");
@@ -4175,9 +4197,6 @@
       cs.awaitingEntry = false;
       cs.bubbleText = textToShow;
       cs.bubbleRevealed = 0;
-      if (!cs.rafId) {
-        cs.rafId = requestAnimationFrame(tickCutscene);
-      }
     }
 
     if (actor && !actor.entered) {
@@ -4244,6 +4263,7 @@
 
     sceneOverlay.classList.remove("is-hidden");
     sceneSpeaker.textContent = step.speaker || "";
+    sceneOverlay.setAttribute("aria-label", step.speaker || "Narration");
     sceneText.textContent = step.text || "";
     sceneText.className = "scene-text" + (step.style === "internal" ? " scene-text--internal" : "");
     sceneChoices.classList.add("is-hidden");
@@ -4303,6 +4323,11 @@
   function continueCampaign() {
     if (!Campaign.loadFromDisk()) {
       startCampaign();
+      return;
+    }
+    if (Campaign.isFinished()) {
+      Campaign.clearSave();
+      showTitleScreen();
       return;
     }
     hideTitleScreen();
@@ -4448,7 +4473,7 @@
   async function aiTryPreMoveAbility(enemy, eDef, players, target) {
     var hpPct = enemy.hp / enemy.maxHp;
     for (const ab of unitAbilities(enemy)) {
-      var _namedHeals = ["Iron Will", "Shadow Mend", "Guardian Aura", "Champion's Resolve"];
+      var _namedHeals = ["Iron Will", "Shadow Mend", "Guardian Aura", "Champion's Resolve", "Neptune's Favor"];
       if (ab.type === "heal" && ab.target === "self" && hpPct < 0.5 && _namedHeals.indexOf(ab.name) === -1) {
         SFX.ability();
         var heal = Math.round(enemy.maxHp * 0.2);
@@ -4654,7 +4679,7 @@
         for (var ipi = 0; ipi < DIRS.length; ipi++) {
           var eipx = enemy.x + DIRS[ipi][0], eipy = enemy.y + DIRS[ipi][1];
           var eipt = occupantAt(eipx, eipy);
-          if (eipt && eipt.team === enemy.team && eipt.hp > 0) { eipt.atkBonus += 2; ipC++; }
+          if (eipt && eipt.team === enemy.team && eipt.hp > 0) { eipt.atkBonus += 2; eipt.atkBonusTurns = 2; ipC++; }
         }
         if (ipC) { SFX.ability(); log(eDef.name + " Inspiring Presence — " + ipC + " allies buffed!"); return true; }
       }
@@ -5167,7 +5192,7 @@
       if (key === "e") { renderer.rotate(1); renderBoard(); return; }
       if (key === "=" || key === "+") { renderer.setZoom(renderer.zoom + 0.15); renderBoard(); return; }
       if (key === "-" || key === "_") { renderer.setZoom(renderer.zoom - 0.15); renderBoard(); return; }
-      if (key === "r" || key === "home") { renderer.zoom = 1.0; renderer.panX = 0; renderer.panY = 0; renderer._recalcLayout(); renderBoard(); return; }
+      if (key === "r" || key === "home") { renderer.zoom = 1.0; renderer.panX = 0; renderer.panY = 0; renderer.rotStep = 0; renderer._recalcLayout(); renderBoard(); return; }
 
       // Battle shortcuts — (A)ttack, a(B)ility, (W)ait, E(sc)ape to cancel
       if (state.phase === "battle" && state.activeUnit && state.activeUnit.team === "player") {

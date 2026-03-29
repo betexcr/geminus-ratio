@@ -76,8 +76,7 @@ html, body {
   background: var(--fft-window-mid);
   border-bottom: 4px solid var(--fft-gold-dark);
   box-shadow:
-    inset 0 1px 0 rgba(255, 220, 120, 0.12),
-    0 4px 0 var(--fft-black);
+    inset 0 1px 0 rgba(255, 220, 120, 0.12);
 }
 
 .banner__crest {
@@ -531,7 +530,7 @@ svg.deploy-card__sprite {
 
 /* ---- Stage area (holds canvas + CT strip) ---- */
 .stage-wrap {
-  padding: 0.5rem 0.75rem 1rem;
+  padding: 0 0.75rem 0.5rem;
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -1114,6 +1113,14 @@ svg.deploy-card__sprite {
   .fft-battlefield {
     flex-direction: column-reverse;
     align-items: center;
+  }
+
+  .iso-canvas-wrap {
+    min-height: min(400px, 50vh);
+  }
+
+  .banner {
+    flex-wrap: wrap;
   }
 
   .phase-battle .fft-ct-strip {

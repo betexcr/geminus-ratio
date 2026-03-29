@@ -275,6 +275,7 @@ var CAMPAIGN_MISSIONS = [
       },
       {
         id: "livia_twin",
+        condition: "livia_allied_early",
         prompt: "Livia is watching. She noticed your reaction to the Editor's champion.",
         options: [
           { label: "Tell Livia about Titus.", flag: "livia_knows_twin" },
@@ -545,7 +546,7 @@ var CAMPAIGN_MISSIONS = [
     postScene: [
       { speaker: null, text: "The arena is a wreck. Sand stained dark. The crowd screams with a harmonic quality — like a choir that doesn't know it's singing." },
       { speaker: "NERVA", text: "I felt something during the fight. When I stood on that dark sand — something was looking up at me through the ground. Cassius... what are we fighting in?", condition: "nerva_alive" },
-      { speaker: "AEMILIA", text: "The Gifted — their movements aren't from training. Something else is moving their bodies. The same something that's under the sand.", condition: "aemilia_alive" },
+      { speaker: "AEMILIA", text: "The Gifted — their movements aren't from training. Something else is moving their bodies. The same something that's under the sand.", condition: "scaeva_allied" },
       { speaker: null, text: "Two more matches. Then the final bout." },
     ],
     choices: [],
@@ -930,7 +931,7 @@ var Campaign = {
       var data = JSON.parse(raw);
       if (!data || !data.active) return false;
       var idx = parseInt(data.missionIndex, 10) || 0;
-      if (idx < 0 || idx >= CAMPAIGN_MISSIONS.length) return false;
+      if (idx < 0 || idx > CAMPAIGN_MISSIONS.length) return false;
       var roster = Array.isArray(data.survivingRoster) ? data.survivingRoster : [];
       roster = roster.filter(function (s) {
         return s && typeof s.classId === "string";
@@ -960,7 +961,7 @@ var Campaign = {
       var data = JSON.parse(raw);
       if (!data || !data.active) return false;
       var idx = parseInt(data.missionIndex, 10) || 0;
-      if (idx < 0 || idx >= CAMPAIGN_MISSIONS.length) return false;
+      if (idx < 0 || idx > CAMPAIGN_MISSIONS.length) return false;
       return true;
     } catch (e) { return false; }
   },

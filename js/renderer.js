@@ -118,7 +118,7 @@ var IsoRenderer = (function () {
     this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     this.originX = cssW / 2 - (d.cols - d.rows) * (TILE_W / 4);
-    this.originY = cssH / 2 - (d.cols + d.rows) * (TILE_H / 4) + DRAW_SPRITE_H * 0.25;
+    this.originY = cssH * 0.5 - (d.cols + d.rows) * (TILE_H / 4) + DRAW_SPRITE_H * 0.25;
   };
 
   // Remap grid coordinates for 90° rotation steps
@@ -532,6 +532,12 @@ var IsoRenderer = (function () {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = "#060810";
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    var _gradH = Math.round(this.canvas.height * 0.18);
+    var _grd = ctx.createLinearGradient(0, 0, 0, _gradH);
+    _grd.addColorStop(0, "#1a1818");
+    _grd.addColorStop(1, "#060810");
+    ctx.fillStyle = _grd;
+    ctx.fillRect(0, 0, this.canvas.width, _gradH);
     ctx.restore();
 
     // Apply camera zoom + pan
@@ -943,15 +949,29 @@ var IsoRenderer = (function () {
     ctx.save();
     ctx.font = font;
 
-    var visibleText = text.substring(0, revealed);
+    var visibleText = text.substring(0, Math.max(0, revealed | 0));
     var words = visibleText.split(" ");
     var lines = [];
     var cur = "";
     for (var wi = 0; wi < words.length; wi++) {
-      var test = cur ? (cur + " " + words[wi]) : words[wi];
+      var word = words[wi];
+      if (ctx.measureText(word).width > maxW) {
+        if (cur) { lines.push(cur); cur = ""; }
+        var chunk = "";
+        for (var ci = 0; ci < word.length; ci++) {
+          if (ctx.measureText(chunk + word[ci]).width > maxW && chunk) {
+            lines.push(chunk);
+            chunk = "";
+          }
+          chunk += word[ci];
+        }
+        cur = chunk;
+        continue;
+      }
+      var test = cur ? (cur + " " + word) : word;
       if (ctx.measureText(test).width > maxW) {
         if (cur) lines.push(cur);
-        cur = words[wi];
+        cur = word;
       } else {
         cur = test;
       }
@@ -978,9 +998,21 @@ var IsoRenderer = (function () {
       var letterboxH = this._lastLetterbox ? Math.round(this.canvas.height / dpr * 0.12 * this._lastLetterbox) : 0;
       bx = sw / 2 - boxW / 2;
       by = letterboxH + 16;
+      if (bx < 8) bx = 8;
+      if (bx + boxW > sw - 8) bx = sw - boxW - 8;
     } else {
       bx = cx - boxW / 2;
       by = cy - DRAW_SPRITE_H - boxH - 12;
+      var _dpr2 = window.devicePixelRatio || 1;
+      var _ch2 = this.canvas.height / _dpr2;
+      var _cw2 = this.canvas.width / _dpr2;
+      var _z = this.zoom || 1;
+      var viewTop = (_ch2 / 2 + (this.panY || 0)) - _ch2 / (2 * _z);
+      var viewLeft = (_cw2 / 2 + (this.panX || 0)) - _cw2 / (2 * _z);
+      var viewRight = viewLeft + _cw2 / _z;
+      if (by < viewTop + 8) by = viewTop + 8;
+      if (bx < viewLeft + 8) bx = viewLeft + 8;
+      if (bx + boxW > viewRight - 8) bx = viewRight - boxW - 8;
     }
 
     var rad = 8;

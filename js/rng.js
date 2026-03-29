@@ -12,6 +12,6 @@ function seedRng(seed) {
   for (var i = 0; i < 3; i++) s = (Math.imul(s, 1103515245) + 12345) | 0;
   return function () {
     s = (Math.imul(s, 1103515245) + 12345) | 0;
-    return (s >>> 1) / 0x40000000;
+    return (s >>> 0) / 0x100000000;
   };
 }
