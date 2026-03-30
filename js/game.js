@@ -5,6 +5,14 @@
 (function () {
   "use strict";
 
+  // Prevent browser-level pinch-zoom (iPad Safari ignores viewport meta since iOS 10)
+  document.addEventListener("gesturestart", function (e) { e.preventDefault(); }, { passive: false });
+  document.addEventListener("gesturechange", function (e) { e.preventDefault(); }, { passive: false });
+  document.addEventListener("gestureend", function (e) { e.preventDefault(); }, { passive: false });
+  document.addEventListener("touchmove", function (e) {
+    if (e.touches.length > 1) e.preventDefault();
+  }, { passive: false });
+
   var BOARD_W = 12;
   var BOARD_H = 10;
   const MAX_ROSTER = 6;
@@ -5725,6 +5733,7 @@
       return Math.sqrt(dx * dx + dy * dy);
     }
     isoCanvas.addEventListener("touchstart", function (e) {
+      e.preventDefault();
       if (e.touches.length === 1) {
         _touch.startX = e.touches[0].clientX;
         _touch.startY = e.touches[0].clientY;
@@ -5735,7 +5744,7 @@
         _touch.pinchDist = _touchDist(e.touches);
         _touch.pinchZoom = renderer.zoom;
       }
-    }, { passive: true });
+    }, { passive: false });
     isoCanvas.addEventListener("touchmove", function (e) {
       e.preventDefault();
       if (state.cutscene.active) return;
