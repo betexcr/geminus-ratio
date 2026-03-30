@@ -1,0 +1,31 @@
+---
+description: Deployment and hosting setup for Geminus Ratio
+alwaysApply: true
+---
+
+# Deploy & Hosting
+
+- Live URL: https://geminus.surge.sh/
+- Repo: https://github.com/betexcr/geminus-ratio.git (branch: main)
+- Hosting: Surge.sh (account: albmunmu@gmail.com, Student plan)
+- No build step — static HTML/CSS/JS served directly
+
+## Deploy command
+
+```bash
+surge . geminus.surge.sh
+```
+
+## Local dev server
+
+```bash
+python3 -m http.server 8765
+```
+
+## Script load order (dependency chain)
+
+rng.js -> sfx.js -> renderer.js -> sprites.js -> campaign.js -> game.js
+
+## Persistence
+
+Campaign saves use localStorage key `geminus_campaign_v2`.
