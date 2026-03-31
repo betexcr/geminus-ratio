@@ -15,6 +15,13 @@ var IsoRenderer = (function () {
   var SPRITE_H = 80;
   var DRAW_SPRITE_H = 60;
   var DRAW_SPRITE_W = Math.round(DRAW_SPRITE_H * (SPRITE_W / SPRITE_H));
+  var _scratchRot = { c: 0, r: 0 };
+  var _scratchPt = { x: 0, y: 0 };
+  var _scratchRotF = { c: 0, r: 0 };
+  var _scratchPtF = { x: 0, y: 0 };
+  var _FIRE_RGB = ["rgb(255,120,30)", "rgb(255,160,30)", "rgb(255,200,30)"];
+  var _HL_RGB = { move: "rgb(50,140,255)", attack: "rgb(255,60,40)", ability: "rgb(200,255,60)", gate: "rgb(80,160,255)" };
+  var _HL_MOVE_STROKE_RGB = "rgb(120,200,255)";
 
   var ZONE_COLORS = {
     sand: [
@@ -47,20 +54,113 @@ var IsoRenderer = (function () {
       { top: "#4a8aaa", left: "#2a6080", right: "#3a7090" },
       { top: "#4a8aaa", left: "#2a6080", right: "#3a7090" },
     ],
+    trap_spike: [
+      { top: "#a08058", left: "#6a5038", right: "#7a6048" },
+      { top: "#a08058", left: "#6a5038", right: "#7a6048" },
+      { top: "#a08058", left: "#6a5038", right: "#7a6048" },
+    ],
+    trap_fire: [
+      { top: "#c06040", left: "#8a3828", right: "#a04830" },
+      { top: "#c06040", left: "#8a3828", right: "#a04830" },
+      { top: "#c06040", left: "#8a3828", right: "#a04830" },
+    ],
+    barricade: [
+      { top: "#6a5a40", left: "#3a3020", right: "#4a4030" },
+      { top: "#6a5a40", left: "#3a3020", right: "#4a4030" },
+      { top: "#6a5a40", left: "#3a3020", right: "#4a4030" },
+    ],
+    fountain: [
+      { top: "#4ab8c8", left: "#2a8090", right: "#3a90a0" },
+      { top: "#4ab8c8", left: "#2a8090", right: "#3a90a0" },
+      { top: "#4ab8c8", left: "#2a8090", right: "#3a90a0" },
+    ],
+    high_ground: [
+      { top: "#d4c090", left: "#a08060", right: "#b09070" },
+      { top: "#d4c090", left: "#a08060", right: "#b09070" },
+      { top: "#d4c090", left: "#a08060", right: "#b09070" },
+    ],
   };
 
-  function _seedRng(col, row) {
-    return seedRng(col * 97 + row * 31 + 7);
+  function _seedFloat(col, row) {
+    var s = (col * 97 + row * 31 + 7) | 0;
+    s = Math.imul(s, 1103515245) + 12345 | 0;
+    s = Math.imul(s, 1103515245) + 12345 | 0;
+    s = Math.imul(s, 1103515245) + 12345 | 0;
+    return (s >>> 0) / 0x100000000;
   }
 
+  var _tileRng = {
+    _s: 0,
+    seed: function (col, row) {
+      var s = (col * 97 + row * 31 + 7) | 0;
+      for (var i = 0; i < 3; i++) s = (Math.imul(s, 1103515245) + 12345) | 0;
+      this._s = s;
+    },
+    next: function () {
+      this._s = (Math.imul(this._s, 1103515245) + 12345) | 0;
+      return (this._s >>> 0) / 0x100000000;
+    }
+  };
+
+  var _adjustColorCache = {};
   function _adjustColor(hex, delta) {
+    if (!hex || typeof hex !== "string" || hex.length < 7 || hex[0] !== "#") return hex || "#000";
+    var key = hex + delta;
+    var cached = _adjustColorCache[key];
+    if (cached) return cached;
     var r = parseInt(hex.slice(1, 3), 16);
     var g = parseInt(hex.slice(3, 5), 16);
     var b = parseInt(hex.slice(5, 7), 16);
     r = Math.max(0, Math.min(255, r + delta));
     g = Math.max(0, Math.min(255, g + delta));
     b = Math.max(0, Math.min(255, b + delta));
-    return "rgb(" + r + "," + g + "," + b + ")";
+    var result = "rgb(" + r + "," + g + "," + b + ")";
+    _adjustColorCache[key] = result;
+    return result;
+  }
+
+  var _hpBarCanvases = null;
+  function _getHpBarCanvas(tier) {
+    if (!_hpBarCanvases) {
+      _hpBarCanvases = {};
+      var stops = {
+        green: ["#70f070", "#30a030"],
+        yellow: ["#f0d848", "#b89020"],
+        red: ["#f05040", "#a02018"],
+      };
+      var bH = 4;
+      for (var k in stops) {
+        var oc = document.createElement("canvas");
+        oc.width = 1;
+        oc.height = bH;
+        var octx = oc.getContext("2d");
+        var g = octx.createLinearGradient(0, 0, 0, bH);
+        g.addColorStop(0, stops[k][0]);
+        g.addColorStop(1, stops[k][1]);
+        octx.fillStyle = g;
+        octx.fillRect(0, 0, 1, bH);
+        _hpBarCanvases[k] = oc;
+      }
+    }
+    return _hpBarCanvases[tier];
+  }
+
+  var _tileSpecularCanvas = null;
+  function _getTileSpecular() {
+    if (_tileSpecularCanvas) return _tileSpecularCanvas;
+    var oc = document.createElement("canvas");
+    oc.width = TILE_W;
+    oc.height = TILE_H;
+    var octx = oc.getContext("2d");
+    _clipDiamond(octx, TILE_W / 2, TILE_H / 2);
+    var grad = octx.createLinearGradient(0, 0, TILE_W * 0.75, TILE_H * 0.75);
+    grad.addColorStop(0, "rgba(255,240,200,0.16)");
+    grad.addColorStop(0.5, "rgba(255,255,255,0.0)");
+    grad.addColorStop(1, "rgba(0,0,0,0.05)");
+    octx.fillStyle = grad;
+    octx.fill();
+    _tileSpecularCanvas = oc;
+    return oc;
   }
 
   function IsoRenderer(canvas) {
@@ -89,6 +189,8 @@ var IsoRenderer = (function () {
     this._panStartY = 0;
     this._panOriginX = 0;
     this._panOriginY = 0;
+    this._scratchGrid = { col: 0, row: 0 };
+    this._dpr = window.devicePixelRatio || 1;
     var _rmq = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)");
     this.reducedMotion = _rmq ? _rmq.matches : false;
     if (_rmq && _rmq.addEventListener) {
@@ -104,18 +206,30 @@ var IsoRenderer = (function () {
   };
 
   IsoRenderer.prototype._recalcLayout = function () {
-    var d = this._rotatedDims();
     var dpr = window.devicePixelRatio || 1;
-
     var wrap = this.canvas.parentElement;
     var cssW = wrap ? wrap.clientWidth : 800;
     var cssH = wrap ? wrap.clientHeight : 600;
     if (cssW < 1) cssW = 800;
     if (cssH < 1) cssH = 600;
 
-    this.canvas.width = Math.round(cssW * dpr);
-    this.canvas.height = Math.round(cssH * dpr);
-    this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (cssW === this._lcW && cssH === this._lcH && dpr === this._lcDpr &&
+        this.cols === this._lcCols && this.rows === this._lcRows && this.rotStep === this._lcRot) {
+      return;
+    }
+    this._lcW = cssW; this._lcH = cssH; this._lcDpr = dpr;
+    this._lcCols = this.cols; this._lcRows = this.rows; this._lcRot = this.rotStep;
+
+    this._dpr = dpr;
+    var d = this._rotatedDims();
+
+    var pw = Math.round(cssW * dpr);
+    var ph = Math.round(cssH * dpr);
+    if (this.canvas.width !== pw || this.canvas.height !== ph) {
+      this.canvas.width = pw;
+      this.canvas.height = ph;
+      this._cachedSkyGrad = null;
+    }
 
     this.originX = cssW / 2 - (d.cols - d.rows) * (TILE_W / 4);
     this.originY = cssH * 0.5 - (d.cols + d.rows) * (TILE_H / 4) + DRAW_SPRITE_H * 0.25;
@@ -128,20 +242,31 @@ var IsoRenderer = (function () {
     if (step === 1) { c = (this.rows - 1) - row; r = col; }
     else if (step === 2) { c = (this.cols - 1) - col; r = (this.rows - 1) - row; }
     else if (step === 3) { c = row; r = (this.cols - 1) - col; }
-    return { c: c, r: r };
+    _scratchRot.c = c; _scratchRot.r = r;
+    return _scratchRot;
   };
 
+  var _scratchDims = { cols: 0, rows: 0 };
   IsoRenderer.prototype._rotatedDims = function () {
     var step = ((this.rotStep % 4) + 4) % 4;
-    if (step === 1 || step === 3) return { cols: this.rows, rows: this.cols };
-    return { cols: this.cols, rows: this.rows };
+    if (step === 1 || step === 3) { _scratchDims.cols = this.rows; _scratchDims.rows = this.cols; }
+    else { _scratchDims.cols = this.cols; _scratchDims.rows = this.rows; }
+    return _scratchDims;
   };
 
+  var _scratchTileScreen = { x: 0, y: 0 };
   IsoRenderer.prototype.tileToScreen = function (col, row, h) {
     var g = this._rotateGrid(col, row);
-    var cx = this.originX + (g.c - g.r) * (TILE_W / 2);
-    var cy = this.originY + (g.c + g.r) * (TILE_H / 2) - h * HEIGHT_PX;
-    return { x: cx, y: cy };
+    _scratchTileScreen.x = this.originX + (g.c - g.r) * (TILE_W / 2);
+    _scratchTileScreen.y = this.originY + (g.c + g.r) * (TILE_H / 2) - h * HEIGHT_PX;
+    return _scratchTileScreen;
+  };
+
+  IsoRenderer.prototype._tileToScreenFast = function (col, row, h) {
+    var g = this._rotateGrid(col, row);
+    _scratchPt.x = this.originX + (g.c - g.r) * (TILE_W / 2);
+    _scratchPt.y = this.originY + (g.c + g.r) * (TILE_H / 2) - h * HEIGHT_PX;
+    return _scratchPt;
   };
 
   // Fractional-aware version for smooth animation
@@ -151,52 +276,90 @@ var IsoRenderer = (function () {
     if (step === 1) { c = (this.rows - 1) - row; r = col; }
     else if (step === 2) { c = (this.cols - 1) - col; r = (this.rows - 1) - row; }
     else if (step === 3) { c = row; r = (this.cols - 1) - col; }
-    return { c: c, r: r };
+    _scratchRotF.c = c; _scratchRotF.r = r;
+    return _scratchRotF;
   };
 
   IsoRenderer.prototype.tileToScreenF = function (col, row, h) {
     var g = this._rotateGridF(col, row);
-    var cx = this.originX + (g.c - g.r) * (TILE_W / 2);
-    var cy = this.originY + (g.c + g.r) * (TILE_H / 2) - h * HEIGHT_PX;
-    return { x: cx, y: cy };
+    _scratchPtF.x = this.originX + (g.c - g.r) * (TILE_W / 2);
+    _scratchPtF.y = this.originY + (g.c + g.r) * (TILE_H / 2) - h * HEIGHT_PX;
+    return _scratchPtF;
   };
 
-  // Convert CSS-space mouse coords to the pre-zoom/pan "world" coords
+  var _scratchWorld = { x: 0, y: 0 };
+  var _scratchInvRot = { c: 0, r: 0 };
+
   IsoRenderer.prototype._cssToWorld = function (sx, sy) {
-    var dpr = window.devicePixelRatio || 1;
+    var dpr = this._dpr || (window.devicePixelRatio || 1);
     var cw = this.canvas.width / dpr;
     var ch = this.canvas.height / dpr;
     var wcx = cw / 2 + this.panX;
     var wcy = ch / 2 + this.panY;
-    var wx = (sx - cw / 2) / this.zoom + wcx;
-    var wy = (sy - ch / 2) / this.zoom + wcy;
-    return { x: wx, y: wy };
+    var z = this.zoom || 1;
+    _scratchWorld.x = (sx - cw / 2) / z + wcx;
+    _scratchWorld.y = (sy - ch / 2) / z + wcy;
+    return _scratchWorld;
+  };
+
+  IsoRenderer.prototype._inverseRotateGrid = function (gc, gr) {
+    var step = ((this.rotStep % 4) + 4) % 4;
+    if (step === 0) { _scratchInvRot.c = gc; _scratchInvRot.r = gr; }
+    else if (step === 1) { _scratchInvRot.c = gr; _scratchInvRot.r = (this.rows - 1) - gc; }
+    else if (step === 2) { _scratchInvRot.c = (this.cols - 1) - gc; _scratchInvRot.r = (this.rows - 1) - gr; }
+    else { _scratchInvRot.c = (this.cols - 1) - gr; _scratchInvRot.r = gc; }
+    return _scratchInvRot;
   };
 
   IsoRenderer.prototype.screenToGrid = function (sx, sy) {
     var w = this._cssToWorld(sx, sy);
+    var _wwx = w.x, _wwy = w.y;
+    var wx = _wwx - this.originX;
+    var wy = _wwy - this.originY;
+    var halfW = TILE_W / 2;
+    var halfH = TILE_H / 2;
+
     var bestCol = -1;
     var bestRow = -1;
     var bestDepth = -1;
-    for (var r = 0; r < this.rows; r++) {
-      for (var c = 0; c < this.cols; c++) {
-        var h = this._lastHeights ? this._lastHeights[r][c] : 0;
-        var p = this.tileToScreen(c, r, h);
-        var dx = (w.x - p.x) / (TILE_W / 2);
-        var dy = (w.y - p.y) / (TILE_H / 2);
-        if (Math.abs(dx) + Math.abs(dy) <= 1.05) {
-          var g = this._rotateGrid(c, r);
-          var depth = g.r + g.c;
-          if (depth > bestDepth) {
-            bestDepth = depth;
-            bestCol = c;
-            bestRow = r;
+
+    var maxH = 8;
+    for (var hGuess = maxH; hGuess >= 0; hGuess--) {
+      var adjWy = wy + hGuess * HEIGHT_PX;
+      var gc = (wx / halfW + adjWy / halfH) / 2;
+      var gr = (adjWy / halfH - wx / halfW) / 2;
+      var baseCol = Math.round(gc);
+      var baseRow = Math.round(gr);
+      var inv = this._inverseRotateGrid(baseCol, baseRow);
+      var invC = inv.c, invR = inv.r;
+
+      for (var dr = -1; dr <= 1; dr++) {
+        for (var dc = -1; dc <= 1; dc++) {
+          var cc = invC + dc;
+          var rr = invR + dr;
+          if (cc < 0 || cc >= this.cols || rr < 0 || rr >= this.rows) continue;
+          var h = this._lastHeights ? this._lastHeights[rr][cc] : 0;
+          var p = this._tileToScreenFast(cc, rr, h);
+          var _px = p.x, _py = p.y;
+          var ddx = (_wwx - _px) / halfW;
+          var ddy = (_wwy - _py) / halfH;
+          if (Math.abs(ddx) + Math.abs(ddy) <= 1.05) {
+            var g = this._rotateGrid(cc, rr);
+            var depth = g.r + g.c;
+            if (depth > bestDepth) {
+              bestDepth = depth;
+              bestCol = cc;
+              bestRow = rr;
+            }
           }
         }
       }
     }
+
     if (bestCol < 0) return null;
-    return { col: bestCol, row: bestRow };
+    this._scratchGrid.col = bestCol;
+    this._scratchGrid.row = bestRow;
+    return this._scratchGrid;
   };
 
   // -- Tile drawing primitives --
@@ -216,19 +379,29 @@ var IsoRenderer = (function () {
     ctx.fill();
   }
 
-  // PS1 dither: draw a checkerboard of dark rects inside a clipped region
+  // PS1 dither: checkerboard pattern via cached CanvasPattern
+  var _ditherPatterns = {};
+  function _getDitherPattern(ctx, alpha, step) {
+    var key = alpha + "," + step;
+    if (_ditherPatterns[key]) return _ditherPatterns[key];
+    var size = step * 2;
+    var oc = document.createElement("canvas");
+    oc.width = size;
+    oc.height = size;
+    var octx = oc.getContext("2d");
+    octx.fillStyle = "rgba(0,0,0," + alpha + ")";
+    octx.fillRect(step, 0, step, step);
+    octx.fillRect(0, step, step, step);
+    _ditherPatterns[key] = ctx.createPattern(oc, "repeat");
+    return _ditherPatterns[key];
+  }
   function _ditherRegion(ctx, x, y, w, h, alpha, step) {
-    ctx.fillStyle = "rgba(0,0,0," + alpha + ")";
-    for (var py = 0; py < h; py += step) {
-      for (var px = ((py / step) & 1) ? 0 : step; px < w; px += step * 2) {
-        ctx.fillRect(x + px, y + py, step, step);
-      }
-    }
+    ctx.fillStyle = _getDitherPattern(ctx, alpha, step);
+    ctx.fillRect(x, y, w, h);
   }
 
   function _drawTopFace(ctx, cx, cy, baseColor, zone, col, row, pulsePhase) {
-    var rng = _seedRng(col, row);
-    var rawNoise = (rng() - 0.5) * 24;
+    var rawNoise = (_seedFloat(col, row) - 0.5) * 24;
     var noise = Math.round(rawNoise / 12) * 12;
     var tileColor = _adjustColor(baseColor, noise);
 
@@ -263,29 +436,90 @@ var IsoRenderer = (function () {
       var ph = pulsePhase || 0;
       var waveAlpha = zone === "water_deep" ? 0.25 : 0.18;
       var waveCount = zone === "water_deep" ? 5 : 4;
+      ctx.strokeStyle = "#ffffff";
       for (var wi = 0; wi < waveCount; wi++) {
         var wy = cy - TILE_H / 2 + (wi + 0.5) * (TILE_H / waveCount);
         var wOff = Math.sin(ph * 1.5 + wi * 1.8 + col * 0.7) * 3;
-        ctx.strokeStyle = "rgba(255,255,255," + (waveAlpha * (0.6 + 0.4 * Math.sin(ph + wi))).toFixed(3) + ")";
+        ctx.globalAlpha = waveAlpha * (0.6 + 0.4 * Math.sin(ph + wi));
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(cx - TILE_W / 3 + wOff, wy);
         ctx.quadraticCurveTo(cx + wOff, wy - 2 + Math.sin(ph + wi * 0.5) * 1.5, cx + TILE_W / 3 + wOff, wy);
         ctx.stroke();
       }
+      ctx.globalAlpha = 1;
       if (zone === "water_deep") {
         _fillDiamond(ctx, cx, cy, "rgba(10,30,60,0.18)");
       }
+    } else if (zone === "trap_spike") {
+      ctx.strokeStyle = "rgba(80,40,20,0.7)";
+      ctx.lineWidth = 2;
+      for (var si = 0; si < 4; si++) {
+        var sx2 = cx - 8 + si * 5;
+        ctx.beginPath();
+        ctx.moveTo(sx2, cy + 4);
+        ctx.lineTo(sx2 + 2, cy - 4);
+        ctx.lineTo(sx2 + 4, cy + 4);
+        ctx.stroke();
+      }
+    } else if (zone === "trap_fire") {
+      var fPh = pulsePhase || 0;
+      for (var fi = 0; fi < 3; fi++) {
+        var fx = cx - 6 + fi * 6;
+        var fh = 4 + Math.sin(fPh * 2 + fi) * 2;
+        ctx.fillStyle = _FIRE_RGB[fi];
+        ctx.globalAlpha = 0.5 + Math.sin(fPh + fi) * 0.2;
+        ctx.beginPath();
+        ctx.moveTo(fx, cy + 2);
+        ctx.quadraticCurveTo(fx + 2, cy - fh, fx + 4, cy + 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    } else if (zone === "barricade") {
+      ctx.strokeStyle = "rgba(50,40,20,0.6)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(cx - 10, cy - 2);
+      ctx.lineTo(cx + 10, cy - 2);
+      ctx.moveTo(cx - 10, cy + 2);
+      ctx.lineTo(cx + 10, cy + 2);
+      ctx.moveTo(cx - 6, cy - 4);
+      ctx.lineTo(cx - 6, cy + 4);
+      ctx.moveTo(cx + 6, cy - 4);
+      ctx.lineTo(cx + 6, cy + 4);
+      ctx.stroke();
+    } else if (zone === "fountain") {
+      var wPh = pulsePhase || 0;
+      ctx.fillStyle = "rgb(100,200,255)";
+      ctx.globalAlpha = 0.3 + Math.sin(wPh * 1.5) * 0.1;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = "rgba(200,240,255,0.4)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 8 + Math.sin(wPh) * 2, 0, Math.PI * 2);
+      ctx.stroke();
+    } else if (zone === "high_ground") {
+      ctx.strokeStyle = "rgba(180,150,80,0.3)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(cx - 8, cy);
+      ctx.lineTo(cx, cy - 5);
+      ctx.lineTo(cx + 8, cy);
+      ctx.stroke();
     } else if (zone === "sand") {
+      _tileRng.seed(col, row);
       var halfW = TILE_W / 2;
       var halfH = TILE_H / 2;
       for (var i = 0; i < 7; i++) {
-        var t = rng();
+        var t = _tileRng.next();
         var lx = cx - halfW + t * TILE_W;
-        var ly = cy - halfH + rng() * TILE_H;
-        var len = 4 + rng() * 8;
+        var ly = cy - halfH + _tileRng.next() * TILE_H;
+        var len = 4 + _tileRng.next() * 8;
         ctx.strokeStyle =
-          rng() > 0.5
+          _tileRng.next() > 0.5
             ? "rgba(0,0,0,0.08)"
             : "rgba(255,240,200,0.10)";
         ctx.lineWidth = 1;
@@ -295,6 +529,7 @@ var IsoRenderer = (function () {
         ctx.stroke();
       }
     } else {
+      _tileRng.seed(col * 3 + 1, row * 5 + 3);
       ctx.strokeStyle = "rgba(0,0,0,0.15)";
       ctx.lineWidth = 1;
       ctx.beginPath();
@@ -304,23 +539,23 @@ var IsoRenderer = (function () {
       ctx.lineTo(cx, cy + 6);
       ctx.stroke();
       for (var si = 0; si < 3; si++) {
-        var sx = cx - TILE_W / 2 + rng() * TILE_W;
-        var sy = cy - TILE_H / 2 + rng() * TILE_H;
+        var sx = cx - TILE_W / 2 + _tileRng.next() * TILE_W;
+        var sy = cy - TILE_H / 2 + _tileRng.next() * TILE_H;
         ctx.strokeStyle = "rgba(0,0,0,0.10)";
         ctx.beginPath();
         ctx.moveTo(sx, sy);
-        ctx.lineTo(sx + 6 + rng() * 8, sy);
+        ctx.lineTo(sx + 6 + _tileRng.next() * 8, sy);
         ctx.stroke();
       }
     }
 
-    var eP = { x: cx + TILE_W / 2, y: cy };
-    var sP = { x: cx, y: cy + TILE_H / 2 };
-    var wP = { x: cx - TILE_W / 2, y: cy };
+    var eX = cx + TILE_W / 2, eY = cy;
+    var sX = cx, sY = cy + TILE_H / 2;
+    var wX = cx - TILE_W / 2, wY = cy;
     ctx.beginPath();
-    ctx.moveTo(eP.x, eP.y);
-    ctx.lineTo(sP.x, sP.y);
-    ctx.lineTo(wP.x, wP.y);
+    ctx.moveTo(eX, eY);
+    ctx.lineTo(sX, sY);
+    ctx.lineTo(wX, wY);
     ctx.closePath();
     ctx.fillStyle = "rgba(0,0,0,0.06)";
     ctx.fill();
@@ -328,8 +563,8 @@ var IsoRenderer = (function () {
     ctx.fillStyle = "rgba(0,0,0,0.04)";
     for (var di = 0; di < 16; di++) {
       var dt = di / 16;
-      var dPx = eP.x + (wP.x - eP.x) * dt;
-      var dPy = eP.y + (wP.y - eP.y) * dt;
+      var dPx = eX + (wX - eX) * dt;
+      var dPy = eY + (wY - eY) * dt;
       if ((di & 1) === 0) {
         ctx.fillRect(dPx - 1, dPy - 1, 2, 2);
       }
@@ -337,55 +572,41 @@ var IsoRenderer = (function () {
 
     ctx.restore();
 
-    _clipDiamond(ctx, cx, cy);
-    var grad = ctx.createLinearGradient(
-      cx - TILE_W / 2,
-      cy - TILE_H / 2,
-      cx + TILE_W / 4,
-      cy + TILE_H / 4
-    );
-    grad.addColorStop(0, "rgba(255,240,200,0.16)");
-    grad.addColorStop(0.5, "rgba(255,255,255,0.0)");
-    grad.addColorStop(1, "rgba(0,0,0,0.05)");
-    ctx.fillStyle = grad;
-    ctx.fill();
+    ctx.drawImage(_getTileSpecular(), cx - TILE_W / 2, cy - TILE_H / 2);
   }
 
   // Hard 1px black outlines on all visible tile edges (PS1 style)
   function _drawTileOutlines(ctx, cx, cy, h) {
-    var n = { x: cx, y: cy - TILE_H / 2 };
-    var e = { x: cx + TILE_W / 2, y: cy };
-    var s = { x: cx, y: cy + TILE_H / 2 };
-    var w = { x: cx - TILE_W / 2, y: cy };
+    var nX = cx, nY = cy - TILE_H / 2;
+    var eX = cx + TILE_W / 2, eY = cy;
+    var sX = cx, sY = cy + TILE_H / 2;
+    var wX = cx - TILE_W / 2, wY = cy;
     var depth = (h + 1) * HEIGHT_PX;
 
     ctx.strokeStyle = "#000";
     ctx.lineWidth = 1;
 
-    // top diamond
     ctx.beginPath();
-    ctx.moveTo(n.x, n.y);
-    ctx.lineTo(e.x, e.y);
-    ctx.lineTo(s.x, s.y);
-    ctx.lineTo(w.x, w.y);
+    ctx.moveTo(nX, nY);
+    ctx.lineTo(eX, eY);
+    ctx.lineTo(sX, sY);
+    ctx.lineTo(wX, wY);
     ctx.closePath();
     ctx.stroke();
 
     if (depth > 0) {
-      // left face outline
       ctx.beginPath();
-      ctx.moveTo(w.x, w.y);
-      ctx.lineTo(w.x, w.y + depth);
-      ctx.lineTo(s.x, s.y + depth);
-      ctx.lineTo(s.x, s.y);
+      ctx.moveTo(wX, wY);
+      ctx.lineTo(wX, wY + depth);
+      ctx.lineTo(sX, sY + depth);
+      ctx.lineTo(sX, sY);
       ctx.stroke();
 
-      // right face outline
       ctx.beginPath();
-      ctx.moveTo(e.x, e.y);
-      ctx.lineTo(e.x, e.y + depth);
-      ctx.lineTo(s.x, s.y + depth);
-      ctx.lineTo(s.x, s.y);
+      ctx.moveTo(eX, eY);
+      ctx.lineTo(eX, eY + depth);
+      ctx.lineTo(sX, sY + depth);
+      ctx.lineTo(sX, sY);
       ctx.stroke();
     }
   }
@@ -486,28 +707,57 @@ var IsoRenderer = (function () {
 
   // -- Diorama shadow (concentric ellipses — PS1 pre-baked look) --
 
+  var _dioramaShadowCanvas = null;
+  var _dioramaShadowKey = "";
+  var _dioramaShadowX = 0;
+  var _dioramaShadowY = 0;
+
   IsoRenderer.prototype._drawDioramaShadow = function (ctx) {
-    var tl = this.tileToScreen(0, 0, 0);
-    var tr = this.tileToScreen(this.cols - 1, 0, 0);
-    var bl = this.tileToScreen(0, this.rows - 1, 0);
-    var br = this.tileToScreen(this.cols - 1, this.rows - 1, 0);
-    var cx = (tl.x + br.x) / 2;
-    var allY = [tl.y, tr.y, bl.y, br.y];
-    var cy = Math.max.apply(null, allY) + 50;
-    var allX = [tl.x, tr.x, bl.x, br.x];
-    var rx = (Math.max.apply(null, allX) - Math.min.apply(null, allX)) / 2 + 30;
+    var key = this.cols + "," + this.rows + "," + this.rotStep + "," + (this.originX | 0) + "," + (this.originY | 0);
+    if (_dioramaShadowKey === key && _dioramaShadowCanvas) {
+      ctx.drawImage(_dioramaShadowCanvas, _dioramaShadowX, _dioramaShadowY);
+      return;
+    }
+
+    var p = this._tileToScreenFast(0, 0, 0);
+    var tlx = p.x, tly = p.y;
+    p = this._tileToScreenFast(this.cols - 1, 0, 0);
+    var trx = p.x, try_ = p.y;
+    p = this._tileToScreenFast(0, this.rows - 1, 0);
+    var blx = p.x, bly = p.y;
+    p = this._tileToScreenFast(this.cols - 1, this.rows - 1, 0);
+    var brx = p.x, bry = p.y;
+    var cx = (tlx + brx) / 2;
+    var maxY = tly > try_ ? tly : try_; if (bly > maxY) maxY = bly; if (bry > maxY) maxY = bry;
+    var cy = maxY + 50;
+    var minX = tlx < trx ? tlx : trx; if (blx < minX) minX = blx; if (brx < minX) minX = brx;
+    var maxX = tlx > trx ? tlx : trx; if (blx > maxX) maxX = blx; if (brx > maxX) maxX = brx;
+    var rx = (maxX - minX) / 2 + 30;
     var ry = 32;
+
+    var ow = Math.ceil(rx * 2) + 4;
+    var oh = Math.ceil(ry * 2) + 4;
+    if (!_dioramaShadowCanvas) _dioramaShadowCanvas = document.createElement("canvas");
+    _dioramaShadowCanvas.width = ow;
+    _dioramaShadowCanvas.height = oh;
+    var oc = _dioramaShadowCanvas.getContext("2d");
+    var lcx = ow / 2, lcy = oh / 2;
 
     var rings = 6;
     for (var i = rings; i >= 0; i--) {
       var t = i / rings;
       var alpha = 0.08 + (1 - t) * 0.22;
       var scale = 0.4 + t * 0.6;
-      ctx.beginPath();
-      ctx.ellipse(cx, cy, rx * scale, ry * scale, 0, 0, Math.PI * 2);
-      ctx.fillStyle = "rgba(0,0,0," + alpha.toFixed(3) + ")";
-      ctx.fill();
+      oc.beginPath();
+      oc.ellipse(lcx, lcy, rx * scale, ry * scale, 0, 0, Math.PI * 2);
+      oc.fillStyle = "rgba(0,0,0," + alpha + ")";
+      oc.fill();
     }
+
+    _dioramaShadowX = cx - ow / 2;
+    _dioramaShadowY = cy - oh / 2;
+    _dioramaShadowKey = key;
+    ctx.drawImage(_dioramaShadowCanvas, _dioramaShadowX, _dioramaShadowY);
   };
 
   // -- Main draw --
@@ -526,17 +776,20 @@ var IsoRenderer = (function () {
     var darkSky = params.darkSky || false;
 
     this._lastHeights = heights;
-    if (!this.reducedMotion) this._pulsePhase += 0.06;
+    if (!this.reducedMotion) this._pulsePhase = (this._pulsePhase + 0.06) % (Math.PI * 2);
 
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = "#060810";
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     var _gradH = Math.round(this.canvas.height * 0.18);
-    var _grd = ctx.createLinearGradient(0, 0, 0, _gradH);
-    _grd.addColorStop(0, "#1a1818");
-    _grd.addColorStop(1, "#060810");
-    ctx.fillStyle = _grd;
+    if (!this._cachedSkyGrad || this._cachedSkyGradH !== _gradH) {
+      this._cachedSkyGradH = _gradH;
+      this._cachedSkyGrad = ctx.createLinearGradient(0, 0, 0, _gradH);
+      this._cachedSkyGrad.addColorStop(0, "#1a1818");
+      this._cachedSkyGrad.addColorStop(1, "#060810");
+    }
+    ctx.fillStyle = this._cachedSkyGrad;
     ctx.fillRect(0, 0, this.canvas.width, _gradH);
     ctx.restore();
 
@@ -554,28 +807,53 @@ var IsoRenderer = (function () {
 
     this._drawDioramaShadow(ctx);
 
-    // pulse alpha for highlights
     var pulseAlpha = 0.30 + 0.20 * Math.sin(this._pulsePhase);
+    var _hlMoveStrokeAlpha = Math.min(1, pulseAlpha + 0.25);
 
-    // Build draw order sorted by rotated depth (back to front)
-    var drawList = [];
-    for (var r = 0; r < this.rows; r++) {
-      for (var c = 0; c < this.cols; c++) {
-        var g = this._rotateGrid(c, r);
-        drawList.push({ c: c, r: r, depth: g.c + g.r });
+    // Build draw order sorted by rotated depth (back to front) — cached
+    if (this._dlCols !== this.cols || this._dlRows !== this.rows || this._dlRot !== this.rotStep) {
+      this._dlCols = this.cols; this._dlRows = this.rows; this._dlRot = this.rotStep;
+      var dl = [];
+      for (var r = 0; r < this.rows; r++) {
+        for (var c = 0; c < this.cols; c++) {
+          var g = this._rotateGrid(c, r);
+          dl.push({ c: c, r: r, depth: g.c + g.r });
+        }
       }
+      dl.sort(function (a, b) { return a.depth - b.depth; });
+      this._drawListCache = dl;
     }
-    drawList.sort(function (a, b) { return a.depth - b.depth; });
+    var drawList = this._drawListCache;
 
-    // Pre-build unit position map for O(1) per-tile lookups
-    var _unitMap = {};
+    // Pre-build unit position map for O(1) per-tile lookups — flat array keyed by row*cols+col
+    var _umCols = this.cols;
+    var _umSize = this.rows * _umCols;
+    if (!this._unitArr || this._unitArr.length < _umSize) {
+      this._unitArr = new Array(_umSize);
+      this._unitArrDirty = [];
+    }
+    var _unitArr = this._unitArr;
+    var _dirty = this._unitArrDirty;
+    for (var _di = 0; _di < _dirty.length; _di++) _unitArr[_dirty[_di]] = null;
+    _dirty.length = 0;
     for (var _ui = 0; _ui < units.length; _ui++) {
       var _uu = units[_ui];
       if (_uu.hp <= 0 && !_uu._deathAnim) continue;
       var _ux = Math.round((_uu.animX != null) ? _uu.animX : _uu.x);
       var _uy = Math.round((_uu.animY != null) ? _uu.animY : _uu.y);
-      _unitMap[_ux + "," + _uy] = _uu;
+      if (_ux >= 0 && _ux < _umCols && _uy >= 0 && _uy < this.rows) {
+        var _idx = _uy * _umCols + _ux;
+        _unitArr[_idx] = _uu;
+        _dirty.push(_idx);
+      }
     }
+
+    // Compute world-space viewport bounds for tile culling
+    var _cullMargin = TILE_W + DRAW_SPRITE_H + HEIGHT_PX * 6;
+    var _viewL = cx - this.shakeX - cw / (2 * this.zoom) - _cullMargin;
+    var _viewR = cx - this.shakeX + cw / (2 * this.zoom) + _cullMargin;
+    var _viewT = cy - this.shakeY - ch / (2 * this.zoom) - _cullMargin;
+    var _viewB = cy - this.shakeY + ch / (2 * this.zoom) + _cullMargin;
 
     for (var di = 0; di < drawList.length; di++) {
       var dc = drawList[di].c;
@@ -584,16 +862,18 @@ var IsoRenderer = (function () {
       var zone = zones[dr][dc];
       var pal = ZONE_COLORS[zone] || ZONE_COLORS.sand;
       var colors = pal[h] || pal[0];
-      var p = this.tileToScreen(dc, dr, h);
+      var p = this._tileToScreenFast(dc, dr, h);
+      var _px = p.x, _py = p.y;
+
+      if (_px < _viewL || _px > _viewR || _py < _viewT || _py > _viewB) continue;
 
       // PS1 affine jitter — seeded +-0.5px
-      var jRng = _seedRng(dc + 5, dr + 3);
-      var jx = (jRng() - 0.5) * 1.0;
-      var jy = (jRng() - 0.5) * 1.0;
-      var px = p.x + jx;
-      var py = p.y + jy;
+      var jx = (_seedFloat(dc + 5, dr + 3) - 0.5) * 1.0;
+      var jy = (_seedFloat(dc + 102, dr + 34) - 0.5) * 1.0;
+      var px = _px + jx;
+      var py = _py + jy;
 
-      var tKey = dc + "," + dr;
+      var tKey = (dr << 8) | dc;
       var isCollapsed = collapsedTiles && collapsedTiles.has(tKey);
 
       if (!isCollapsed) {
@@ -609,15 +889,15 @@ var IsoRenderer = (function () {
         ctx.save();
         _clipDiamond(ctx, px, py);
         ctx.clip();
-        var cRng = _seedRng(dc * 7 + 3, dr * 11 + 1);
+        _tileRng.seed(dc * 7 + 3, dr * 11 + 1);
         ctx.strokeStyle = "rgba(60, 30, 20, 0.6)";
         ctx.lineWidth = 1;
         for (var ci = 0; ci < 4; ci++) {
-          var cx1 = px - TILE_W / 2 + cRng() * TILE_W;
-          var cy1 = py - TILE_H / 2 + cRng() * TILE_H;
+          var cx1 = px - TILE_W / 2 + _tileRng.next() * TILE_W;
+          var cy1 = py - TILE_H / 2 + _tileRng.next() * TILE_H;
           ctx.beginPath();
           ctx.moveTo(cx1, cy1);
-          ctx.lineTo(cx1 + (cRng() - 0.5) * 16, cy1 + (cRng() - 0.5) * 10);
+          ctx.lineTo(cx1 + (_tileRng.next() - 0.5) * 16, cy1 + (_tileRng.next() - 0.5) * 10);
           ctx.stroke();
         }
         ctx.restore();
@@ -630,16 +910,18 @@ var IsoRenderer = (function () {
         ctx.save();
         _clipDiamond(ctx, px, py);
         ctx.clip();
-        var eRng = _seedRng(dc * 13 + 1, dr * 7 + 5);
+        _tileRng.seed(dc * 13 + 1, dr * 7 + 5);
+        ctx.fillStyle = "rgb(180, 50, 30)";
         for (var ei = 0; ei < 3; ei++) {
-          var ex = px - TILE_W / 3 + eRng() * (TILE_W * 0.66);
-          var ey = py - TILE_H / 3 + eRng() * (TILE_H * 0.66);
-          var er = 1 + eRng() * 1.5;
-          ctx.fillStyle = "rgba(180, 50, 30, " + (0.25 + eRng() * 0.3).toFixed(2) + ")";
+          var ex = px - TILE_W / 3 + _tileRng.next() * (TILE_W * 0.66);
+          var ey = py - TILE_H / 3 + _tileRng.next() * (TILE_H * 0.66);
+          var er = 1 + _tileRng.next() * 1.5;
+          ctx.globalAlpha = 0.25 + _tileRng.next() * 0.3;
           ctx.beginPath();
           ctx.arc(ex, ey, er, 0, Math.PI * 2);
           ctx.fill();
         }
+        ctx.globalAlpha = 1;
         ctx.restore();
       }
 
@@ -649,31 +931,27 @@ var IsoRenderer = (function () {
 
       _drawTileOutlines(ctx, px, py, h);
 
-      var key = tKey;
-      var hlType = highlights[key];
+      var hlType = highlights[tKey];
       if (hlType) {
-        var hlBase = _hlBaseColor(hlType);
-        var hlColor =
-          "rgba(" +
-          hlBase[0] + "," +
-          hlBase[1] + "," +
-          hlBase[2] + "," +
-          pulseAlpha.toFixed(3) +
-          ")";
-        _fillDiamond(ctx, px, py, hlColor);
+        ctx.globalAlpha = pulseAlpha;
+        _fillDiamond(ctx, px, py, _HL_RGB[hlType] || _HL_RGB.gate);
+        ctx.globalAlpha = 1;
 
         if (hlType === "move") {
+          ctx.save();
           _clipDiamond(ctx, px, py);
-          ctx.strokeStyle =
-            "rgba(120, 200, 255, " + (pulseAlpha + 0.25).toFixed(3) + ")";
+          ctx.globalAlpha = _hlMoveStrokeAlpha;
+          ctx.strokeStyle = _HL_MOVE_STROKE_RGB;
           ctx.lineWidth = 1.5;
           ctx.stroke();
+          ctx.globalAlpha = 1;
+          ctx.restore();
         }
       }
 
-      var unit = _unitMap[dc + "," + dr] || null;
+      var unit = _unitArr[dr * _umCols + dc] || null;
       if (unit) {
-        var unitH = heights[dr][dc];
+        var unitH = h;
         var unitAnimX = (unit.animX != null) ? unit.animX : unit.x;
         var unitAnimY = (unit.animY != null) ? unit.animY : unit.y;
         var fracX = unitAnimX - Math.floor(unitAnimX);
@@ -682,8 +960,7 @@ var IsoRenderer = (function () {
         var drawPy = py;
         if (fracX > 0.01 || fracY > 0.01) {
           var exactP = this.tileToScreenF(unitAnimX, unitAnimY, unitH);
-          drawPx = exactP.x;
-          drawPy = exactP.y;
+          drawPx = exactP.x; drawPy = exactP.y;
         }
         if (unit.lungeX != null) {
           drawPx += unit.lungeX;
@@ -699,22 +976,23 @@ var IsoRenderer = (function () {
       ctx.setTransform(_dpr, 0, 0, _dpr, 0, 0);
       ctx.globalCompositeOperation = "multiply";
       ctx.fillStyle = "rgba(20, 15, 30, 0.18)";
-      var logW = this.canvas.clientWidth || this.canvas.width;
-      var logH = this.canvas.clientHeight || this.canvas.height;
+      var logW = this.canvas.clientWidth || (this.canvas.width / _dpr);
+      var logH = this.canvas.clientHeight || (this.canvas.height / _dpr);
       ctx.fillRect(0, 0, logW, logH);
       ctx.restore();
-      var tRng = _seedRng(3, 7);
+      _tileRng.seed(3, 7);
       for (var ti = 0; ti < 4; ti++) {
-        var twx = tRng() * this.cols;
-        var twy = tRng() < 0.5 ? 0 : this.rows - 1;
+        var twx = _tileRng.next() * this.cols;
+        var twy = _tileRng.next() < 0.5 ? 0 : this.rows - 1;
         var tH = heights[twy] ? (heights[twy][Math.floor(twx)] || 0) : 0;
-        var tp = this.tileToScreen(Math.floor(twx), twy, tH);
+        var tp = this._tileToScreenFast(Math.floor(twx), twy, tH);
+        var _tpx = tp.x, _tpy = tp.y;
         var flicker = 6 + Math.sin(this._pulsePhase * 2 + ti * 1.5) * 3;
         ctx.save();
         ctx.globalAlpha = 0.15 + Math.sin(this._pulsePhase * 3 + ti) * 0.05;
         ctx.fillStyle = "#ff9040";
         ctx.beginPath();
-        ctx.arc(tp.x, tp.y - 10, flicker, 0, Math.PI * 2);
+        ctx.arc(_tpx, _tpy - 10, flicker, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
       }
@@ -769,9 +1047,10 @@ var IsoRenderer = (function () {
       var u = units[i];
       if (u.hp <= 0) continue;
       var h = (heights && heights[u.y] && heights[u.y][u.x]) || 0;
-      var tp = this.tileToScreen(u.x, u.y, h);
-      var sx = z * tp.x + (sw / 2) * (1 - z) - z * px;
-      var sy = z * tp.y + (sh / 2) * (1 - z) - z * py;
+      var tp = this._tileToScreenFast(u.x, u.y, h);
+      var _osx = tp.x, _osy = tp.y;
+      var sx = z * _osx + (sw / 2) * (1 - z) - z * px;
+      var sy = z * _osy + (sh / 2) * (1 - z) - z * py;
       if (sx >= margin && sx <= sw - margin && sy >= margin && sy <= sh - margin) continue;
       var cx = Math.max(margin, Math.min(sw - margin, sx));
       var cy = Math.max(margin, Math.min(sh - margin, sy));
@@ -793,17 +1072,10 @@ var IsoRenderer = (function () {
     ctx.restore();
   };
 
-  function _hlBaseColor(type) {
-    if (type === "move") return [50, 140, 255];
-    if (type === "attack") return [255, 60, 40];
-    if (type === "ability") return [200, 255, 60];
-    return [80, 160, 255]; // gate
-  }
-
   // -- Unit rendering --
 
   IsoRenderer.prototype._drawUnit = function (ctx, cx, cy, unit, isActive) {
-    var key = unit.classId + "_" + unit.team;
+    var key = unit._spriteKey || (unit._spriteKey = unit.classId + "_" + unit.team);
     var bitmap = this.spriteCache[key];
     if (!bitmap) return;
 
@@ -861,9 +1133,9 @@ var IsoRenderer = (function () {
     if (isActive) {
       var glowBitmap = this._getGlowBitmap(key, bitmap, unit.team);
       if (glowBitmap) {
-        ctx.globalAlpha = unit.exhausted ? 0.4 : 0.7;
+        ctx.globalAlpha = (unit.exhausted ? 0.4 : 0.7) * deathAlpha;
         ctx.drawImage(glowBitmap, dx - 2, dy - 2, DRAW_SPRITE_W + 4, DRAW_SPRITE_H + 4);
-        ctx.globalAlpha = unit.exhausted ? 0.5 : 1.0;
+        ctx.globalAlpha = baseAlpha * deathAlpha;
       }
     }
 
@@ -881,22 +1153,23 @@ var IsoRenderer = (function () {
     ctx.strokeStyle = "rgba(255,255,255,0.15)";
     ctx.lineWidth = 1;
     ctx.strokeRect(barX - 1, barY - 1, barW + 2, barH + 2);
-    var ratio = unit.hp / unit.maxHp;
-    var grad = ctx.createLinearGradient(barX, barY, barX, barY + barH);
-    if (ratio > 0.5) {
-      grad.addColorStop(0, "#70f070");
-      grad.addColorStop(1, "#30a030");
-    } else if (ratio > 0.25) {
-      grad.addColorStop(0, "#f0d848");
-      grad.addColorStop(1, "#b89020");
-    } else {
-      grad.addColorStop(0, "#f05040");
-      grad.addColorStop(1, "#a02018");
-    }
-    ctx.fillStyle = grad;
-    ctx.fillRect(barX, barY, barW * ratio, barH);
+    var ratio = unit.maxHp > 0 ? Math.max(0, Math.min(1, unit.hp / unit.maxHp)) : 0;
+    var hpTier = ratio > 0.5 ? "green" : ratio > 0.25 ? "yellow" : "red";
+    var hpCanvas = _getHpBarCanvas(hpTier);
+    ctx.drawImage(hpCanvas, 0, 0, 1, 4, barX, barY, barW * ratio, barH);
 
-    // Hit flash overlay — use cached white silhouette
+    if (unit.accentColor) {
+      ctx.fillStyle = unit.accentColor;
+      ctx.fillRect(cx - barW / 2, barY + barH + 1, barW, 2);
+    }
+
+    if (unit.promotionId) {
+      ctx.fillStyle = "#e8c040";
+      ctx.font = "bold 8px monospace";
+      ctx.textAlign = "center";
+      ctx.fillText("\u2605", cx, dy - 2);
+    }
+
     if (flashAlpha > 0) {
       var flashBmp = this._getFlashBitmap(key, bitmap);
       if (flashBmp) {
@@ -914,6 +1187,9 @@ var IsoRenderer = (function () {
       var totalIconW = statuses.length * (iconSize + iconGap) - iconGap;
       var iconStartX = cx - totalIconW / 2;
       var iconY = barY + barH + 3;
+      ctx.font = "bold 6px monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
       for (var si = 0; si < statuses.length; si++) {
         var ic = statuses[si];
         ctx.fillStyle = "rgba(0,0,0,0.7)";
@@ -921,9 +1197,6 @@ var IsoRenderer = (function () {
         ctx.fillStyle = ic.color || "#88ccff";
         ctx.fillRect(iconStartX, iconY, iconSize, iconSize);
         ctx.fillStyle = "#fff";
-        ctx.font = "bold 6px monospace";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
         ctx.fillText(ic.glyph || "?", iconStartX + iconSize / 2, iconY + iconSize / 2 + 0.5);
         iconStartX += iconSize + iconGap;
       }
@@ -990,6 +1263,8 @@ var IsoRenderer = (function () {
 
   // -- Speech bubbles --
 
+  var _bubbleLayoutCache = { key: "", lines: [], boxW: 0, boxH: 0 };
+
   IsoRenderer.prototype._drawSpeechBubble = function (ctx, cx, cy, text, revealed, style) {
     if (!text) return;
 
@@ -1006,43 +1281,57 @@ var IsoRenderer = (function () {
     ctx.font = font;
 
     var visibleText = text.substring(0, Math.max(0, revealed | 0));
-    var words = visibleText.split(" ");
-    var lines = [];
-    var cur = "";
-    for (var wi = 0; wi < words.length; wi++) {
-      var word = words[wi];
-      if (ctx.measureText(word).width > maxW) {
-        if (cur) { lines.push(cur); cur = ""; }
-        var chunk = "";
-        for (var ci = 0; ci < word.length; ci++) {
-          if (ctx.measureText(chunk + word[ci]).width > maxW && chunk) {
-            lines.push(chunk);
-            chunk = "";
-          }
-          chunk += word[ci];
-        }
-        cur = chunk;
-        continue;
-      }
-      var test = cur ? (cur + " " + word) : word;
-      if (ctx.measureText(test).width > maxW) {
-        if (cur) lines.push(cur);
-        cur = word;
-      } else {
-        cur = test;
-      }
-    }
-    if (cur) lines.push(cur);
-    if (lines.length === 0) lines.push("");
+    var cacheKey = visibleText + "|" + font + "|" + maxW;
+    var lines, boxW, boxH;
 
-    var boxW = 0;
-    for (var li = 0; li < lines.length; li++) {
-      var lw = ctx.measureText(lines[li]).width;
-      if (lw > maxW) lw = maxW;
-      if (lw > boxW) boxW = lw;
+    if (_bubbleLayoutCache.key === cacheKey) {
+      lines = _bubbleLayoutCache.lines;
+      boxW = _bubbleLayoutCache.boxW;
+      boxH = _bubbleLayoutCache.boxH;
+    } else {
+      var words = visibleText.split(" ");
+      lines = [];
+      var cur = "";
+      for (var wi = 0; wi < words.length; wi++) {
+        var word = words[wi];
+        if (ctx.measureText(word).width > maxW) {
+          if (cur) { lines.push(cur); cur = ""; }
+          var chunk = "";
+          for (var ci = 0; ci < word.length; ci++) {
+            if (ctx.measureText(chunk + word[ci]).width > maxW && chunk) {
+              lines.push(chunk);
+              chunk = "";
+            }
+            chunk += word[ci];
+          }
+          cur = chunk;
+          continue;
+        }
+        var test = cur ? (cur + " " + word) : word;
+        if (ctx.measureText(test).width > maxW) {
+          if (cur) lines.push(cur);
+          cur = word;
+        } else {
+          cur = test;
+        }
+      }
+      if (cur) lines.push(cur);
+      if (lines.length === 0) lines.push("");
+
+      boxW = 0;
+      for (var li = 0; li < lines.length; li++) {
+        var lw = ctx.measureText(lines[li]).width;
+        if (lw > maxW) lw = maxW;
+        if (lw > boxW) boxW = lw;
+      }
+      boxW = boxW + padX * 2;
+      boxH = lines.length * lineH + padY * 2;
+
+      _bubbleLayoutCache.key = cacheKey;
+      _bubbleLayoutCache.lines = lines;
+      _bubbleLayoutCache.boxW = boxW;
+      _bubbleLayoutCache.boxH = boxH;
     }
-    boxW = boxW + padX * 2;
-    var boxH = lines.length * lineH + padY * 2;
 
     var bx, by;
     var useScreenSpace = (style === "narration");
@@ -1101,11 +1390,12 @@ var IsoRenderer = (function () {
     }
 
     if (style === "dialogue") {
+      var tailX = Math.max(bx + 10, Math.min(cx, bx + boxW - 10));
       ctx.fillStyle = "rgba(255, 250, 240, 0.95)";
       ctx.beginPath();
-      ctx.moveTo(cx - 6, by + boxH);
-      ctx.lineTo(cx, by + boxH + 10);
-      ctx.lineTo(cx + 6, by + boxH);
+      ctx.moveTo(tailX - 6, by + boxH);
+      ctx.lineTo(tailX, by + boxH + 10);
+      ctx.lineTo(tailX + 6, by + boxH);
       ctx.closePath();
       ctx.fill();
       ctx.strokeStyle = "rgba(80, 60, 40, 0.5)";
@@ -1117,7 +1407,6 @@ var IsoRenderer = (function () {
     } else {
       ctx.fillStyle = "#1a1408";
     }
-    ctx.font = font;
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
     for (var li2 = 0; li2 < lines.length; li2++) {
@@ -1169,12 +1458,14 @@ var IsoRenderer = (function () {
       octx.drawImage(img, 0, 0, w, h);
       self.spriteCache[key] = oc;
       // invalidate outline/glow caches when sprite updates
-      delete self._outlineCache[key + "_outline"];
-      delete self._outlineCache[key + "_glow_player"];
-      delete self._outlineCache[key + "_glow_enemy"];
-      delete self._outlineCache[key + "_glow_gifted"];
+      var cachePrefix = key + "_";
+      var cacheKeys = Object.keys(self._outlineCache);
+      for (var ci = 0; ci < cacheKeys.length; ci++) {
+        if (cacheKeys[ci].indexOf(cachePrefix) === 0) delete self._outlineCache[cacheKeys[ci]];
+      }
       URL.revokeObjectURL(url);
     };
+    img.onerror = function() { URL.revokeObjectURL(url); };
     img.src = url;
   };
 
@@ -1184,6 +1475,7 @@ var IsoRenderer = (function () {
   };
 
   IsoRenderer.prototype.setZoom = function (z) {
+    if (!Number.isFinite(z)) return;
     this.zoom = Math.max(this.zoomMin, Math.min(this.zoomMax, z));
   };
 
@@ -1211,32 +1503,35 @@ var IsoRenderer = (function () {
     this.floatingTexts.push({
       col: col, row: row, h: h,
       text: text, color: color || "#fff",
-      age: 0, maxAge: 50
+      startTime: performance.now(), durationMs: 800
     });
+    if (this.floatingTexts.length > 30) this.floatingTexts.shift();
   };
 
   IsoRenderer.prototype._drawFloatingTexts = function (ctx) {
+    if (!this.floatingTexts.length) return;
+    var now = performance.now();
+    ctx.save();
+    ctx.font = "bold 13px monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.strokeStyle = "#000";
+    ctx.lineWidth = 3;
     for (var i = this.floatingTexts.length - 1; i >= 0; i--) {
       var ft = this.floatingTexts[i];
-      ft.age++;
-      if (ft.age > ft.maxAge) { this.floatingTexts.splice(i, 1); continue; }
-      var p = this.tileToScreen(ft.col, ft.row, ft.h);
-      var baseY = p.y - DRAW_SPRITE_H * 0.5;
-      var t = ft.age / ft.maxAge;
+      var t = (now - ft.startTime) / ft.durationMs;
+      if (t >= 1) { this.floatingTexts.splice(i, 1); continue; }
+      var p = this._tileToScreenFast(ft.col, ft.row, ft.h);
+      var _ftx = p.x, _fty = p.y;
+      var baseY = _fty - DRAW_SPRITE_H * 0.5;
       var alpha = t < 0.7 ? 1 : 1 - (t - 0.7) / 0.3;
       var rise = t * 28;
-      ctx.save();
       ctx.globalAlpha = alpha;
-      ctx.font = "bold 13px monospace";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.strokeStyle = "#000";
-      ctx.lineWidth = 3;
-      ctx.strokeText(ft.text, p.x, baseY - rise);
       ctx.fillStyle = ft.color;
-      ctx.fillText(ft.text, p.x, baseY - rise);
-      ctx.restore();
+      ctx.strokeText(ft.text, _ftx, baseY - rise);
+      ctx.fillText(ft.text, _ftx, baseY - rise);
     }
+    ctx.restore();
   };
 
   IsoRenderer.TILE_W = TILE_W;

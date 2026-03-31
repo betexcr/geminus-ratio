@@ -7,10 +7,10 @@ Turn-based tactics in the Colosseum—**Final Fantasy Tactics**–inspired rules
 Open `index.html` in a modern browser, or serve the folder:
 
 ```bash
-cd geminus-ratio && npx --yes serve -p 3333
+python3 -m http.server 8765
 ```
 
-Then open `http://localhost:3333`.
+Then open `http://localhost:8765`.
 
 ## Flow
 

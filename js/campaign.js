@@ -6,6 +6,8 @@
 
 /* eslint-disable no-unused-vars */
 
+var _VALID_CLASS_IDS = ["murmillo","retiarius","secutor","thraex","hoplomachus","dimachaerus","provocator","samnite","sagittarius","essedarius","umbra","vestige"];
+
 var CAMPAIGN_MISSIONS = [
 
   // ─── TUTORIAL ─────────────────────────────────────────────────────
@@ -737,12 +739,12 @@ var VIGNETTE_POOL = [
     lines: [{ speaker: "B", text: "I kept count. Seven arrows, seven hits." }, { speaker: "A", text: "And I kept seven enemies off your back. You're welcome." }] },
   { id: "v_dim_ess", classA: "dimachaerus", classB: "essedarius", condition: "both_survived",
     lines: [{ speaker: "A", text: "Your charge nearly trampled our own side." }, { speaker: "B", text: "Nearly. That's what makes it exciting." }] },
-  { id: "v_laq_ves", classA: "laquearius", classB: "vestige", condition: "both_survived",
+  { id: "v_pro_ves", classA: "provocator", classB: "vestige", condition: "both_survived",
     lines: [{ speaker: "A", text: "You went down — I saw it. Then you just... stood back up." }, { speaker: "B", text: "Death and I have an arrangement. She waits." }] },
   { id: "v_mur_sag", classA: "murmillo", classB: "sagittarius", condition: "both_survived",
     lines: [{ speaker: "A", text: "Stay behind me next time. Arrows don't stop swords." }, { speaker: "B", text: "They do when they hit first." }] },
-  { id: "v_thr_laq", classA: "thraex", classB: "laquearius", condition: "both_survived",
-    lines: [{ speaker: "A", text: "That lasso trick — where did you learn that?" }, { speaker: "B", text: "The streets. Everything's a weapon when you grow up hungry." }] },
+  { id: "v_thr_ess", classA: "thraex", classB: "essedarius", condition: "both_survived",
+    lines: [{ speaker: "A", text: "That charging trick — where did you learn that?" }, { speaker: "B", text: "The streets. Everything's a weapon when you grow up hungry." }] },
   { id: "v_sec_hop", classA: "secutor", classB: "hoplomachus", condition: "both_survived",
     lines: [{ speaker: "B", text: "You pursued that retreating gladiator across the whole arena." }, { speaker: "A", text: "Once I start running, I don't stop until they do." }] },
   { id: "v_ret_sag", classA: "retiarius", classB: "sagittarius", condition: "both_survived",
@@ -766,6 +768,9 @@ var campaignState = {
   ritualMeter: 0,
   totalDeaths: 0,
   endingKey: null,
+  difficulty: "normal",
+  campaignStats: { totalBattles: 0, totalKills: 0, totalDamage: 0, totalTurns: 0, deathlessBattles: 0, classesUsed: {}, peakDenarii: 0 },
+  inventory: [],
 };
 
 // ─── Helper Functions ───────────────────────────────────────────────
@@ -791,7 +796,7 @@ var Campaign = {
 
   getUnlockedClasses: function () {
     var m = this.getMission();
-    if (!m) return [];
+    if (!m) return _VALID_CLASS_IDS.slice();
     return m.unlockedClasses || [];
   },
 
@@ -807,6 +812,7 @@ var Campaign = {
   },
 
   isNamedAlive: function (name) {
+    if (!name) return true;
     var key = name.toLowerCase() + "_alive";
     if (campaignState.flags[key] === false) return false;
     return true;
@@ -832,12 +838,14 @@ var Campaign = {
         else if (totalKills >= 3) title = "Blooded";
         var ndc = u.nearDeathCount || 0;
         if (u.hp > 0 && u.hp < u.maxHp * 0.25) ndc++;
+        var safeMaxHp = u.maxHp || 10;
+        var safeHp = Math.min(Math.max(1, u.hp || safeMaxHp), safeMaxHp);
         var entry = {
           uid: u.uid || ("surv_" + i),
           classId: u.classId,
           name: u.displayName || null,
-          hp: (carryHp && !skipDeathCount) ? u.hp : u.maxHp,
-          maxHp: u.maxHp,
+          hp: (carryHp && !skipDeathCount) ? safeHp : safeMaxHp,
+          maxHp: safeMaxHp,
           isFree: u.isFree || false,
           level: u.level || 1,
           xp: u.xp || 0,
@@ -851,6 +859,9 @@ var Campaign = {
           bonusSpd: u.bonusSpd || 0,
         };
         if (u.gifted) entry.gifted = true;
+        if (u.accent) entry.accent = u.accent;
+        if (u.promotionId) entry.promotionId = u.promotionId;
+        if (u.equipment) entry.equipment = u.equipment;
         survivors.push(entry);
       }
     }
@@ -871,14 +882,16 @@ var Campaign = {
 
     // Bond pair tracking (skip for training bouts; only count deployed units)
     if (!skipDeathCount) {
-      if (!campaignState.flags._bondCounts) campaignState.flags._bondCounts = {};
-      if (!campaignState.flags._bondPairs) campaignState.flags._bondPairs = [];
+      if (typeof campaignState.flags._bondCounts !== "object" || campaignState.flags._bondCounts === null || Array.isArray(campaignState.flags._bondCounts)) campaignState.flags._bondCounts = {};
+      if (!Array.isArray(campaignState.flags._bondPairs)) campaignState.flags._bondPairs = [];
       var bondPool = deployedUids
         ? survivors.filter(function (s) { return deployedUids[s.uid]; })
         : survivors;
       for (var pi = 0; pi < bondPool.length; pi++) {
         for (var pj = pi + 1; pj < bondPool.length; pj++) {
-          var pairKey = bondPool[pi].uid + "|" + bondPool[pj].uid;
+          var _a = bondPool[pi].uid, _b = bondPool[pj].uid;
+          if (!_a || !_b) continue;
+          var pairKey = _a < _b ? _a + "|" + _b : _b + "|" + _a;
           campaignState.flags._bondCounts[pairKey] = (campaignState.flags._bondCounts[pairKey] || 0) + 1;
           if (campaignState.flags._bondCounts[pairKey] >= 3) {
             var exists = campaignState.flags._bondPairs.some(function(bp) { return bp === pairKey; });
@@ -896,15 +909,16 @@ var Campaign = {
     if (!m) return null;
 
     if (won) {
-      campaignState.denarii += m.victoryBonus;
+      campaignState.denarii += (m.victoryBonus || 0);
       var playerDied = campaignState.survivingRoster.length <
-        (campaignState._preBattleCount || 99);
-      if (!playerDied) campaignState.denarii += m.perfectBonus;
+        (typeof campaignState._preBattleCount === "number" ? campaignState._preBattleCount : 99);
+      if (!playerDied) campaignState.denarii += (m.perfectBonus || 0);
 
-      for (var i = 0; i < m.flagsToSet.length; i++) {
-        this.setFlag(m.flagsToSet[i]);
+      var flags = m.flagsToSet || [];
+      for (var i = 0; i < flags.length; i++) {
+        this.setFlag(flags[i]);
       }
-      campaignState.ritualMeter = m.ritualMeter;
+      campaignState.ritualMeter = (m.ritualMeter || 0);
 
       campaignState.missionIndex++;
     }
@@ -932,6 +946,9 @@ var Campaign = {
     campaignState.totalDeaths = 0;
     campaignState.endingKey = null;
     campaignState._preBattleCount = 0;
+    campaignState.difficulty = "normal";
+    campaignState.campaignStats = { totalBattles: 0, totalKills: 0, totalDamage: 0, totalTurns: 0, deathlessBattles: 0, classesUsed: {}, peakDenarii: 0 };
+    campaignState.inventory = [];
   },
 
   start: function () {
@@ -975,13 +992,14 @@ var Campaign = {
     return this._SAVE_KEY_PREFIX + "_slot_" + slot;
   },
 
-  setSlot: function (slot) { this._activeSlot = slot; },
+  setSlot: function (slot) { this._activeSlot = Math.max(0, Math.min(2, parseInt(slot, 10) || 0)); },
   getSlot: function () { return this._activeSlot; },
 
   saveToDisk: function () {
-    if (!campaignState.active) return;
+    if (!campaignState.active) return true;
     try {
       var data = {
+        version: 2,
         active: campaignState.active,
         missionIndex: campaignState.missionIndex,
         denarii: campaignState.denarii,
@@ -991,36 +1009,124 @@ var Campaign = {
         totalDeaths: campaignState.totalDeaths,
         endingKey: campaignState.endingKey,
         _preBattleCount: campaignState._preBattleCount || 0,
+        difficulty: campaignState.difficulty || "normal",
+        campaignStats: campaignState.campaignStats || {},
+        inventory: campaignState.inventory || [],
         savedAt: Date.now(),
       };
+      if (data.campaignStats) {
+        data.campaignStats.peakDenarii = Math.max(data.campaignStats.peakDenarii || 0, campaignState.denarii || 0);
+      }
       localStorage.setItem(this._slotKey(), JSON.stringify(data));
-      localStorage.setItem("geminus_last_slot", String(this._activeSlot));
-    } catch (e) { /* storage full or private mode */ }
+      return true;
+    } catch (e) {
+      return false;
+    }
+  },
+
+  _sanitizeSaveData: function (data) {
+    if (!data || typeof data !== "object" || !data.active) return null;
+    var saveVersion = parseInt(data.version, 10) || 1;
+    if (saveVersion < 2) {
+      if (!data.campaignStats) data.campaignStats = { totalBattles: 0, totalKills: 0, totalDamage: 0, totalTurns: 0, deathlessBattles: 0, classesUsed: {}, peakDenarii: 0 };
+      if (!Array.isArray(data.inventory)) data.inventory = [];
+    }
+    var idx = parseInt(data.missionIndex, 10) || 0;
+    if (idx < 0 || idx > CAMPAIGN_MISSIONS.length) return null;
+    var roster = Array.isArray(data.survivingRoster) ? data.survivingRoster : [];
+    roster = roster.filter(function (s) {
+      return s && typeof s.classId === "string" && _VALID_CLASS_IDS.indexOf(s.classId) !== -1;
+    });
+    var _uidSeen = {};
+    roster = roster.map(function (s) {
+      var mHp = Math.max(1, parseInt(s.maxHp, 10) || 10);
+      var hp = Math.min(mHp, Math.max(1, parseInt(s.hp, 10) || mHp));
+      var uid = (typeof s.uid === "string" && s.uid) ? s.uid : ("unit_" + Math.random().toString(36).slice(2, 8));
+      if (_uidSeen[uid]) uid = uid + "_" + Math.random().toString(36).slice(2, 6);
+      _uidSeen[uid] = true;
+      s.hp = hp;
+      s.maxHp = mHp;
+      s.level = Math.max(1, Math.min(10, parseInt(s.level, 10) || 1));
+      s.xp = Math.max(0, parseInt(s.xp, 10) || 0);
+      s.uid = uid;
+      s.kills = Math.max(0, parseInt(s.kills, 10) || 0);
+      s.battlesSurvived = Math.max(0, parseInt(s.battlesSurvived, 10) || 0);
+      s.nearDeathCount = Math.max(0, parseInt(s.nearDeathCount, 10) || 0);
+      s.bonusHp  = Math.max(0, parseInt(s.bonusHp,  10) || 0);
+      s.bonusAtk = Math.max(0, parseInt(s.bonusAtk, 10) || 0);
+      s.bonusDef = Math.max(0, parseInt(s.bonusDef, 10) || 0);
+      s.bonusSpd = Math.max(0, parseInt(s.bonusSpd, 10) || 0);
+      if (s.name != null && typeof s.name !== "string") s.name = "";
+      if (s.title != null && typeof s.title !== "string") s.title = "";
+      s.isFree = !!s.isFree;
+      s.gifted = !!s.gifted;
+      if (s.promotionId != null && typeof s.promotionId !== "string") s.promotionId = null;
+      if (s.accent != null && (typeof s.accent !== "string" || s.accent.length > 30)) s.accent = null;
+      s.equipment = (Array.isArray(s.equipment) ? s.equipment : []).filter(function(eq) {
+        return eq && typeof eq === "object" && typeof eq.id === "string";
+      });
+      return s;
+    });
+    if (typeof data.flags !== "object" || data.flags === null || Array.isArray(data.flags)) data.flags = {};
+    if (Array.isArray(data.flags._bondPairs)) {
+      data.flags._bondPairs = data.flags._bondPairs.filter(function(bp) { return typeof bp === "string"; });
+    }
+    if (data.flags._bondCounts && (typeof data.flags._bondCounts !== "object" || Array.isArray(data.flags._bondCounts))) {
+      data.flags._bondCounts = {};
+    }
+    if (data.flags._bondCounts && typeof data.flags._bondCounts === "object") {
+      var _bc = data.flags._bondCounts;
+      for (var _bk in _bc) {
+        if (_bc.hasOwnProperty(_bk)) _bc[_bk] = Math.max(0, parseInt(_bc[_bk], 10) || 0);
+      }
+    }
+    data.missionIndex = idx;
+    data.survivingRoster = roster;
+    data.denarii = Math.max(0, parseInt(data.denarii, 10) || 0);
+    data.ritualMeter = Math.max(0, parseInt(data.ritualMeter, 10) || 0);
+    data.totalDeaths = Math.max(0, parseInt(data.totalDeaths, 10) || 0);
+    data.endingKey = (data.endingKey === "a" || data.endingKey === "b" || data.endingKey === "c") ? data.endingKey : null;
+    data.difficulty = (data.difficulty === "easy" || data.difficulty === "hard") ? data.difficulty : "normal";
+    var rawStats = (typeof data.campaignStats === "object" && data.campaignStats) ? data.campaignStats : {};
+    data.campaignStats = {
+      totalBattles:    Math.max(0, parseInt(rawStats.totalBattles, 10) || 0),
+      totalKills:      Math.max(0, parseInt(rawStats.totalKills, 10) || 0),
+      totalDamage:     Math.max(0, parseInt(rawStats.totalDamage, 10) || 0),
+      totalTurns:      Math.max(0, parseInt(rawStats.totalTurns, 10) || 0),
+      deathlessBattles: Math.max(0, parseInt(rawStats.deathlessBattles, 10) || 0),
+      classesUsed:     (typeof rawStats.classesUsed === "object" && rawStats.classesUsed && !Array.isArray(rawStats.classesUsed)) ? rawStats.classesUsed : {},
+      peakDenarii:     Math.max(0, parseInt(rawStats.peakDenarii, 10) || 0),
+    };
+    data.inventory = (Array.isArray(data.inventory) ? data.inventory : []).filter(function(it) {
+      return it && typeof it === "object" && typeof it.id === "string";
+    });
+    data.savedAt = (typeof data.savedAt === "number" && isFinite(data.savedAt)) ? data.savedAt : 0;
+    var _pbc = parseInt(data._preBattleCount, 10);
+    data._preBattleCount = (_pbc > 0 && _pbc <= roster.length) ? _pbc : roster.length;
+    return data;
   },
 
   loadFromDisk: function (slot) {
-    if (slot != null) this._activeSlot = slot;
+    if (slot != null) this._activeSlot = Math.max(0, Math.min(2, parseInt(slot, 10) || 0));
     try {
       var raw = localStorage.getItem(this._slotKey());
       if (!raw) return false;
       var data = JSON.parse(raw);
-      if (!data || !data.active) return false;
-      var idx = parseInt(data.missionIndex, 10) || 0;
-      if (idx < 0 || idx > CAMPAIGN_MISSIONS.length) return false;
-      var roster = Array.isArray(data.survivingRoster) ? data.survivingRoster : [];
-      roster = roster.filter(function (s) {
-        return s && typeof s.classId === "string";
-      });
-      if (typeof data.flags !== "object" || data.flags === null) data.flags = {};
+      data = this._sanitizeSaveData(data);
+      if (!data) return false;
       campaignState.active = true;
-      campaignState.missionIndex = idx;
-      campaignState.denarii = parseInt(data.denarii, 10) || 0;
+      campaignState.missionIndex = data.missionIndex;
+      campaignState.denarii = data.denarii;
       campaignState.flags = data.flags;
-      campaignState.survivingRoster = roster;
-      campaignState.ritualMeter = parseInt(data.ritualMeter, 10) || 0;
-      campaignState.totalDeaths = parseInt(data.totalDeaths, 10) || 0;
-      campaignState.endingKey = data.endingKey || null;
-      campaignState._preBattleCount = parseInt(data._preBattleCount, 10) || 0;
+      campaignState.survivingRoster = data.survivingRoster;
+      campaignState.ritualMeter = data.ritualMeter;
+      campaignState.totalDeaths = data.totalDeaths;
+      campaignState.endingKey = data.endingKey;
+      var _pbc = parseInt(data._preBattleCount, 10);
+      campaignState._preBattleCount = (_pbc > 0) ? _pbc : data.survivingRoster.length;
+      campaignState.difficulty = data.difficulty;
+      campaignState.campaignStats = data.campaignStats;
+      campaignState.inventory = data.inventory;
       return true;
     } catch (e) { return false; }
   },
@@ -1036,10 +1142,7 @@ var Campaign = {
       var raw = localStorage.getItem(key);
       if (!raw) return false;
       var data = JSON.parse(raw);
-      if (!data || !data.active) return false;
-      var idx = parseInt(data.missionIndex, 10) || 0;
-      if (idx < 0 || idx > CAMPAIGN_MISSIONS.length) return false;
-      return true;
+      return !!this._sanitizeSaveData(data);
     } catch (e) { return false; }
   },
 
@@ -1049,16 +1152,40 @@ var Campaign = {
       var raw = localStorage.getItem(key);
       if (!raw) return null;
       var data = JSON.parse(raw);
-      if (!data || !data.active) return null;
-      var mi = parseInt(data.missionIndex, 10) || 0;
-      var m = CAMPAIGN_MISSIONS[mi];
+      data = this._sanitizeSaveData(data);
+      if (!data) return null;
+      var m = CAMPAIGN_MISSIONS[data.missionIndex];
       return {
         slot: slot,
         missionName: m ? ("M" + m.id + ": " + m.title) : "Completed",
-        savedAt: data.savedAt || 0,
-        rosterSize: (data.survivingRoster || []).length,
+        savedAt: typeof data.savedAt === "number" ? data.savedAt : 0,
+        rosterSize: data.survivingRoster.length,
       };
     } catch (e) { return null; }
+  },
+
+  exportSave: function (slot) {
+    var key = this._slotKey(slot != null ? slot : this._activeSlot);
+    try { return localStorage.getItem(key) || null; } catch (e) { return null; }
+  },
+
+  importSave: function (jsonString, slot) {
+    var data;
+    try {
+      data = JSON.parse(jsonString);
+    } catch (e) {
+      return "parse";
+    }
+    data = this._sanitizeSaveData(data);
+    if (!data) return "invalid";
+    try {
+      var key = this._slotKey(slot != null ? slot : this._activeSlot);
+      localStorage.setItem(key, JSON.stringify(data));
+      return true;
+    } catch (e) {
+      if (e && e.name === "QuotaExceededError") return "quota";
+      return "invalid";
+    }
   },
 
   migrateOldSave: function () {

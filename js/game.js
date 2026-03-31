@@ -5,19 +5,28 @@
 (function () {
   "use strict";
 
-  // Prevent browser-level pinch-zoom (iPad Safari ignores viewport meta since iOS 10)
-  document.addEventListener("gesturestart", function (e) { e.preventDefault(); }, { passive: false });
-  document.addEventListener("gesturechange", function (e) { e.preventDefault(); }, { passive: false });
-  document.addEventListener("gestureend", function (e) { e.preventDefault(); }, { passive: false });
-  document.addEventListener("touchmove", function (e) {
-    if (e.touches.length > 1) e.preventDefault();
-  }, { passive: false });
+  // Gesture prevention is scoped to the canvas in init() so the rest of the
+  // page remains pinch-zoomable for accessibility.
+
+  function _esc(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
 
   var BOARD_W = 12;
   var BOARD_H = 10;
   const MAX_ROSTER = 6;
   const BUDGET_MAX_DEFAULT = 140;
   var budgetCurrent = BUDGET_MAX_DEFAULT;
+
+  var gameRng = Math.random;
+
+  var DIFFICULTY = {
+    easy:   { label: "Novice",    hpMul: 0.8, atkMul: 0.85, spdMul: 0.9, xpMul: 0.75, aiFocusFire: false },
+    normal: { label: "Gladiator", hpMul: 1.0, atkMul: 1.0,  spdMul: 1.0, xpMul: 1.0,  aiFocusFire: true },
+    hard:   { label: "Lanista",   hpMul: 1.3, atkMul: 1.2,  spdMul: 1.1, xpMul: 1.25, aiFocusFire: true },
+  };
+
+  function getDiff() { return DIFFICULTY[(campaignState.active ? campaignState.difficulty : null) || skirmishConfig.difficulty] || DIFFICULTY.normal; }
 
   var skirmishConfig = {
     enemyCount: 3,
@@ -26,8 +35,72 @@
     terrainDensity: "normal",
     seed: null,
     template: null,
+    difficulty: "normal",
   };
   var MAP_SIZES = { small: { w: 8, h: 7 }, medium: { w: 12, h: 10 }, large: { w: 14, h: 12 } };
+
+  var ACCENT_COLORS = [
+    { id: "gold", hex: "#e8c040" },
+    { id: "crimson", hex: "#d84838" },
+    { id: "teal", hex: "#48c8a8" },
+    { id: "purple", hex: "#a878d8" },
+    { id: "silver", hex: "#c0c0c0" },
+    { id: "bronze", hex: "#c08848" },
+  ];
+
+  var EQUIPMENT_DB = [
+    { id: "gladius_iron",    name: "Iron Gladius",     slot: "weapon",  rarity: "common",    cost: 12, mods: { atk: 2 } },
+    { id: "gladius_steel",   name: "Steel Gladius",    slot: "weapon",  rarity: "common",    cost: 16, mods: { atk: 3 } },
+    { id: "spatha_bronze",   name: "Bronze Spatha",    slot: "weapon",  rarity: "common",    cost: 14, mods: { atk: 2, spd: 1 } },
+    { id: "falcata",         name: "Falcata",          slot: "weapon",  rarity: "rare",      cost: 22, mods: { atk: 4 } },
+    { id: "pugio_venom",     name: "Venomed Pugio",    slot: "weapon",  rarity: "rare",      cost: 20, mods: { atk: 3, spd: 1 } },
+    { id: "gladius_gold",    name: "Gilded Gladius",   slot: "weapon",  rarity: "legendary", cost: 35, mods: { atk: 5, spd: 1 } },
+    { id: "hasta_mars",      name: "Hasta of Mars",    slot: "weapon",  rarity: "legendary", cost: 38, mods: { atk: 6 } },
+    { id: "trident_neptune", name: "Neptune's Fork",   slot: "weapon",  rarity: "legendary", cost: 36, mods: { atk: 4, def: 2 } },
+    { id: "scutum_oak",      name: "Oak Scutum",       slot: "armor",   rarity: "common",    cost: 10, mods: { def: 2 } },
+    { id: "scutum_iron",     name: "Iron Scutum",      slot: "armor",   rarity: "common",    cost: 14, mods: { def: 3 } },
+    { id: "lorica_leather",  name: "Leather Lorica",   slot: "armor",   rarity: "common",    cost: 12, mods: { def: 1, hp: 4 } },
+    { id: "lorica_chain",    name: "Chain Lorica",     slot: "armor",   rarity: "rare",      cost: 22, mods: { def: 3, hp: 4 } },
+    { id: "manica_steel",    name: "Steel Manica",     slot: "armor",   rarity: "rare",      cost: 18, mods: { def: 2, spd: 1 } },
+    { id: "aegis_minerva",   name: "Aegis of Minerva", slot: "armor",   rarity: "legendary", cost: 35, mods: { def: 5, hp: 6 } },
+    { id: "lorica_praetor",  name: "Praetorian Plate", slot: "armor",   rarity: "legendary", cost: 38, mods: { def: 4, hp: 8 } },
+    { id: "sandals_mercury", name: "Mercury Sandals",  slot: "trinket", rarity: "rare",      cost: 20, mods: { spd: 2, move: 1 } },
+    { id: "amulet_fortuna",  name: "Fortuna's Charm",  slot: "trinket", rarity: "common",    cost: 10, mods: { spd: 1 } },
+    { id: "ring_vigor",      name: "Ring of Vigor",    slot: "trinket", rarity: "common",    cost: 12, mods: { hp: 6 } },
+    { id: "belt_titan",      name: "Titan Belt",       slot: "trinket", rarity: "common",    cost: 14, mods: { hp: 4, def: 1 } },
+    { id: "cloak_shadow",    name: "Shadow Cloak",     slot: "trinket", rarity: "rare",      cost: 18, mods: { spd: 2 } },
+    { id: "gauntlets_fury",  name: "Gauntlets of Fury",slot: "trinket", rarity: "rare",      cost: 20, mods: { atk: 2, spd: 1 } },
+    { id: "crown_sol",       name: "Crown of Sol",     slot: "trinket", rarity: "legendary", cost: 32, mods: { atk: 2, def: 2, spd: 1 } },
+    { id: "torc_war",        name: "War Torc",         slot: "trinket", rarity: "legendary", cost: 30, mods: { atk: 3, hp: 5 } },
+    { id: "helm_centurion",  name: "Centurion Helm",   slot: "armor",   rarity: "rare",      cost: 20, mods: { def: 2, hp: 6 } },
+    { id: "dagger_shade",    name: "Shade Dagger",     slot: "weapon",  rarity: "rare",      cost: 18, mods: { atk: 3, move: 1 } },
+    { id: "shield_titan",    name: "Titan Shield",     slot: "armor",   rarity: "common",    cost: 15, mods: { def: 2, hp: 2 } },
+    { id: "greaves_wind",    name: "Windrunner Greaves",slot: "trinket", rarity: "rare",     cost: 22, mods: { move: 1, spd: 2 } },
+    { id: "spear_achilles",  name: "Spear of Achilles",slot: "weapon",  rarity: "legendary", cost: 40, mods: { atk: 5, move: 1 } },
+  ];
+  var _equipById = {};
+  (function() { for (var i = 0; i < EQUIPMENT_DB.length; i++) _equipById[EQUIPMENT_DB[i].id] = EQUIPMENT_DB[i]; })();
+
+  function equipMod(unit, stat) {
+    if (!unit.equipment) return 0;
+    var total = 0;
+    var slots = ["weapon", "armor", "trinket"];
+    for (var i = 0; i < slots.length; i++) {
+      var eid = unit.equipment[slots[i]];
+      if (eid && _equipById[eid]) total += (_equipById[eid].mods[stat] || 0);
+    }
+    return total;
+  }
+
+  var AI_PROFILES = {
+    balanced:  { targetPref: "closest",   retreatPct: 0.15, abilityBias: 0.4, label: "Balanced" },
+    berserker: { targetPref: "weakest",   retreatPct: 0,    abilityBias: 0.2, label: "Berserker" },
+    tactician: { targetPref: "strongest", retreatPct: 0.25, abilityBias: 0.7, label: "Tactician" },
+    assassin:  { targetPref: "lowest_hp", retreatPct: 0.2,  abilityBias: 0.5, label: "Assassin" },
+    guardian:  { targetPref: "closest",   retreatPct: 0.3,  abilityBias: 0.8, label: "Guardian" },
+  };
+  var _aiProfileKeys = Object.keys(AI_PROFILES);
+
   var MAP_MODIFIER_DEFS = {
     cursed_3:  { type: "cursed", count: 3, dmg: 3 },
     cursed_4:  { type: "cursed", count: 4, dmg: 3 },
@@ -93,7 +166,7 @@
     }
     var available = ROMAN_NAMES.filter(function(n) { return !used[n]; });
     if (!available.length) available = ROMAN_NAMES;
-    return available[Math.floor(Math.random() * available.length)];
+    return available[Math.floor(gameRng() * available.length)];
   }
 
   /**
@@ -348,10 +421,245 @@
     },
   ];
 
+  var CLASS_PROMOTIONS = {
+    murmillo: [
+      { id: "centurion", name: "Centurion", statBonus: { hp: 8, def: 3 },
+        abilities: [
+          { name: "Legion Wall", desc: "Adjacent allies gain +2 DEF for 2 turns.", type: "buff", target: "self", levelReq: 5 },
+          { name: "Imperium", desc: "AoE 1.0\u00d7 hit to all adjacent enemies.", type: "attack", target: "aoe_adjacent", mult: 1.0, levelReq: 6 },
+        ] },
+      { id: "praetorian", name: "Praetorian", statBonus: { hp: 4, atk: 2, def: 1 },
+        abilities: [
+          { name: "Defiant Counter", desc: "Riposte: counter next 2 melee hits.", type: "buff", target: "self", levelReq: 5 },
+          { name: "Unyielding", desc: "Heal 20% HP; immune to debuffs 1 turn.", type: "heal", target: "self", levelReq: 6 },
+        ] },
+    ],
+    retiarius: [
+      { id: "laquearius", name: "Laquearius", statBonus: { spd: 3, atk: 1 },
+        abilities: [
+          { name: "Lasso Snare", desc: "Range-3 root + pull 1 tile.", type: "debuff", target: "line", range: 3, effect: "pull", levelReq: 5 },
+          { name: "Triple Tide", desc: "Hit 3 tiles in a line for 0.7\u00d7 each.", type: "attack", target: "line", range: 3, mult: 0.7, levelReq: 6 },
+        ] },
+      { id: "pontarius", name: "Pontarius", statBonus: { hp: 5, def: 2 },
+        abilities: [
+          { name: "Bridgekeeper", desc: "+3 DEF and heal 5 HP.", type: "buff", target: "self", levelReq: 5 },
+          { name: "Cascade", desc: "Push all adjacent foes 2 tiles.", type: "utility", target: "self", effect: "push2", levelReq: 6 },
+        ] },
+    ],
+    secutor: [
+      { id: "contraretiarius", name: "Contraretiarius", statBonus: { atk: 3, spd: 1 },
+        abilities: [
+          { name: "Net Cutter", desc: "Cleanse root/stun + 1.2\u00d7 strike.", type: "attack", target: "adjacent_enemy", mult: 1.2, effect: "cleanse_self", levelReq: 5 },
+          { name: "Pursue & Finish", desc: "Dash 2 tiles + 1.4\u00d7 hit if foe below 40% HP.", type: "attack", target: "line", range: 2, mult: 1.4, levelReq: 6 },
+        ] },
+      { id: "scissor", name: "Scissor", statBonus: { def: 2, hp: 4 },
+        abilities: [
+          { name: "Crescent Guard", desc: "+4 DEF until next turn, counter 3 dmg.", type: "buff", target: "self", levelReq: 5 },
+          { name: "Scissor Rend", desc: "1.3\u00d7 hit ignoring 30% DEF.", type: "attack", target: "adjacent_enemy", mult: 1.3, ignoreDefPct: 0.3, levelReq: 6 },
+        ] },
+    ],
+    thraex: [
+      { id: "hoplomachus_thraex", name: "Myrmex", statBonus: { atk: 4, spd: 1 },
+        abilities: [
+          { name: "Scorpion Sting", desc: "1.4\u00d7 hit + bleed 4 (2 turns).", type: "attack", target: "adjacent_enemy", mult: 1.4, effect: "bleed", levelReq: 5 },
+          { name: "Frenzy", desc: "Attack twice at 0.7\u00d7 each.", type: "attack", target: "adjacent_enemy", mult: 0.7, effect: "double_strike", levelReq: 6 },
+        ] },
+      { id: "veles_thraex", name: "Veles", statBonus: { spd: 3, move: 1 },
+        abilities: [
+          { name: "Javelin Toss", desc: "Range-3 line shot for 0.9\u00d7.", type: "attack", target: "line", range: 3, mult: 0.9, levelReq: 5 },
+          { name: "Skirmish Dance", desc: "Attack + teleport 2 tiles away.", type: "attack", target: "adjacent_enemy", mult: 1.0, effect: "teleport_back", levelReq: 6 },
+        ] },
+    ],
+    hoplomachus: [
+      { id: "hoplite", name: "Hoplite", statBonus: { def: 3, hp: 5 },
+        abilities: [
+          { name: "Shield Wall", desc: "Adjacent allies +3 DEF for 2 turns.", type: "buff", target: "self", levelReq: 5 },
+          { name: "Spartan Thrust", desc: "Range-3 line 1.3\u00d7 + push 1.", type: "attack", target: "line", range: 3, mult: 1.3, effect: "push", levelReq: 6 },
+        ] },
+      { id: "peltast", name: "Peltast", statBonus: { atk: 2, spd: 2, move: 1 },
+        abilities: [
+          { name: "Javelin Barrage", desc: "Range-4 line 0.8\u00d7 + bleed 2.", type: "attack", target: "line", range: 4, mult: 0.8, effect: "bleed", levelReq: 5 },
+          { name: "Hit and Run", desc: "1.1\u00d7 hit + move 2 tiles back.", type: "attack", target: "adjacent_enemy", mult: 1.1, effect: "teleport_back", levelReq: 6 },
+        ] },
+    ],
+    dimachaerus: [
+      { id: "gladiatrix", name: "Gladiatrix", statBonus: { atk: 3, spd: 2 },
+        abilities: [
+          { name: "Whirling Blades", desc: "1.2\u00d7 all adjacent + heal 3 per hit.", type: "attack", target: "aoe_adjacent", mult: 1.2, effect: "lifesteal", steal: 3, levelReq: 5 },
+          { name: "Perfect Strike", desc: "1.8\u00d7 single hit, cannot miss.", type: "attack", target: "adjacent_enemy", mult: 1.8, alwaysHit: true, levelReq: 6 },
+        ] },
+      { id: "rudiarius", name: "Rudiarius", statBonus: { hp: 6, def: 2 },
+        abilities: [
+          { name: "Veteran's Wisdom", desc: "Heal 30% HP + cleanse all debuffs.", type: "heal", target: "self", levelReq: 5 },
+          { name: "Freedom's Edge", desc: "1.5\u00d7 hit; if kill, +1 Move next turn.", type: "attack", target: "adjacent_enemy", mult: 1.5, levelReq: 6 },
+        ] },
+    ],
+    provocator: [
+      { id: "primus_palus", name: "Primus Palus", statBonus: { hp: 6, atk: 2 },
+        abilities: [
+          { name: "Champion Duel", desc: "Mark foe: both deal +20% vs each other.", type: "debuff", target: "adjacent_enemy", effect: "duel", levelReq: 5 },
+          { name: "Crowd's Favor", desc: "Full heal + +3 ATK for 2 turns (once/battle).", type: "heal", target: "self", levelReq: 6 },
+        ] },
+      { id: "tertiarius", name: "Tertiarius", statBonus: { def: 3, hp: 4 },
+        abilities: [
+          { name: "Hold the Line", desc: "Intercept all hits on adjacent allies 1 turn.", type: "buff", target: "self", levelReq: 5 },
+          { name: "Last Stand", desc: "+5 ATK, +5 DEF when below 30% HP.", type: "buff", target: "self", levelReq: 6 },
+        ] },
+    ],
+    samnite: [
+      { id: "secutor_sam", name: "Legionary", statBonus: { hp: 5, atk: 2, def: 1 },
+        abilities: [
+          { name: "Pilum Throw", desc: "Range-3 line 1.0\u00d7 + \u22122 DEF on foe 2 turns.", type: "attack", target: "line", range: 3, mult: 1.0, effect: "defdebuff", levelReq: 5 },
+          { name: "Testudo March", desc: "+4 DEF, +2 Move for 1 turn.", type: "buff", target: "self", levelReq: 6 },
+        ] },
+      { id: "velite", name: "Velite", statBonus: { spd: 3, move: 1 },
+        abilities: [
+          { name: "Skirmish Throw", desc: "Range-2 line 0.9\u00d7 + root 1 turn.", type: "attack", target: "line", range: 2, mult: 0.9, effect: "stun", levelReq: 5 },
+          { name: "Guerrilla", desc: "Teleport 3 tiles + stealth 1 turn.", type: "buff", target: "self", levelReq: 6 },
+        ] },
+    ],
+    sagittarius: [
+      { id: "arcuballista", name: "Arcuballista", statBonus: { atk: 4 },
+        abilities: [
+          { name: "Siege Shot", desc: "Range-5 line 1.2\u00d7, ignores 50% DEF.", type: "attack", target: "line", range: 5, mult: 1.2, ignoreDefPct: 0.5, levelReq: 5 },
+          { name: "Rain of Arrows", desc: "3\u00d73 AoE at range 3, 0.5\u00d7 each.", type: "attack", target: "aoe_range", range: 3, mult: 0.5, levelReq: 6 },
+        ] },
+      { id: "venator", name: "Venator", statBonus: { spd: 2, move: 1, hp: 3 },
+        abilities: [
+          { name: "Beast Trap", desc: "Place trap on tile; next foe stepping takes 6 dmg + root.", type: "utility", target: "self", levelReq: 5 },
+          { name: "Marked Prey", desc: "Target takes +3 dmg from all attacks for 2 turns.", type: "debuff", target: "adjacent_enemy", effect: "huntermark", levelReq: 6 },
+        ] },
+    ],
+    essedarius: [
+      { id: "cataphract", name: "Cataphract", statBonus: { hp: 6, def: 2 },
+        abilities: [
+          { name: "Armored Charge", desc: "Range-3 line 1.4\u00d7 + push 2 tiles.", type: "attack", target: "line", range: 3, mult: 1.4, effect: "push2", levelReq: 5 },
+          { name: "Iron Rampart", desc: "+5 DEF for 2 turns; rooted.", type: "buff", target: "self", levelReq: 6 },
+        ] },
+      { id: "auriga", name: "Auriga", statBonus: { spd: 3, atk: 1, move: 1 },
+        abilities: [
+          { name: "Chariot Rush", desc: "Dash 4 tiles + 1.0\u00d7 each foe in path.", type: "attack", target: "line", range: 4, mult: 1.0, effect: "trample", levelReq: 5 },
+          { name: "Reins of War", desc: "+3 ATK, +2 Move for 1 turn.", type: "buff", target: "self", levelReq: 6 },
+        ] },
+    ],
+    umbra: [
+      { id: "noctis", name: "Noctis", statBonus: { atk: 3, spd: 2 },
+        abilities: [
+          { name: "Shadow Reap", desc: "1.5\u00d7 hit + steal 5 HP.", type: "attack", target: "adjacent_enemy", mult: 1.5, effect: "lifesteal", steal: 5, levelReq: 5 },
+          { name: "Nightmare", desc: "All adjacent foes \u22123 ATK, \u22122 SPD for 2 turns.", type: "debuff", target: "self", levelReq: 6 },
+        ] },
+      { id: "augur", name: "Augur", statBonus: { hp: 5, def: 1, spd: 1 },
+        abilities: [
+          { name: "Prophecy", desc: "Heal adjacent ally 30% + cleanse.", type: "heal", target: "adjacent_ally", levelReq: 5 },
+          { name: "Fate's Thread", desc: "Swap HP% with target foe.", type: "utility", target: "adjacent_enemy", effect: "hpswap", levelReq: 6 },
+        ] },
+    ],
+    vestige: [
+      { id: "lich", name: "Lich", statBonus: { atk: 4, hp: 3 },
+        abilities: [
+          { name: "Soul Siphon", desc: "1.3\u00d7 hit + heal 50% of damage.", type: "attack", target: "adjacent_enemy", mult: 1.3, effect: "lifesteal", steal: 0.5, levelReq: 5 },
+          { name: "Army of the Dead", desc: "Summon 2 skeletal allies (1 HP, 5 ATK) for 3 turns.", type: "summon", target: "self", levelReq: 6 },
+        ] },
+      { id: "revenant", name: "Revenant", statBonus: { hp: 8, def: 2 },
+        abilities: [
+          { name: "Undying Will", desc: "Survive lethal hit at 1 HP (once/battle).", type: "passive", target: "self", levelReq: 5 },
+          { name: "Death Knell", desc: "1.6\u00d7 hit; +0.4\u00d7 if below 25% HP.", type: "attack", target: "adjacent_enemy", mult: 1.6, levelReq: 6 },
+        ] },
+    ],
+  };
+
+  var _promotionIndex = {};
+  (function() {
+    for (var cls in CLASS_PROMOTIONS) {
+      var promos = CLASS_PROMOTIONS[cls];
+      for (var i = 0; i < promos.length; i++) {
+        _promotionIndex[promos[i].id] = { classId: cls, promo: promos[i] };
+      }
+    }
+  })();
+
+  function getPromotion(promotionId) {
+    var entry = _promotionIndex[promotionId];
+    return entry ? entry.promo : null;
+  }
+
   function classById(id) {
     const c = GLADIATOR_CLASSES.find((g) => g.id === id);
     if (!c) throw new Error("Unknown gladiator class: " + id);
     return c;
+  }
+
+  function collectPendingPromotions() {
+    var eligible = [];
+    var playerUnits = state.units.filter(function(u) { return u.team === "player" && u.hp > 0; });
+    for (var i = 0; i < playerUnits.length; i++) {
+      var u = playerUnits[i];
+      if ((u.level || 1) >= 5 && !u.promotionId && CLASS_PROMOTIONS[u.classId]) {
+        eligible.push(u);
+      }
+    }
+    return eligible;
+  }
+
+  function showPromotionChoice(unit, callback) {
+    var overlay = document.getElementById("promoOverlay");
+    var unitLabel = document.getElementById("promoUnit");
+    var choicesEl = document.getElementById("promoChoices");
+    var cDef = classById(unit.classId);
+    var promos = CLASS_PROMOTIONS[unit.classId];
+    if (!promos || promos.length === 0) { callback(); return; }
+
+    unitLabel.textContent = (unit.displayName || cDef.name) + " has reached Level 5!";
+    choicesEl.innerHTML = "";
+
+    for (var i = 0; i < promos.length; i++) {
+      (function(promo) {
+        var card = document.createElement("button");
+        card.className = "promo-card";
+        card.type = "button";
+
+        var statParts = [];
+        if (promo.statBonus.hp) statParts.push("+" + promo.statBonus.hp + " HP");
+        if (promo.statBonus.atk) statParts.push("+" + promo.statBonus.atk + " ATK");
+        if (promo.statBonus.def) statParts.push("+" + promo.statBonus.def + " DEF");
+        if (promo.statBonus.spd) statParts.push("+" + promo.statBonus.spd + " SPD");
+        if (promo.statBonus.move) statParts.push("+" + promo.statBonus.move + " MOV");
+
+        var html = '<div class="promo-card__name">' + _esc(promo.name) + '</div>';
+        html += '<div class="promo-card__stats">' + statParts.join(", ") + '</div>';
+        for (var j = 0; j < promo.abilities.length; j++) {
+          html += '<div class="promo-card__ability">' + _esc(promo.abilities[j].name) + ': ' + _esc(promo.abilities[j].desc) + '</div>';
+        }
+        card.innerHTML = html;
+
+        card.addEventListener("click", function() {
+          unit.promotionId = promo.id;
+          unit.promoStatBonus = promo.statBonus;
+          if (promo.statBonus.hp) { unit.maxHp += promo.statBonus.hp; unit.hp = Math.min(unit.hp + promo.statBonus.hp, unit.maxHp); }
+          if (promo.statBonus.move) { unit.giftedMove = (unit.giftedMove || cDef.move) + promo.statBonus.move; }
+
+          var matchPick = state.picks.find(function(p) { return p.uid === unit.uid; });
+          if (matchPick) {
+            matchPick.promotionId = promo.id;
+          }
+
+          overlay.classList.add("is-hidden");
+          releaseFocusTrap();
+          log((unit.displayName || cDef.name) + " promoted to " + promo.name + "!", "system");
+          callback();
+        });
+        choicesEl.appendChild(card);
+      })(promos[i]);
+    }
+    overlay.classList.remove("is-hidden");
+    trapFocus(overlay);
+  }
+
+  function processPromotionQueue(units, index, callback) {
+    if (index >= units.length) { callback(); return; }
+    showPromotionChoice(units[index], function() {
+      processPromotionQueue(units, index + 1, callback);
+    });
   }
 
   const SVG_NS = "http://www.w3.org/2000/svg";
@@ -602,6 +910,25 @@
           }
         }
       }
+      var interactTypes = ["trap_spike", "trap_fire", "fountain", "high_ground", "barricade"];
+      var iCount = Math.round((1 + Math.floor(rng() * 2)) * densityMult);
+      for (var ii = 0; ii < iCount; ii++) {
+        var ix, iy;
+        for (var iatt = 0; iatt < 20; iatt++) {
+          ix = 2 + Math.floor(rng() * (BOARD_W - 4));
+          iy = 2 + Math.floor(rng() * (BOARD_H - 4));
+          if (!T[iy][ix]) break;
+        }
+        if (!T[iy][ix]) {
+          var iType = interactTypes[Math.floor(rng() * interactTypes.length)];
+          T[iy][ix] = iType;
+          if (iType === "high_ground") state.height[iy][ix] = 2;
+          if (iType === "barricade") {
+            if (!state.barricadeHp) state.barricadeHp = {};
+            state.barricadeHp[ix + "," + iy] = 8;
+          }
+        }
+      }
     }
     return T;
   }
@@ -615,8 +942,11 @@
   function isTileShallowWater(x, y) {
     return state.terrain && state.terrain[y] && state.terrain[y][x] === "water_shallow";
   }
+  function isTileBarricade(x, y) {
+    return state.terrain && state.terrain[y] && state.terrain[y][x] === "barricade";
+  }
   function isTileImpassableTerrain(x, y) {
-    return isTileBuilding(x, y) || isTileDeepWater(x, y);
+    return isTileBuilding(x, y) || isTileDeepWater(x, y) || (isTileBarricade(x, y) && state.barricadeHp && state.barricadeHp[x + "," + y] > 0);
   }
 
   const state = {
@@ -665,6 +995,12 @@
     endingATriggered: false,
     titusTurnCounter: 0,
     tutorialStep: 0,
+    survivalMode: false,
+    survivalWave: 0,
+    survivalScore: 0,
+    survivalDenarii: 0,
+    battleRecord: [],
+    barricadeHp: {},
     cutscene: {
       active: false,
       actors: [],
@@ -743,6 +1079,51 @@
     setTimeout(function() { _srEl.textContent = msg; }, 50);
   }
 
+  var _activeFocusTrap = null;
+  var _focusableSelector = 'button:not(:disabled):not(.is-hidden), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])';
+
+  function _docFocusGuard(e) {
+    if (!_activeFocusTrap) return;
+    if (_activeFocusTrap.el.contains(e.target)) return;
+    var first = _activeFocusTrap.el.querySelector(_focusableSelector);
+    if (first) { first.focus(); }
+    else { _activeFocusTrap.el.setAttribute("tabindex", "-1"); _activeFocusTrap.el.focus(); }
+  }
+  document.addEventListener("focusin", _docFocusGuard);
+
+  function trapFocus(el) {
+    releaseFocusTrap();
+    function handler(e) {
+      if (e.key !== "Tab") return;
+      var focusable = el.querySelectorAll(_focusableSelector);
+      if (!focusable.length) return;
+      var first = focusable[0];
+      var last = focusable[focusable.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+      } else {
+        if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    }
+    el.addEventListener("keydown", handler);
+    _activeFocusTrap = { el: el, handler: handler };
+  }
+  function releaseFocusTrap() {
+    if (_activeFocusTrap) {
+      _activeFocusTrap.el.removeEventListener("keydown", _activeFocusTrap.handler);
+      _activeFocusTrap = null;
+    }
+  }
+
+  var _saveWarned = false;
+  function safeSave() {
+    if (!campaignState.active) return;
+    if (!Campaign.saveToDisk() && !_saveWarned) {
+      _saveWarned = true;
+      log("Save failed \u2014 storage may be full.", "system");
+    }
+  }
+
   function log(msg, type) {
     var cls = "log-entry";
     if (type) cls += " log-entry--" + type;
@@ -766,6 +1147,7 @@
     var overlay = document.getElementById("logOverlay");
     var trigger = document.getElementById("btnLogExpand");
     if (overlay) {
+      releaseFocusTrap();
       overlay.remove();
       if (trigger) { trigger.setAttribute("aria-expanded", "false"); trigger.focus(); }
       return;
@@ -780,6 +1162,7 @@
     header.className = "log-overlay__header";
     header.innerHTML = '<span>Full Battle Log</span><button type="button" class="btn btn--ghost" aria-label="Close log">✕</button>';
     header.querySelector("button").onclick = function () {
+      releaseFocusTrap();
       overlay.remove();
       if (trigger) { trigger.setAttribute("aria-expanded", "false"); trigger.focus(); }
     };
@@ -800,11 +1183,13 @@
     body.scrollTop = body.scrollHeight;
     overlay.addEventListener("keydown", function (e) {
       if (e.key === "Escape") {
+        releaseFocusTrap();
         overlay.remove();
         if (trigger) { trigger.setAttribute("aria-expanded", "false"); trigger.focus(); }
       }
     });
     overlay.tabIndex = -1;
+    trapFocus(overlay);
     overlay.focus();
     if (trigger) trigger.setAttribute("aria-expanded", "true");
   }
@@ -827,13 +1212,19 @@
 
   function animateMove(unit, path) {
     if (!path || path.length === 0) return Promise.resolve();
+    unit._statTilesMoved = (unit._statTilesMoved || 0) + path.length;
+    var last = path[path.length - 1];
+    recordAction(unit, "move", { fromCol: unit.x, fromRow: unit.y, toCol: last[0], toRow: last[1] });
     SFX.move();
+    unit._animGen = (unit._animGen || 0) + 1;
+    var gen = unit._animGen;
     return new Promise(function (resolve) {
       var stepIdx = 0;
       var stepDur = 80;
       var startTime = null;
       var fromX = unit.x, fromY = unit.y;
       function tick(ts) {
+        if (unit._animGen !== gen) { delete unit.animX; delete unit.animY; resolve(); return; }
         if (!startTime) startTime = ts;
         var elapsed = ts - startTime;
         var t = Math.min(1, elapsed / stepDur);
@@ -849,6 +1240,7 @@
           if (stepIdx >= path.length) {
             delete unit.animX;
             delete unit.animY;
+            triggerTerrainStep(unit);
             resolve();
             return;
           }
@@ -876,10 +1268,13 @@
   }
 
   function animateHitFlash(unit) {
+    unit._animGen = (unit._animGen || 0) + 1;
+    var gen = unit._animGen;
     return new Promise(function (resolve) {
       unit._flashAnim = 1;
       var start = performance.now();
       function tick() {
+        if (unit._animGen !== gen) { delete unit._flashAnim; resolve(); return; }
         var t = (performance.now() - start) / 150;
         if (t >= 1) { delete unit._flashAnim; resolve(); return; }
         unit._flashAnim = 1 - t;
@@ -889,11 +1284,14 @@
     });
   }
 
+  var _shakeGen = 0;
   function screenShake(dur, intensity) {
     if (!renderer || renderer.reducedMotion) return Promise.resolve();
+    var gen = ++_shakeGen;
     return new Promise(function (resolve) {
       var start = performance.now();
       function tick() {
+        if (_shakeGen !== gen) { renderer.shakeX = 0; renderer.shakeY = 0; resolve(); return; }
         var t = (performance.now() - start) / dur;
         if (t >= 1) { renderer.shakeX = 0; renderer.shakeY = 0; resolve(); return; }
         var amt = intensity * (1 - t);
@@ -907,17 +1305,27 @@
 
   function animateDeath(unit) {
     SFX.death();
+    if (unit.duelTarget) {
+      var _duelPartner = state.units.find(function(u) { return u.uid === unit.duelTarget; });
+      if (_duelPartner) { _duelPartner.duelTarget = null; _duelPartner.duelTurns = 0; }
+      unit.duelTarget = null; unit.duelTurns = 0;
+    }
     if (campaignState.active && unit.team === "enemy" && state.activeUnit && state.activeUnit.team === "player") {
-      awardXp(state.activeUnit, XP_PER_KILL);
+      awardXp(state.activeUnit, Math.round(XP_PER_KILL * getDiff().xpMul));
       state.activeUnit.kills = (state.activeUnit.kills || 0) + 1;
     }
+    if (state.activeUnit) state.activeUnit._statKills = (state.activeUnit._statKills || 0) + 1;
+    if (!state._statFirstBlood) state._statFirstBlood = unit.displayName || classById(unit.classId).name;
+    unit._animGen = (unit._animGen || 0) + 1;
+    var gen = unit._animGen;
     return new Promise(function (resolve) {
       var start = performance.now();
       var dur = 400;
       function tick() {
+        if (unit._animGen !== gen) { delete unit._deathAnim; resolve(); return; }
         var t = Math.min(1, (performance.now() - start) / dur);
         unit._deathAnim = 1 - t;
-        if (t >= 1) { delete unit._deathAnim; refreshCtStrip(); resolve(); return; }
+        if (t >= 1) { delete unit._deathAnim; resolve(); return; }
         requestAnimationFrame(tick);
       }
       unit._deathAnim = 1;
@@ -967,9 +1375,8 @@
     if (cost[dk] == null) return [];
     var path = [];
     var cur2 = dk;
-    while (cur2 && cur2 !== startKey) {
-      var parts = cur2.split(",").map(Number);
-      path.unshift(parts);
+    while (cur2 != null && cur2 !== startKey) {
+      path.unshift([cellKeyX(cur2), cellKeyY(cur2)]);
       cur2 = prev[cur2];
     }
     return path;
@@ -998,6 +1405,8 @@
     momentum: { glyph: "!", color: "#ffdd44", label: "Momentum" },
     bond:     { glyph: "♥", color: "#ff88cc", label: "Bonded +1 DEF" },
     scarred:  { glyph: "×", color: "#cc4444", label: "Scarred" },
+    defdown:  { glyph: "d", color: "#cc88ff", label: "DEF Down" },
+    dbfimmun: { glyph: "U", color: "#88ffcc", label: "Debuff Immune" },
   };
 
   function getUnitStatusIcons(u) {
@@ -1006,12 +1415,14 @@
     if (u.braceCharges > 0) icons.push(STATUS_DEFS.brace);
     if (u.testudoBonus > 0) icons.push(STATUS_DEFS.testudo);
     if (u.phalanxBonus > 0) icons.push(STATUS_DEFS.phalanx);
-    if (u.riposteActive) icons.push(STATUS_DEFS.riposte);
+    if (u.riposteCharges > 0) icons.push(STATUS_DEFS.riposte);
     if (u.rootedSkip) icons.push(STATUS_DEFS.rooted);
     if (u.tempExtraMove) icons.push(STATUS_DEFS.surge);
     if (u.markDebuffTurns > 0) icons.push(STATUS_DEFS.marked);
     if (u.bleedTurns > 0) icons.push(STATUS_DEFS.bleed);
     if (u.atkDebuffTurns > 0) icons.push(STATUS_DEFS.atkdown);
+    if (u.defDebuffTurns > 0) icons.push(STATUS_DEFS.defdown);
+    if (u.debuffImmuneTurns > 0) icons.push(STATUS_DEFS.dbfimmun);
     if (u.blindRushAtk > 0) icons.push(STATUS_DEFS.blindrush);
     if (u.battleFocusNext) icons.push(STATUS_DEFS.highgnd);
     else if (u.highGroundNext) icons.push(STATUS_DEFS.highgnd);
@@ -1046,8 +1457,10 @@
   }
 
   function cellKey(x, y) {
-    return x + "," + y;
+    return (y << 8) | x;
   }
+  function cellKeyX(k) { return k & 0xff; }
+  function cellKeyY(k) { return k >> 8; }
 
   function inBounds(x, y) {
     return x >= 0 && x < BOARD_W && y >= 0 && y < BOARD_H;
@@ -1061,25 +1474,32 @@
     return y >= BOARD_H - 2;
   }
 
-  function unitAtk(u)  { return Math.max(1, (u.giftedAtk || classById(u.classId).atk) + levelBonus(u, "Atk") + (u.blindRushAtk || 0) + (u.atkBonus || 0) + (u.momentumBonus || 0) + (u.battleHardenedTurns > 0 ? (u.battleHardenedAtk || 0) : 0) - (u.shadowMendAtkPenalty || 0) - (u.atkDebuffAmt && u.atkDebuffTurns > 0 ? u.atkDebuffAmt : 0)); }
-  function unitDef(u)  { return Math.max(0, (u.giftedDef || classById(u.classId).def) + levelBonus(u, "Def") + (u.phalanxBonus || 0) + (u.battleHardenedTurns > 0 ? (u.battleHardenedDef || 0) : 0) - (u.blindRushDef || 0) + (u.bondBuff ? 1 : 0)); }
-  function unitSpd(u)  { return Math.max(1, (u.giftedSpd || classById(u.classId).spd) + levelBonus(u, "Spd") - (u.crowdSpdDebuff || 0)); }
-  function unitMove(u) { return u.giftedMove || classById(u.classId).move; }
+  function unitAtk(u)  { return Math.max(1, (u.giftedAtk || classById(u.classId).atk) + levelBonus(u, "Atk") + equipMod(u, "atk") + (u.blindRushAtk || 0) + (u.atkBonus || 0) + (u.momentumBonus || 0) + (u.battleHardenedTurns > 0 ? (u.battleHardenedAtk || 0) : 0) - (u.shadowMendAtkPenalty || 0) - (u.atkDebuffAmt && u.atkDebuffTurns > 0 ? u.atkDebuffAmt : 0) + (u.promoStatBonus ? (u.promoStatBonus.atk || 0) : 0) + (u.lastStandActive && u.hp <= u.maxHp * 0.3 ? 5 : 0)); }
+  function unitDef(u)  { return Math.max(0, (u.giftedDef || classById(u.classId).def) + levelBonus(u, "Def") + equipMod(u, "def") + (u.phalanxBonus || 0) + (u.battleHardenedTurns > 0 ? (u.battleHardenedDef || 0) : 0) - (u.blindRushDef || 0) + (u.bondBuff ? 1 : 0) + (u.promoStatBonus ? (u.promoStatBonus.def || 0) : 0) - (u.defDebuffAmt && u.defDebuffTurns > 0 ? u.defDebuffAmt : 0) + (u.lastStandActive && u.hp <= u.maxHp * 0.3 ? 5 : 0)); }
+  function unitSpd(u)  { return Math.max(1, (u.giftedSpd || classById(u.classId).spd) + levelBonus(u, "Spd") + equipMod(u, "spd") - (u.crowdSpdDebuff || 0) + (u.promoStatBonus ? (u.promoStatBonus.spd || 0) : 0)); }
+  function unitMove(u) { return (u.giftedMove || classById(u.classId).move) + equipMod(u, "move"); }
   function unitJump(u) { return u.giftedJump || classById(u.classId).jump; }
+
+  function canDebuff(u) { return !(u.debuffImmuneTurns > 0); }
 
   function unitAbilities(u) {
     var base = classById(u.classId).abilities;
-    var all = u.extraAbilities ? base.concat(u.extraAbilities) : base;
-    if (campaignState.active && u.level) {
-      return all.filter(function (ab) { return !ab.levelReq || ab.levelReq <= u.level; });
+    if (u.promotionId) {
+      var promo = getPromotion(u.promotionId);
+      if (promo && promo.abilities) {
+        base = base.filter(function(ab) { return !ab.levelReq || ab.levelReq < 5; })
+          .concat(promo.abilities);
+      }
     }
-    return all;
+    var all = u.extraAbilities ? base.concat(u.extraAbilities) : base;
+    var lvl = u.level || 1;
+    return all.filter(function (ab) { return !ab.levelReq || ab.levelReq <= lvl; });
   }
 
   function effectiveMove(unit) {
     let m = unitMove(unit);
     if (unit.tempExtraMove) m += (unit.rallyCharge ? 2 : 1);
-    return m;
+    return Math.max(1, m);
   }
 
   function attackerAtkValue(attacker, target) {
@@ -1157,13 +1577,14 @@
     return Math.max(30, Math.min(95, chance));
   }
 
-  function rollHit(attacker, defender) {
+  function rollHit(attacker, defender, ab) {
+    if (ab && ab.alwaysHit) return true;
     if (attacker.eagleEyeHits > 0) {
       attacker.eagleEyeHits--;
       return true;
     }
     const chance = computeHitChance(attacker, defender);
-    return Math.random() * 100 < chance;
+    return gameRng() * 100 < chance;
   }
 
   function consumeAttackBuffs(u) {
@@ -1174,15 +1595,17 @@
   function physicalDamage(attacker, defender, mult, ignoreDefPct, dryRun) {
     const atk = attackerAtkValue(attacker, defender);
     const baseDef = unitDef(defender) + (defender.testudoBonus || 0);
-    const effectiveDef = ignoreDefPct
-      ? Math.round(baseDef * (1 - ignoreDefPct))
+    const clampedIgnore = Math.min(1, Math.max(0, ignoreDefPct || 0));
+    const effectiveDef = clampedIgnore
+      ? Math.round(baseDef * (1 - clampedIgnore))
       : baseDef;
     const aH = state.height[attacker.y][attacker.x];
     const dH = state.height[defender.y][defender.x];
     let heightMult = 1;
     if (aH > dH) heightMult = 1.15;
     else if (aH < dH) heightMult = 0.85;
-    const raw = Math.max(1, Math.round(atk * mult * heightMult) - effectiveDef);
+    var duelMult = (attacker.duelTarget && attacker.duelTarget === defender.uid) ? 1.2 : 1;
+    const raw = Math.max(1, Math.round(atk * mult * heightMult * duelMult) - effectiveDef);
     let dmg = raw;
     if (attacker.pursuitBonusDmg) {
       dmg += attacker.pursuitBonusDmg;
@@ -1203,7 +1626,7 @@
       dmg = Math.max(1, Math.floor(dmg / 2));
       if (!dryRun) {
         defender.parryCharges -= 1;
-        applyDamage(attacker, 3);
+        applyDamage(attacker, 3, defender);
         log("Parry counters for 3!");
       }
     }
@@ -1218,6 +1641,7 @@
     if (!interceptor && u.markDebuffTurns > 0 && u.dreadMarkDmg) {
       dmg += u.dreadMarkDmg;
     }
+    dmg = Math.max(0, dmg);
     if (interceptor) {
       interceptor.interceptActive = false;
       interceptor.hp -= dmg;
@@ -1233,6 +1657,14 @@
     }
     u.hp -= dmg;
     if (u.hp < 0) u.hp = 0;
+    u._statDmgTaken = (u._statDmgTaken || 0) + dmg;
+    if (dmg > 0 && u.team === "player" && state.activeUnit && state.activeUnit.team === "player") {
+      state._noDamageTurn = false;
+    }
+    if (attacker) {
+      attacker._statDmgDealt = (attacker._statDmgDealt || 0) + dmg;
+      if (dmg > (state._statMaxSingleHit || 0)) state._statMaxSingleHit = dmg;
+    }
     if (u.spearBraceActive && attacker && attacker.hp > 0) {
       u.spearBraceActive = false;
       attacker.hp = Math.max(0, attacker.hp - 4);
@@ -1242,7 +1674,7 @@
     if (u.team === "enemy") state.totalDamageDealt += dmg;
     var xpSource = attacker || state.activeUnit;
     if (campaignState.active && xpSource && xpSource.team === "player" && u.team === "enemy") {
-      awardXp(xpSource, XP_PER_HIT);
+      awardXp(xpSource, Math.round(XP_PER_HIT * getDiff().xpMul));
     }
     spawnDmgNumber(u, "-" + dmg, "#ff6040");
     if (u.hp <= 0 && u.classId === "vestige" && !u.secondWindUsed) {
@@ -1287,7 +1719,7 @@
       ct: team === "player" ? 20 : 0,
       rootedSkip: 0,
       braceCharges: 0,
-      riposteActive: false,
+      riposteCharges: 0,
       tempExtraMove: false,
       testudoBonus: 0,
       markDebuffTurns: 0,
@@ -1319,6 +1751,8 @@
       bonusDef: 0,
       bonusSpd: 0,
       resolveUsed: false,
+      crowdsFavorUsed: false,
+      lastStandActive: false,
       parryCharges: 0,
       spearBraceActive: false,
       interceptActive: false,
@@ -1331,11 +1765,18 @@
       shadowMendAtkPenalty: 0,
       bondBuff: false,
       nearDeathCount: 0,
+      defDebuffTurns: 0,
+      defDebuffAmt: 0,
+      debuffImmuneTurns: 0,
       title: null,
     };
   }
 
+  var _cachedZoneMap = null;
+  var _zoneMapTerrain = null;
   function buildZoneMap() {
+    if (_cachedZoneMap && _zoneMapTerrain === state.terrain) return _cachedZoneMap;
+    _zoneMapTerrain = state.terrain;
     const zones = [];
     for (let y = 0; y < BOARD_H; y++) {
       const row = [];
@@ -1345,11 +1786,25 @@
       }
       zones.push(row);
     }
+    _cachedZoneMap = zones;
     return zones;
   }
 
+  var _highlightMapBuf = {};
+  var _hlDirty = true;
+  var _hlLastSize = -1;
+  var _hlLastMode = null;
+  var _hlLastPhase = null;
+
+  function invalidateHighlights() { _hlDirty = true; }
+
   function buildHighlightMap() {
-    const map = {};
+    var sz = state.highlightCells.size;
+    if (!_hlDirty && sz === _hlLastSize && state.battleMode === _hlLastMode && state.phase === _hlLastPhase && state.phase !== "deploy") {
+      return _highlightMapBuf;
+    }
+    var map = _highlightMapBuf;
+    for (var k in map) { if (map.hasOwnProperty(k)) delete map[k]; }
     for (const key of state.highlightCells) {
       if (state.battleMode === "move") map[key] = "move";
       else if (state.battleMode === "attack") map[key] = "attack";
@@ -1358,70 +1813,126 @@
     if (state.phase === "deploy") {
       for (let y = 0; y < BOARD_H; y++) {
         for (let x = 0; x < BOARD_W; x++) {
-          if (isGateTile(x, y) && !occupantAt(x, y) && !isTileImpassableTerrain(x, y)) {
+          if (isGateTile(x, y) && !occupantAt(x, y) && !isTileImpassableTerrain(x, y) && !isTileCollapsed(x, y)) {
             map[cellKey(x, y)] = "gate";
           }
         }
       }
     }
+    _hlLastSize = sz;
+    _hlLastMode = state.battleMode;
+    _hlLastPhase = state.phase;
+    _hlDirty = false;
     return map;
   }
+
+  var _unitDataBuf = [];
+  var _drawParamsBuf = {
+    heights: null, zones: null, highlights: null, units: null,
+    activeUnitId: null, phase: null, cursedTiles: null,
+    collapsedTiles: null, glowTiles: null, darkSky: false,
+    letterbox: undefined, cutsceneBubble: undefined,
+  };
+  var _fullCurseSet = null;
+  var _fullCurseKey = "";
+  var _statusIconsBuf = [];
 
   function renderBoard() {
     if (!renderer) return;
     renderer._recalcLayout();
-    const unitData = state.units
-      .filter((u) => u.hp > 0 || u._deathAnim != null)
-      .map((u) => {
-        var t = u.isCinematic ? u.team : (u.gifted ? "gifted" : (u.team === "player" ? "player" : "enemy"));
-        return {
-          id: u.id,
-          x: u.x,
-          y: u.y,
-          hp: u.hp,
-          maxHp: u.maxHp,
-          classId: u.classId,
-          team: t,
-          exhausted: u.isCinematic ? false : (state.phase === "battle" && u.ct < 50),
-          animX: u.animX,
-          animY: u.animY,
-          lungeX: u.lungeX,
-          lungeY: u.lungeY,
-          _deathAnim: u._deathAnim,
-          _flashAnim: u._flashAnim,
-          statusIcons: u.isCinematic ? [] : getUnitStatusIcons(u),
-          isCinematic: u.isCinematic || false,
-        };
-      });
+
+    var udIdx = 0;
+    for (var ui = 0; ui < state.units.length; ui++) {
+      var u = state.units[ui];
+      if (u.hp <= 0 && u._deathAnim == null) continue;
+      var entry = _unitDataBuf[udIdx];
+      if (!entry) { entry = {}; _unitDataBuf[udIdx] = entry; }
+      entry.id = u.id;
+      entry.x = u.x;
+      entry.y = u.y;
+      entry.hp = u.hp;
+      entry.maxHp = u.maxHp;
+      entry.classId = u.classId;
+      entry.team = u.isCinematic ? u.team : (u.gifted ? "gifted" : (u.team === "player" ? "player" : "enemy"));
+      entry.exhausted = u.isCinematic ? false : (state.phase === "battle" && u.ct < 50);
+      entry.animX = u.animX;
+      entry.animY = u.animY;
+      entry.lungeX = u.lungeX;
+      entry.lungeY = u.lungeY;
+      entry._deathAnim = u._deathAnim;
+      entry._flashAnim = u._flashAnim;
+      entry.isCinematic = u.isCinematic || false;
+
+      if (u.isCinematic) {
+        entry.statusIcons = _statusIconsBuf;
+        _statusIconsBuf.length = 0;
+      } else {
+        var icons = [];
+        if (u.gifted) icons.push(STATUS_DEFS.gifted);
+        if (u.braceCharges > 0) icons.push(STATUS_DEFS.brace);
+        if (u.testudoBonus > 0) icons.push(STATUS_DEFS.testudo);
+        if (u.phalanxBonus > 0) icons.push(STATUS_DEFS.phalanx);
+        if (u.riposteCharges > 0) icons.push(STATUS_DEFS.riposte);
+        if (u.rootedSkip) icons.push(STATUS_DEFS.rooted);
+        if (u.tempExtraMove) icons.push(STATUS_DEFS.surge);
+        if (u.markDebuffTurns > 0) icons.push(STATUS_DEFS.marked);
+        if (u.bleedTurns > 0) icons.push(STATUS_DEFS.bleed);
+        if (u.atkDebuffTurns > 0) icons.push(STATUS_DEFS.atkdown);
+        if (u.defDebuffTurns > 0) icons.push(STATUS_DEFS.defdown);
+        if (u.debuffImmuneTurns > 0) icons.push(STATUS_DEFS.dbfimmun);
+        if (u.blindRushAtk > 0) icons.push(STATUS_DEFS.blindrush);
+        if (u.battleFocusNext) icons.push(STATUS_DEFS.highgnd);
+        else if (u.highGroundNext) icons.push(STATUS_DEFS.highgnd);
+        if (u.classId === "vestige" && !u.secondWindUsed) icons.push(STATUS_DEFS.second);
+        if (u.parryCharges > 0) icons.push(STATUS_DEFS.parry);
+        if (u.spearBraceActive) icons.push(STATUS_DEFS.spbrace);
+        if (u.interceptActive) icons.push(STATUS_DEFS.intercpt);
+        if (u.eagleEyeHits > 0) icons.push(STATUS_DEFS.eagle);
+        if (u.fortressRooted > 0) icons.push(STATUS_DEFS.fortress);
+        if (u.momentumBonus > 0) icons.push(STATUS_DEFS.momentum);
+        if (u.bondBuff) icons.push(STATUS_DEFS.bond);
+        if ((u.nearDeathCount || 0) >= 2) icons.push(STATUS_DEFS.scarred);
+        entry.statusIcons = icons;
+      }
+      udIdx++;
+    }
+    _unitDataBuf.length = udIdx;
 
     var cursedSet = null;
     if (state.mapMods.fullCurse) {
-      cursedSet = new Set();
-      for (var cy = 0; cy < BOARD_H; cy++)
-        for (var cx = 0; cx < BOARD_W; cx++)
-          cursedSet.add(cellKey(cx, cy));
+      var cKey = BOARD_W + "," + BOARD_H;
+      if (_fullCurseKey !== cKey) {
+        _fullCurseSet = new Set();
+        for (var cy = 0; cy < BOARD_H; cy++)
+          for (var cx = 0; cx < BOARD_W; cx++)
+            _fullCurseSet.add(cellKey(cx, cy));
+        _fullCurseKey = cKey;
+      }
+      cursedSet = _fullCurseSet;
     } else if (state.mapMods.cursedTiles.size) {
       cursedSet = state.mapMods.cursedTiles;
     }
-    var drawParams = {
-      heights: state.height,
-      zones: buildZoneMap(),
-      highlights: state.cutscene.active ? {} : buildHighlightMap(),
-      units: unitData,
-      activeUnitId: state.activeUnit ? state.activeUnit.id : null,
-      phase: state.phase,
-      cursedTiles: cursedSet,
-      collapsedTiles: state.mapMods.collapsedTiles.size ? state.mapMods.collapsedTiles : null,
-      glowTiles: state.mapMods.glowTiles.size ? state.mapMods.glowTiles : null,
-      darkSky: state.mapMods.darkSky,
-    };
+
+    var dp = _drawParamsBuf;
+    dp.heights = state.height;
+    dp.zones = buildZoneMap();
+    dp.highlights = state.cutscene.active ? {} : buildHighlightMap();
+    dp.units = _unitDataBuf;
+    dp.activeUnitId = state.activeUnit ? state.activeUnit.id : null;
+    dp.phase = state.phase;
+    dp.cursedTiles = cursedSet;
+    dp.collapsedTiles = state.mapMods.collapsedTiles.size ? state.mapMods.collapsedTiles : null;
+    dp.glowTiles = state.mapMods.glowTiles.size ? state.mapMods.glowTiles : null;
+    dp.darkSky = state.mapMods.darkSky;
+    dp.letterbox = undefined;
+    dp.cutsceneBubble = undefined;
 
     if (state.cutscene.active) {
-      drawParams.letterbox = state.cutscene.letterbox;
+      dp.letterbox = state.cutscene.letterbox;
       var bu = state.cutscene.bubbleUnit;
       if (bu && state.cutscene.bubbleText) {
         var bp = renderer.tileToScreen(bu.x, bu.y, state.height[bu.y] ? state.height[bu.y][bu.x] || 0 : 0);
-        drawParams.cutsceneBubble = {
+        dp.cutsceneBubble = {
           cx: bp.x,
           cy: bp.y,
           text: state.cutscene.bubbleText,
@@ -1429,7 +1940,7 @@
           style: state.cutscene.bubbleStyle,
         };
       } else if (!bu && state.cutscene.bubbleText && state.cutscene.bubbleStyle === "narration") {
-        drawParams.cutsceneBubble = {
+        dp.cutsceneBubble = {
           cx: 0,
           cy: 0,
           text: state.cutscene.bubbleText,
@@ -1439,7 +1950,7 @@
       }
     }
 
-    renderer.draw(drawParams);
+    renderer.draw(dp);
   }
 
   var NPC_SPRITE_IDS = ["cassius", "livia", "lurco", "official", "nero", "aemilia", "varro", "dis_pater"];
@@ -1481,27 +1992,31 @@
 
   function syncBodyPhaseClass() {
     document.body.classList.toggle("phase-battle", state.phase === "battle");
-    document.body.classList.toggle("phase-deploy", state.phase === "deploy");
-    document.body.classList.toggle("phase-ludus", state.phase === "ludus");
   }
 
+  var _ctStripKey = "";
   function refreshCtStrip() {
     const el = document.getElementById("ctStrip");
     if (!el) return;
     if (state.phase !== "battle") {
       el.innerHTML = "";
       el.hidden = true;
+      _ctStripKey = "";
       return;
     }
     el.hidden = false;
-    el.innerHTML = "";
     const alive = state.units.filter((u) => u.hp > 0);
     const sorted = [...alive].sort((a, b) => {
-      const ta = (100 - a.ct) / unitSpd(a);
-      const tb = (100 - b.ct) / unitSpd(b);
+      const ta = Math.max(0, 100 - a.ct) / unitSpd(a);
+      const tb = Math.max(0, 100 - b.ct) / unitSpd(b);
       return ta - tb;
     });
     const maxSlots = Math.min(8, sorted.length);
+    var ctKey = "";
+    for (var ci = 0; ci < maxSlots; ci++) ctKey += sorted[ci].id + "," + sorted[ci].hp + ";";
+    if (ctKey === _ctStripKey) return;
+    _ctStripKey = ctKey;
+    el.innerHTML = "";
     for (let i = 0; i < maxSlots; i++) {
       const u = sorted[i];
       const def = classById(u.classId);
@@ -1584,9 +2099,9 @@
     syncBodyPhaseClass();
     refreshCtStrip();
     const p = state.phase;
-    if (p === "ludus") SFX.startAmbient("ludus");
-    else if (p === "battle") SFX.startAmbient("battle");
-    else SFX.startAmbient("ludus");
+    if (p === "ludus") { SFX.startAmbient("ludus"); SFX.startMusic("ludus"); }
+    else if (p === "battle") { SFX.startAmbient("battle"); SFX.startMusic("battle"); }
+    else { SFX.startAmbient("ludus"); SFX.startMusic("ludus"); }
     var phaseText = p === "ludus" ? "Ludus" : p === "deploy" ? "Gates" : "Arena";
     if (campaignState.active) {
       var m = Campaign.getMission();
@@ -1596,6 +2111,12 @@
     panelRoster.classList.toggle("is-hidden", p !== "ludus");
     panelDeploy.classList.toggle("is-hidden", p !== "deploy");
     panelBattle.classList.toggle("is-hidden", p !== "battle");
+    setTimeout(function () {
+      var target = p === "ludus" ? panelRoster.querySelector(".class-row, button:not(:disabled)")
+        : p === "deploy" ? (deployQueueEl.querySelector(".deploy-card") || btnToBattle)
+        : btnMove.disabled ? btnWait : btnMove;
+      if (target) target.focus();
+    }, 120);
   }
 
   var _abilityTipEl = null;
@@ -1675,6 +2196,7 @@
         var tag = document.createElement("span");
         tag.className = "ability-tag";
         tag.setAttribute("tabindex", "0");
+        tag.setAttribute("role", "button");
         tag.textContent = a.name;
         var tipParts = [];
         if (a.type) tipParts.push(a.type.charAt(0).toUpperCase() + a.type.slice(1));
@@ -1734,11 +2256,33 @@
       nameSpan.className = "pick-name";
       var labelSpan = document.createElement("span");
       labelSpan.className = "pick-name-text";
-      var label = def.name;
-      if (pick.displayName) label = pick.displayName + " (" + def.name + ")";
+      var className = def.name;
+      if (pick.promotionId) { var _pr = getPromotion(pick.promotionId); if (_pr) className = _pr.name; }
+      var label = className;
+      if (pick.displayName) label = pick.displayName + " (" + className + ")";
       if (pick.isFree) label += " [free]";
       labelSpan.textContent = label;
       nameSpan.appendChild(labelSpan);
+      var renameBtn = document.createElement("button");
+      renameBtn.type = "button"; renameBtn.className = "btn-rename"; renameBtn.textContent = "\u270E";
+      renameBtn.title = "Rename"; renameBtn.setAttribute("aria-label", "Rename fighter");
+      renameBtn.addEventListener("click", function(e) { e.stopPropagation(); promptFighterName(pick); });
+      nameSpan.appendChild(renameBtn);
+      var accentWrap = document.createElement("span");
+      accentWrap.className = "accent-picker";
+      ACCENT_COLORS.forEach(function(ac) {
+        var dot = document.createElement("button");
+        dot.type = "button"; dot.className = "accent-dot" + (pick.accent === ac.id ? " is-active" : "");
+        dot.style.backgroundColor = ac.hex;
+        dot.title = ac.id; dot.setAttribute("aria-label", "Set accent " + ac.id);
+        dot.addEventListener("click", function(e) {
+          e.stopPropagation();
+          pick.accent = (pick.accent === ac.id) ? null : ac.id;
+          refreshRosterUI(); safeSave();
+        });
+        accentWrap.appendChild(dot);
+      });
+      nameSpan.appendChild(accentWrap);
       li.appendChild(nameSpan);
       if (campaignState.active) {
         var lvl = pick.level || 1;
@@ -1765,13 +2309,14 @@
           var spliceIdx = state.picks.findIndex(function(p) { return p.uid === pick.uid; });
           if (spliceIdx >= 0) state.picks.splice(spliceIdx, 1);
           refreshRosterUI();
-          if (campaignState.active) Campaign.saveToDisk();
+          safeSave();
         });
         li.appendChild(rm);
       }
       pickedListEl.appendChild(li);
     });
 
+    renderEquipShop();
     btnToDeploy.disabled = state.picks.length === 0 || state.budget < 0;
     if (btnTrainingBout) {
       if (campaignState.active && state.picks.length > 0) {
@@ -1784,6 +2329,81 @@
     if (btnStats) {
       btnStats.classList.toggle("is-hidden", !campaignState.active);
     }
+  }
+
+  function renderEquipShop() {
+    var existing = document.getElementById("equipShopSection");
+    if (existing) existing.remove();
+    if (!campaignState.active && !state.survivalMode) return;
+    if (state.picks.length === 0) return;
+    var section = document.createElement("div");
+    section.id = "equipShopSection"; section.className = "equip-shop";
+    section.innerHTML = '<div class="equip-shop__title">Equipment Shop</div>';
+    var row = document.createElement("div");
+    row.className = "equip-shop__row";
+    var shopPool = EQUIPMENT_DB.filter(function(e) { return e.cost <= state.budget + 10; });
+    shopPool.sort(function(a, b) { return a.cost - b.cost; });
+    if (shopPool.length > 12) shopPool = shopPool.slice(0, 12);
+    for (var i = 0; i < shopPool.length; i++) {
+      (function(item) {
+        var card = document.createElement("div");
+        card.className = "equip-card" + (item.rarity === "rare" ? " equip-card--rare" : item.rarity === "legendary" ? " equip-card--legendary" : "");
+        card.setAttribute("role", "button");
+        card.setAttribute("tabindex", "0");
+        card.innerHTML = '<div class="equip-card__name">' + _esc(item.name) + '</div>' +
+          '<div>' + item.slot + '</div>' +
+          '<div>' + Object.keys(item.mods).map(function(k) { return "+" + item.mods[k] + " " + k.toUpperCase(); }).join(", ") + '</div>' +
+          '<div class="equip-card__cost">' + item.cost + ' d</div>';
+        var handler = function() { showEquipPicker(item); };
+        card.addEventListener("click", handler);
+        card.addEventListener("keydown", function(e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handler(); } });
+        row.appendChild(card);
+      })(shopPool[i]);
+    }
+    section.appendChild(row);
+
+    var inv = campaignState.inventory || [];
+    if (inv.length > 0) {
+      var invDiv = document.createElement("div");
+      invDiv.style.marginTop = "0.3rem";
+      invDiv.style.fontSize = "0.65rem";
+      invDiv.style.color = "var(--fft-text-dim)";
+      invDiv.textContent = "Inventory: " + inv.map(function(id) { return _equipById[id] ? _equipById[id].name : id; }).join(", ");
+      section.appendChild(invDiv);
+    }
+    var rosterSection = document.getElementById("panelRoster");
+    var btnToDeploy = document.getElementById("btnToDeploy");
+    if (rosterSection && btnToDeploy) {
+      rosterSection.insertBefore(section, btnToDeploy.parentElement || btnToDeploy);
+    }
+  }
+
+  function showEquipPicker(item) {
+    if (item.cost > state.budget) {
+      log("Not enough denarii for " + item.name + ".", "system");
+      return;
+    }
+    var msg = "Buy " + item.name + " (" + item.cost + "d)?\\nAssign to which fighter?\\n";
+    for (var i = 0; i < state.picks.length; i++) {
+      msg += (i + 1) + ": " + (state.picks[i].displayName || classById(state.picks[i].classId).name) + "\\n";
+    }
+    var choice = prompt(msg, "1");
+    if (!choice) return;
+    var idx = parseInt(choice, 10) - 1;
+    if (idx < 0 || idx >= state.picks.length) return;
+    var pick = state.picks[idx];
+    if (!pick.equipment) pick.equipment = { weapon: null, armor: null, trinket: null };
+    var oldId = pick.equipment[item.slot];
+    if (oldId) {
+      campaignState.inventory.push(oldId);
+    }
+    pick.equipment[item.slot] = item.id;
+    state.budget -= item.cost;
+    budgetCurrent -= item.cost;
+    if (campaignState.active) campaignState.denarii -= item.cost;
+    log("Equipped " + item.name + " on " + (pick.displayName || classById(pick.classId).name) + ".");
+    refreshRosterUI();
+    safeSave();
   }
 
   function toggleRosterStats() {
@@ -1813,8 +2433,8 @@
       var s = roster[i];
       var def = classById(s.classId);
       var tr = document.createElement("tr");
-      var dName = s.name || (s.displayName || def.name);
-      var titleStr = s.title || "—";
+      var dName = _esc(s.name || (s.displayName || def.name));
+      var titleStr = _esc(s.title || "—");
       if ((s.nearDeathCount || 0) >= 2) titleStr += " (Scarred)";
       tr.innerHTML = "<td>" + dName + "</td><td>" + def.name + "</td><td>" + (s.level || 1) + "</td><td>" + (s.kills || 0) + "</td><td>" + (s.battlesSurvived || 0) + "</td><td>" + titleStr + "</td>";
       if (s.gifted) tr.classList.add("roster-stats--gifted");
@@ -1839,9 +2459,20 @@
           if (roster[ri].uid === pair[0]) n1 = roster[ri].name || classById(roster[ri].classId).name;
           if (roster[ri].uid === pair[1]) n2 = roster[ri].name || classById(roster[ri].classId).name;
         }
-        if (n1 && n2) bondDiv.innerHTML += (bp > 0 ? ", " : "") + n1 + " & " + n2;
+        if (n1 && n2) bondDiv.innerHTML += (bp > 0 ? ", " : "") + _esc(n1) + " &amp; " + _esc(n2);
       }
       panel.appendChild(bondDiv);
+    }
+    var cs = campaignState.campaignStats;
+    if (cs && cs.totalBattles > 0) {
+      var csDiv = document.createElement("div");
+      csDiv.style.marginTop = "0.5rem";
+      csDiv.style.fontSize = "0.7rem";
+      csDiv.style.color = "var(--fft-cyan-dim)";
+      csDiv.innerHTML = "<strong>Campaign Totals:</strong> " +
+        cs.totalBattles + " battles · " + cs.totalKills + " kills · " +
+        cs.totalDamage + " dmg · " + cs.totalTurns + " turns";
+      panel.appendChild(csDiv);
     }
     panel.classList.remove("is-hidden");
     if (btn) btn.setAttribute("aria-expanded", "true");
@@ -1865,7 +2496,7 @@
     state.picks.push(newPick);
     log("Hired " + newPick.displayName + " the " + c.name + ".");
     refreshRosterUI();
-    if (campaignState.active) Campaign.saveToDisk();
+    safeSave();
     promptFighterName(newPick);
   }
 
@@ -1942,6 +2573,7 @@
     state.trainingBout = true;
     var trainSeed = (state.boutNumber + 1) * 71 + 137;
     state._mapSeed = trainSeed;
+    gameRng = seedRng(trainSeed * 1999 + 1);
     state.height = buildHeightField(trainSeed);
     state.terrain = buildTerrainMap(trainSeed, null);
     state.phase = "deploy";
@@ -1962,14 +2594,14 @@
       for (var i = 0; i < state.picks.length; i++) totalLvl += (state.picks[i].level || 1);
       avgLevel = Math.round(totalLvl / state.picks.length);
     }
-    var enemyLvl = Math.max(1, avgLevel - 1 + Math.floor(Math.random() * 2));
+    var enemyLvl = Math.max(1, avgLevel - 1 + Math.floor(gameRng() * 2));
     var unlocked = Campaign.getUnlockedClasses ? Campaign.getUnlockedClasses() : GLADIATOR_CLASSES.map(function(c) { return c.id; });
     var count = state.picks.length;
     for (var j = 0; j < count; j++) {
-      var cls = unlocked[Math.floor(Math.random() * unlocked.length)];
-      var ex = Math.floor(Math.random() * BOARD_W);
-      var ey = Math.floor(Math.random() * 3);
-      while (occupantAt(ex, ey) || isTileImpassableTerrain(ex, ey)) { ex = Math.floor(Math.random() * BOARD_W); ey = Math.floor(Math.random() * 3); }
+      var cls = unlocked[Math.floor(gameRng() * unlocked.length)];
+      var ex = Math.floor(gameRng() * BOARD_W);
+      var ey = Math.floor(gameRng() * 3);
+      while (occupantAt(ex, ey) || isTileImpassableTerrain(ex, ey)) { ex = Math.floor(gameRng() * BOARD_W); ey = Math.floor(gameRng() * 3); }
       var eu = createUnit("enemy", cls, ex, ey);
       eu.level = enemyLvl;
       if (enemyLvl > 1) {
@@ -1986,7 +2618,7 @@
   function snapshotPicksToRoster() {
     if (!campaignState.active) return;
     campaignState.survivingRoster = state.picks.map(function (p) {
-      return {
+      var entry = {
         uid: p.uid,
         classId: p.classId,
         name: p.displayName || null,
@@ -2001,9 +2633,16 @@
         bonusAtk: p.bonusAtk || 0,
         bonusDef: p.bonusDef || 0,
         bonusSpd: p.bonusSpd || 0,
+        battlesSurvived: p.battlesSurvived || 0,
+        nearDeathCount: p.nearDeathCount || 0,
+        title: p.title || null,
       };
+      if (p.promotionId) entry.promotionId = p.promotionId;
+      if (p.equipment) entry.equipment = p.equipment;
+      if (p.accent) entry.accent = p.accent;
+      return entry;
     });
-    Campaign.saveToDisk();
+    safeSave();
   }
 
   function startDeploy() {
@@ -2087,7 +2726,14 @@
       do { px = 1 + Math.floor(rng() * (BOARD_W - 2)); }
       while (usedPositions[px + "," + py] || isTileImpassableTerrain(px, py));
       usedPositions[px + "," + py] = true;
-      state.units.push(createUnit("enemy", chosen[j], px, py));
+      var eu = createUnit("enemy", chosen[j], px, py);
+      eu.aiProfile = _aiProfileKeys[Math.floor(rng() * _aiProfileKeys.length)];
+      var diff = getDiff();
+      eu.maxHp = Math.round(eu.maxHp * diff.hpMul); eu.hp = eu.maxHp;
+      var _bAtk = classById(eu.classId).atk, _bSpd = classById(eu.classId).spd;
+      eu.bonusAtk = (eu.bonusAtk || 0) + Math.round(_bAtk * (diff.atkMul - 1));
+      eu.bonusSpd = (eu.bonusSpd || 0) + Math.round(_bSpd * (diff.spdMul - 1));
+      state.units.push(eu);
     }
   }
 
@@ -2127,6 +2773,7 @@
       if (spec.gifted) unit.gifted = true;
       if (spec.boss) unit.boss = true;
       if (spec.atkBonus) unit.atkBonus = spec.atkBonus;
+      unit.aiProfile = (spec.boss || spec.gifted) ? "tactician" : _aiProfileKeys[Math.floor(rng() * _aiProfileKeys.length)];
       if (unit.gifted) applyGiftedBoosts(unit);
       var eLvl = mission.enemyLevel || 1;
       unit.level = eLvl;
@@ -2136,6 +2783,11 @@
         unit.bonusDef = egb.def; unit.bonusSpd = egb.spd;
         if (egb.hp > 0) { unit.maxHp += egb.hp; unit.hp = unit.maxHp; }
       }
+      var diff = getDiff();
+      unit.maxHp = Math.round(unit.maxHp * diff.hpMul); unit.hp = unit.maxHp;
+      var _bAtk = classById(unit.classId).atk, _bSpd = classById(unit.classId).spd;
+      unit.bonusAtk = (unit.bonusAtk || 0) + Math.round(_bAtk * (diff.atkMul - 1));
+      unit.bonusSpd = (unit.bonusSpd || 0) + Math.round(_bSpd * (diff.spdMul - 1));
       state.units.push(unit);
     }
   }
@@ -2163,6 +2815,29 @@
     if (hpBonus > 0) {
       unit.maxHp += hpBonus;
       unit.hp += hpBonus;
+    }
+    if (pick.accent) {
+      unit.accent = pick.accent;
+      var acObj = ACCENT_COLORS.find(function(a) { return a.id === pick.accent; });
+      if (acObj) unit.accentColor = acObj.hex;
+    }
+    if (pick.promotionId) {
+      unit.promotionId = pick.promotionId;
+      var promo = getPromotion(pick.promotionId);
+      if (promo && promo.statBonus) {
+        unit.promoStatBonus = promo.statBonus;
+        if (promo.statBonus.hp) { unit.maxHp += promo.statBonus.hp; unit.hp += promo.statBonus.hp; }
+        if (promo.statBonus.move) { unit.giftedMove = (unit.giftedMove || classById(unit.classId).move) + promo.statBonus.move; }
+      }
+    }
+    if (pick.equipment) {
+      unit.equipment = pick.equipment;
+      var eqHp = equipMod(unit, "hp");
+      if (eqHp > 0) { unit.maxHp += eqHp; unit.hp += eqHp; }
+    }
+    if (pick.hp != null && pick.maxHp != null) {
+      unit.maxHp = pick.maxHp + (unit.bonusHp || 0) + equipMod(unit, "hp");
+      unit.hp = Math.min(pick.hp + (unit.bonusHp || 0) + equipMod(unit, "hp"), unit.maxHp);
     }
   }
 
@@ -2196,7 +2871,7 @@
 
       var info = document.createElement("div");
       info.className = "deploy-card__info";
-      var nameStr = p.displayName ? p.displayName : def.name;
+      var nameStr = p.displayName ? _esc(p.displayName) : def.name;
       var lvlBadge = campaignState.active ? ' <span class="level-badge">Lv.' + (p.level || 1) + '</span>' : '';
       info.innerHTML = '<span class="deploy-card__name">' + nameStr + lvlBadge + '</span><span class="deploy-card__class">' + def.name + '</span>';
       li.appendChild(info);
@@ -2206,10 +2881,18 @@
       status.textContent = p.placed ? "✓" : "…";
       li.appendChild(status);
 
-      li.addEventListener("click", () => {
+      li.setAttribute("tabindex", "0");
+      li.setAttribute("role", "option");
+      li.setAttribute("aria-selected", String(idx === state.deploySelectedIndex && !p.placed));
+      function selectDeploy() {
         state.deploySelectedIndex = idx;
         refreshDeployUI();
         renderBoard();
+      }
+      li.addEventListener("click", selectDeploy);
+      li.addEventListener("keydown", function (e) {
+        if (e.repeat) return;
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); selectDeploy(); }
       });
       deployQueueEl.appendChild(li);
     });
@@ -2234,9 +2917,9 @@
         }
         return;
       }
-      if (!isGateTile(x, y) || existing || isTileImpassableTerrain(x, y)) {
+      if (!isGateTile(x, y) || existing || isTileImpassableTerrain(x, y) || isTileCollapsed(x, y)) {
         if (existing) log("Tile occupied. Click a placed ally to recall them.");
-        else if (!isGateTile(x, y)) log("Select a blue gate tile to place a fighter.");
+        else if (!isGateTile(x, y)) log("Select a highlighted gate tile to place a fighter.");
         return;
       }
       const pick = state.deployTemplate[state.deploySelectedIndex];
@@ -2261,7 +2944,7 @@
       return;
     }
     if (state.phase === "battle") {
-      handleBattleClick(x, y);
+      handleBattleClick(x, y).catch(function(e) { console.error("Battle click error:", e); state.animating = false; });
     }
   }
 
@@ -2369,6 +3052,29 @@
     return u.hp <= 0;
   }
 
+  function triggerTerrainStep(u) {
+    if (u.hp <= 0) return;
+    var zone = tileZone(u.x, u.y);
+    if (zone === "trap_spike") {
+      var dmg = 3 + Math.floor((campaignState.missionIndex || 0) / 3);
+      applyDamage(u, dmg);
+      log((u.displayName || classById(u.classId).name) + " steps on spikes! (-" + dmg + ")", "system");
+      if (state.terrain[u.y]) state.terrain[u.y][u.x] = "sand";
+    } else if (zone === "trap_fire") {
+      applyDamage(u, 4);
+      u.bleedTurns = Math.max(u.bleedTurns || 0, 1);
+      log((u.displayName || classById(u.classId).name) + " walks through fire! (-4, bleeding)", "system");
+    } else if (zone === "fountain") {
+      var heal = Math.min(5, u.maxHp - u.hp);
+      if (heal > 0) {
+        u.hp += heal;
+        u._statHealing = (u._statHealing || 0) + heal;
+        spawnDmgNumber(u, "+" + heal, "#80ff80");
+        log((u.displayName || classById(u.classId).name) + " is healed by the fountain! (+" + heal + ")", "heal");
+      }
+    }
+  }
+
   function tickRitualPulse() {
     var rp = state.mapMods.ritualPulse;
     if (!rp) return [];
@@ -2444,8 +3150,7 @@
     state.mapMods.glowTiles = new Set();
     if (!state.mapMods.fullCurse && state.mapMods.collapsingMission !== 13) return;
     state.mapMods.collapsedTiles.forEach(function (k) {
-      var parts = k.split(",").map(Number);
-      var cx = parts[0], cy = parts[1];
+      var cx = cellKeyX(k), cy = cellKeyY(k);
       for (var di = 0; di < DIRS.length; di++) {
         var nx = cx + DIRS[di][0], ny = cy + DIRS[di][1];
         if (!inBounds(nx, ny)) continue;
@@ -2540,6 +3245,7 @@
     state.boutNumber++;
     var mission = campaignState.active ? Campaign.getMission() : null;
     var hSeed = state._mapSeed;
+    gameRng = seedRng(hSeed * 1999 + state.boutNumber * 41 + 1);
     var tmplKey = (!mission && !campaignState.active && skirmishConfig.template) ? skirmishConfig.template : null;
     state.height = buildHeightField(hSeed, tmplKey);
     state.phase = "battle";
@@ -2548,7 +3254,15 @@
     state.highlightCells.clear();
     state.turnCount = 0;
     state.totalDamageDealt = 0;
+    state._statMaxSingleHit = 0;
     state.battleLog = [];
+    state.battleRecord = [];
+    if (renderer) renderer.floatingTexts = [];
+    for (var _si = 0; _si < state.units.length; _si++) {
+      var _su = state.units[_si];
+      _su._statDmgDealt = 0; _su._statDmgTaken = 0; _su._statHealing = 0;
+      _su._statKills = 0; _su._statTilesMoved = 0; _su._statAbilitiesUsed = 0;
+    }
     state.titusForgottenName = false;
     state.endingATriggered = false;
     state.titusTurnCounter = 0;
@@ -2575,7 +3289,11 @@
     log("The editors salute. Fight!", "system");
     SFX.click();
     startBattleLoop();
-    tickBattleTurn();
+    tickBattleTurn().catch(function(e) {
+      console.error("tickBattleTurn:", e);
+      state.animating = false;
+      log("Turn error — you may continue.", "system");
+    });
   }
 
   function bindBattleButtons() {
@@ -2621,6 +3339,7 @@
       if (u.battleHardenedTurns <= 0) { u.battleHardenedAtk = 0; u.battleHardenedDef = 0; }
     }
     if (u.fortressRooted > 0) u.fortressRooted--;
+    u.interceptActive = false;
   }
 
   async function tickBattleTurn() {
@@ -2638,6 +3357,7 @@
       await checkVictoryAsync();
       return;
     }
+    state.activeUnit = actor;
     if (actor.team === "enemy") {
       try {
         await runEnemyTurn(actor);
@@ -2647,26 +3367,30 @@
       }
       if (await checkVictoryAsync()) return;
       await delay(200);
-      tickBattleTurn();
+      await tickBattleTurn();
       return;
     }
     if (actor.atkDebuffTurns > 0) actor.atkDebuffTurns--;
     if (actor.atkDebuffTurns <= 0) actor.atkDebuffAmt = 0;
+    if (actor.defDebuffTurns > 0) actor.defDebuffTurns--;
+    if (actor.defDebuffTurns <= 0) actor.defDebuffAmt = 0;
+    if (actor.debuffImmuneTurns > 0) actor.debuffImmuneTurns--;
+    if (actor.duelTurns > 0) { actor.duelTurns--; if (actor.duelTurns <= 0) actor.duelTarget = null; }
     if (actor.bleedTurns > 0) {
       actor.bleedTurns--;
       applyDamage(actor, 1);
       log(classById(actor.classId).name + " bleeds! (−1 HP)");
-      if (actor.hp <= 0) { await animateDeath(actor); tickBattleTurn(); return; }
+      if (actor.hp <= 0) { tickMarkDebuffIfNeeded(actor); await animateDeath(actor); await tickBattleTurn(); return; }
     }
     if (actor.rootedSkip) {
       actor.rootedSkip--;
       log(classById(actor.classId).name + " is netted and cannot act!");
       var cursedKillP = tickCursedTileDamage(actor);
-      if (cursedKillP) { await animateDeath(actor); tickBattleTurn(); return; }
+      if (cursedKillP) { tickMarkDebuffIfNeeded(actor); await animateDeath(actor); await tickBattleTurn(); return; }
       tickMarkDebuffIfNeeded(actor);
       renderBoard();
       await delay(350);
-      tickBattleTurn();
+      await tickBattleTurn();
       return;
     }
     state.activeUnit = actor;
@@ -2675,6 +3399,7 @@
     state.hasMoved = false;
     state.hasActed = false;
     state.selectedAbilityIndex = -1;
+    state._noDamageTurn = true;
     updateBondBuff(actor);
     showUnitPanel(actor);
     setBattleButtons(actor);
@@ -2702,13 +3427,21 @@
     if (terrain === "building") txt += " · Impassable";
     else if (terrain === "water_deep") txt += " · Impassable";
     else if (terrain === "water_shallow") txt += " · Slows movement";
+    else if (terrain === "trap_spike") { txt = "Spike Trap · H:" + hName; }
+    else if (terrain === "trap_fire") { txt = "Fire Trap · H:" + hName; }
+    else if (terrain === "barricade") { txt = "Barricade · Impassable"; var bhp = state.barricadeHp ? state.barricadeHp[col+","+row] : 0; if (bhp > 0) txt += " HP:" + bhp; }
+    else if (terrain === "fountain") { txt = "Fountain · Heals +5/turn · H:" + hName; }
+    else if (terrain === "high_ground") { txt = "High Ground · +15% dmg · H:" + hName; }
     if (isTileCollapsed(col, row)) txt += " · COLLAPSED";
     else if (isTileCursed(col, row)) txt += " · Cursed";
     if (state.mapMods.glowTiles.has(cellKey(col, row))) txt += " · Glow (+2 ATK)";
     var occ = occupantAt(col, row);
     if (occ) {
       var def = classById(occ.classId);
-      txt += " · " + def.name + " (" + occ.team + ") HP:" + occ.hp + "/" + occ.maxHp;
+      var occName = def.name;
+      if (occ.promotionId) { var occPromo = getPromotion(occ.promotionId); if (occPromo) occName = occPromo.name; }
+      txt += " \u00b7 " + occName + " (" + occ.team + ") HP:" + occ.hp + "/" + occ.maxHp;
+      if (occ.aiProfile && AI_PROFILES[occ.aiProfile]) txt += " [" + AI_PROFILES[occ.aiProfile].label + "]";
     }
     tileInfoEl.textContent = txt;
     tileInfoEl.classList.remove("is-hidden");
@@ -2728,6 +3461,14 @@
       ab = unitAbilities(attacker)[abilityIdx];
       if (ab) { label = ab.name; mult = ab.mult || 1; ignDef = ab.ignoreDefPct || 0; }
     }
+    if (ab && ab.effect === "hpswap") {
+      var html = '<div class="fc-name">' + _esc(def.name) + '</div>';
+      html += '<div class="fc-dmg">' + _esc(label) + ': Swap HP%</div>';
+      forecastEl.innerHTML = html;
+      forecastEl.classList.remove("is-hidden");
+      announce(def.name + " — " + label + ": Swap HP%");
+      return;
+    }
     if (ab && ab.effect === "suppress") {
       dmg = 3;
     } else if (ab && ab.effect === "grave_pulse") {
@@ -2735,16 +3476,35 @@
     } else {
       dmg = physicalDamage(attacker, target, mult, ignDef, true);
     }
-    var html = '<div class="fc-name">' + def.name + '</div>';
-    html += '<div class="fc-hit">Hit: ' + hitPct + '%</div>';
     var dmgLabel = (ab && (ab.effect === "suppress" || ab.effect === "grave_pulse")) ? " true dmg" : " dmg";
-    html += '<div class="fc-dmg">' + label + ': ~' + dmg + dmgLabel + '</div>';
+    var dmgPrefix = "~";
+    if (ab && ab.effect === "double_strike") {
+      dmgPrefix = "2x ~";
+    }
+    var dmgSuffix = "";
+    if (ab && (ab.target === "aoe_adjacent" || ab.target === "aoe_range")) {
+      dmgSuffix = " (per foe)";
+    }
+    var html = '<div class="fc-name">' + _esc(def.name) + '</div>';
+    html += '<div class="fc-hit">Hit: ' + hitPct + '%</div>';
+    html += '<div class="fc-dmg">' + _esc(label) + ': ' + dmgPrefix + dmg + dmgLabel + dmgSuffix + '</div>';
+    forecastEl.innerHTML = html;
+    forecastEl.classList.remove("is-hidden");
+    announce(def.name + " — Hit: " + hitPct + "% — " + label + ": " + dmgPrefix + dmg + dmgLabel + dmgSuffix);
+  }
+
+  function showAreaForecast(attacker, ab) {
+    var label = ab.name;
+    var dmg = physicalDamage(attacker, attacker, ab.mult || 1, ab.ignoreDefPct || 0, true);
+    var html = '<div class="fc-name">' + _esc(label) + '</div>';
+    html += '<div class="fc-dmg">~' + dmg + ' dmg per foe in area</div>';
     forecastEl.innerHTML = html;
     forecastEl.classList.remove("is-hidden");
   }
 
   function hideForecast() {
     forecastEl.classList.add("is-hidden");
+    announce("");
   }
 
   function showUnitPanel(u) {
@@ -2796,13 +3556,13 @@
     abilityMenu.innerHTML = "";
     var menuIdx = 0;
     abList.forEach(function (ab, idx) {
-      if (ab.type === "passive") return;
+      if (ab.type === "passive" || ab.type === "summon") return;
       menuIdx++;
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "ability-menu__btn";
       btn.setAttribute("role", "menuitem");
-      btn.innerHTML = "<kbd>" + menuIdx + "</kbd> " + ab.name + "<small>" + ab.desc + "</small>";
+      btn.innerHTML = "<kbd>" + menuIdx + "</kbd> " + _esc(ab.name) + "<small>" + _esc(ab.desc) + "</small>";
       btn.addEventListener("click", function () {
         hideAbilityMenu();
         state.selectedAbilityIndex = idx;
@@ -2810,17 +3570,21 @@
       });
       abilityMenu.appendChild(btn);
     });
+    if (menuIdx === 0) { log("No usable abilities."); return; }
     abilityMenu.classList.remove("is-hidden");
+    btnAbility.setAttribute("aria-expanded", "true");
   }
 
   function hideAbilityMenu() {
     abilityMenu.classList.add("is-hidden");
     abilityMenu.innerHTML = "";
+    btnAbility.setAttribute("aria-expanded", "false");
   }
 
   async function clearPlayerTurn() {
     const actor = state.activeUnit;
     if (actor) {
+      if (state._noDamageTurn) state._statPacifistTurn = true;
       var cursedKill = tickCursedTileDamage(actor);
       if (cursedKill) await animateDeath(actor);
       tickMarkDebuffIfNeeded(actor);
@@ -2842,7 +3606,7 @@
     btnUndo.disabled = true;
     renderBoard();
     await delay(250);
-    tickBattleTurn();
+    await tickBattleTurn();
   }
 
   function endMove() {
@@ -2852,6 +3616,7 @@
     hideForecast();
     const u = state.activeUnit;
     if (u) {
+      updateBondBuff(u);
       showUnitPanel(u);
       setBattleButtons(u);
     }
@@ -2871,6 +3636,7 @@
     state.battleMode = "idle";
     state.highlightCells.clear();
     hideForecast();
+    updateBondBuff(u);
     showUnitPanel(u);
     setBattleButtons(u);
     renderBoard();
@@ -2879,11 +3645,13 @@
 
   function endAction() {
     state.hasActed = true;
-    clearPlayerTurn();
+    clearPlayerTurn().catch(function(e) { console.error("Turn error:", e); state.animating = false; });
   }
 
-  function waitAction() {
+  async function waitAction() {
+    if (state.animating) return;
     if (!state.activeUnit || state.activeUnit.team !== "player") return;
+    recordAction(state.activeUnit, "wait", {});
 
     if (state.titusForgottenName && !state.endingATriggered) {
       var u = state.activeUnit;
@@ -2899,6 +3667,8 @@
           state.battleMode = "idle";
           log("Cassius reaches out. Titus lowers his blade.", "system");
           log("The twin bond holds. The ritual shatters.", "system");
+          battleLoopRunning = false;
+          await delay(300);
           showResultOverlay("victory");
           return;
         }
@@ -2906,7 +3676,7 @@
     }
 
     log("Guard.");
-    clearPlayerTurn();
+    clearPlayerTurn().catch(function(e) { console.error("Turn error:", e); state.animating = false; });
   }
 
   function cancelTargeting() {
@@ -2914,6 +3684,7 @@
     state.battleMode = "idle";
     state.highlightCells.clear();
     state.selectedAbilityIndex = -1;
+    state._abyssalAlly = null;
     hideForecast();
     var u = state.activeUnit;
     if (u && u.team === "player") { showUnitPanel(u); setBattleButtons(u); }
@@ -2921,6 +3692,7 @@
   }
 
   function beginMoveMode() {
+    if (state.animating) return;
     const u = state.activeUnit;
     if (!u || u.team !== "player" || state.hasMoved) return;
     hideAbilityMenu();
@@ -2933,9 +3705,11 @@
   }
 
   function beginAttackMode() {
+    if (state.animating) return;
     const u = state.activeUnit;
     if (!u || u.team !== "player" || state.hasActed) return;
     hideAbilityMenu();
+    hideForecast();
     state.battleMode = "attack";
     state.highlightCells = new Set();
     for (const [dx, dy] of DIRS) {
@@ -2950,6 +3724,8 @@
   }
 
   function beginAbilityTargeting(u, ab, idx) {
+    if (state.animating) return;
+    hideForecast();
     state.battleMode = "ability";
     state.selectedAbilityIndex = idx;
     state.highlightCells.clear();
@@ -2965,6 +3741,11 @@
         const t = occupantAt(tx, ty);
         if (t && t.team !== u.team) state.highlightCells.add(cellKey(tx, ty));
       }
+      if (state.highlightCells.size === 0) {
+        state.battleMode = "idle";
+        log(ab.name + " — no adjacent enemies.");
+        return;
+      }
       log(ab.name + " — choose adjacent enemy.");
     } else if (ab.target === "line") {
       const range = ab.range || 3;
@@ -2979,6 +3760,11 @@
           if (occupantAt(tx, ty)) break;
         }
       }
+      if (state.highlightCells.size === 0) {
+        state.battleMode = "idle";
+        log(ab.name + " — no valid line targets.");
+        return;
+      }
       log(ab.name + " — pick a direction tile.");
     } else if (ab.target === "adjacent_ally") {
       for (var aai = 0; aai < DIRS.length; aai++) {
@@ -2989,7 +3775,27 @@
           state.highlightCells.add(cellKey(aax, aay));
         }
       }
+      if (state.highlightCells.size === 0) {
+        state.battleMode = "idle";
+        log(ab.name + " — no adjacent allies.");
+        return;
+      }
       log(ab.name + " — choose adjacent ally.");
+    } else if (ab.target === "aoe_range") {
+      var aoerRange = ab.range || 3;
+      for (var aoerX = 0; aoerX < BOARD_W; aoerX++) {
+        for (var aoerY = 0; aoerY < BOARD_H; aoerY++) {
+          if (Math.abs(aoerX - u.x) + Math.abs(aoerY - u.y) <= aoerRange && (aoerX !== u.x || aoerY !== u.y)) {
+            state.highlightCells.add(cellKey(aoerX, aoerY));
+          }
+        }
+      }
+      if (state.highlightCells.size === 0) {
+        state.battleMode = "idle";
+        log(ab.name + " — no tiles in range.");
+        return;
+      }
+      log(ab.name + " — choose center tile for area attack.");
     } else {
       state.battleMode = "idle";
       log("No valid target.");
@@ -3001,87 +3807,98 @@
   async function handleBattleClick(x, y) {
     const u = state.activeUnit;
     if (!u || u.team !== "player" || state.animating) return;
+    if (state.battleMode === "idle") return;
+    state.animating = true;
 
     if (state.battleMode === "move") {
       const k = cellKey(x, y);
-      if (!state.highlightCells.has(k)) return;
+      if (!state.highlightCells.has(k)) { state.animating = false; return; }
       state.preMovePos = { x: u.x, y: u.y };
-      state.animating = true;
-      var path = computePath(u, x, y);
-      await animateMove(u, path);
-      if (u.gifted && u.classId === "secutor" && path.length >= 4) {
-        u.pursuitBonusDmg = 3;
-        log("Pursuit Sense — bonus damage primed!");
-      }
-      if (u.classId === "essedarius" && path.length >= 3) {
-        var hasMomentum = unitAbilities(u).some(function(a) { return a.name === "Momentum"; });
-        if (hasMomentum) {
-          u.momentumBonus = 3;
-          log("Momentum — +3 ATK from charge!");
+      try {
+        var path = computePath(u, x, y);
+        if (path.length === 0) { state.animating = false; return; }
+        await animateMove(u, path);
+        if (u.gifted && u.classId === "secutor" && path.length >= 4) {
+          u.pursuitBonusDmg = 3;
+          log("Pursuit Sense — bonus damage primed!");
         }
+        if (u.classId === "essedarius" && path.length >= 3) {
+          var hasMomentum = unitAbilities(u).some(function(a) { return a.name === "Momentum"; });
+          if (hasMomentum) {
+            u.momentumBonus = 3;
+            log("Momentum — +3 ATK from charge!");
+          }
+        }
+      } finally {
+        state.animating = false;
       }
-      state.animating = false;
       log("Advance! — choose an action.");
       endMove();
       return;
     }
     if (state.battleMode === "attack") {
       const k = cellKey(x, y);
-      if (!state.highlightCells.has(k)) return;
+      if (!state.highlightCells.has(k)) { state.animating = false; return; }
       const tgt = occupantAt(x, y);
-      if (!tgt || tgt.team === u.team) return;
-      state.animating = true;
-      const hitPct = computeHitChance(u, tgt);
-      await animateAttack(u, tgt);
-      if (!rollHit(u, tgt)) {
-        SFX.miss();
-        spawnDmgNumber(tgt, "MISS", "#aaaaaa");
-        log(classById(u.classId).name + " misses " + classById(tgt.classId).name + "! (" + hitPct + "% hit)");
+      if (!tgt || tgt.team === u.team) { state.animating = false; return; }
+      recordAction(u, "attack", { targetName: tgt.displayName || classById(tgt.classId).name, targetId: tgt.id });
+      try {
+        const hitPct = computeHitChance(u, tgt);
+        await animateAttack(u, tgt);
+        if (!rollHit(u, tgt)) {
+          SFX.miss();
+          spawnDmgNumber(tgt, "MISS", "#aaaaaa");
+          log(classById(u.classId).name + " misses " + classById(tgt.classId).name + "! (" + hitPct + "% hit)");
+          state.animating = false;
+          endAction();
+          return;
+        }
+        SFX.hit();
+        let dmg = physicalDamage(u, tgt, 1);
+        consumeAttackBuffs(u);
+        if (tgt.riposteCharges > 0) {
+          applyDamage(u, 5, tgt);
+          tgt.riposteCharges--;
+          log("Riposte pricks the attacker!");
+        }
+        applyDamage(tgt, dmg, u);
+        await Promise.all([animateHitFlash(tgt), screenShake(100, 3)]);
+        log(
+          classById(u.classId).name + " hits " + classById(tgt.classId).name + " for " + dmg + ". (" + hitPct + "% hit)"
+        );
+        tutorialTip(40, "Hit! Damage is based on your ATK minus the defender's DEF, with height and buffs as modifiers.");
+        if (tgt.hp <= 0) {
+          await animateDeath(tgt);
+          tutorialTip(50, "Enemy down! Defeat all enemies to win the bout.");
+        }
+        if (u.hp <= 0) await animateDeath(u);
+      } finally {
         state.animating = false;
-        endAction();
-        return;
       }
-      SFX.hit();
-      let dmg = physicalDamage(u, tgt, 1);
-      consumeAttackBuffs(u);
-      if (tgt.riposteActive) {
-        applyDamage(u, 5);
-        tgt.riposteActive = false;
-        log("Riposte pricks the attacker!");
-      }
-      applyDamage(tgt, dmg, u);
-      await Promise.all([animateHitFlash(tgt), screenShake(100, 3)]);
-      log(
-        classById(u.classId).name + " hits " + classById(tgt.classId).name + " for " + dmg + ". (" + hitPct + "% hit)"
-      );
-      tutorialTip(40, "Hit! Damage is based on your ATK minus the defender's DEF, with height and buffs as modifiers.");
-      if (tgt.hp <= 0) {
-        await animateDeath(tgt);
-        tutorialTip(50, "Enemy down! Defeat all enemies to win the bout.");
-      }
-      state.animating = false;
       if (await checkVictoryAsync()) return;
       endAction();
       return;
     }
     if (state.battleMode === "shadow_step") {
       const k = cellKey(x, y);
-      if (!state.highlightCells.has(k)) return;
-      state.animating = true;
-      u.x = x;
-      u.y = y;
-      state.highlightCells.clear();
-      state.battleMode = "idle";
-      log("Teleported!");
-      state.animating = false;
+      if (!state.highlightCells.has(k)) { state.animating = false; return; }
+      try {
+        u.x = x;
+        u.y = y;
+        state.highlightCells.clear();
+        state.battleMode = "idle";
+        log("Teleported!");
+      } finally {
+        state.animating = false;
+      }
       endAction();
       return;
     }
     if (state.battleMode === "abyssal_gate") {
       const agk = cellKey(x, y);
-      if (!state.highlightCells.has(agk)) return;
+      if (!state.highlightCells.has(agk)) { state.animating = false; return; }
       var agAlly = occupantAt(x, y);
-      if (!agAlly || agAlly.team !== u.team) return;
+      if (!agAlly || agAlly.team !== u.team) { state.animating = false; return; }
       state.highlightCells.clear();
       state.battleMode = "abyssal_gate_dest";
       state._abyssalAlly = agAlly;
@@ -3093,56 +3910,68 @@
           }
         }
       }
+      if (state.highlightCells.size === 0) {
+        state.battleMode = "idle";
+        state._abyssalAlly = null;
+        state.animating = false;
+        log("Abyssal Gate — no valid destination tiles.");
+        endAction();
+        return;
+      }
+      state.animating = false;
       renderBoard();
       log("Abyssal Gate — select destination for " + (agAlly.displayName || classById(agAlly.classId).name) + ".");
       return;
     }
     if (state.battleMode === "abyssal_gate_dest") {
       const agdk = cellKey(x, y);
-      if (!state.highlightCells.has(agdk)) return;
-      state.animating = true;
-      var agTarget = state._abyssalAlly;
-      if (agTarget && agTarget.hp > 0) {
-        agTarget.x = x;
-        agTarget.y = y;
-        log("Abyssal Gate — " + (agTarget.displayName || classById(agTarget.classId).name) + " teleported!");
+      if (!state.highlightCells.has(agdk)) { state.animating = false; return; }
+      try {
+        var agTarget = state._abyssalAlly;
+        if (agTarget && agTarget.hp > 0) {
+          agTarget.x = x;
+          agTarget.y = y;
+          log("Abyssal Gate — " + (agTarget.displayName || classById(agTarget.classId).name) + " teleported!");
+        }
+        state.highlightCells.clear();
+        state.battleMode = "idle";
+        state._abyssalAlly = null;
+      } finally {
+        state.animating = false;
       }
-      state.highlightCells.clear();
-      state.battleMode = "idle";
-      state._abyssalAlly = null;
-      state.animating = false;
       endAction();
       return;
     }
     if (state.battleMode === "ability") {
-      state.animating = true;
       try {
-        await doPlayerAbility(u, x, y);
-        consumeAttackBuffs(u);
+        var _ab = unitAbilities(u)[state.selectedAbilityIndex];
+        var abilityResult = await doPlayerAbility(u, x, y);
+        if (abilityResult !== false && _ab && _ab.target !== "self") consumeAttackBuffs(u);
       } finally {
         state.animating = false;
       }
       if (await checkVictoryAsync()) return;
       return;
     }
+    state.animating = false;
   }
 
   async function doPlayerAbility(u, x, y) {
     const cid = u.classId;
     const k = cellKey(x, y);
     const ab = unitAbilities(u)[state.selectedAbilityIndex];
-    if (!ab) return;
-    if (!state.highlightCells.has(k)) return;
+    if (!ab) return false;
+    if (!state.highlightCells.has(k)) return false;
 
     SFX.ability();
 
     if (ab.target === "self") {
-      if (x !== u.x || y !== u.y) return;
+      if (x !== u.x || y !== u.y) return false;
       return executeAbilitySelf(u, ab);
     }
 
     if (ab.target === "aoe_adjacent") {
-      if (x !== u.x || y !== u.y) return;
+      if (x !== u.x || y !== u.y) return false;
       if (ab.effect === "grave_pulse") {
         var allAdj = [];
         for (var gd = 0; gd < DIRS.length; gd++) {
@@ -3151,7 +3980,7 @@
           if (gt && gt.hp > 0 && gt.team !== u.team) allAdj.push(gt);
         }
         for (var gi = 0; gi < allAdj.length; gi++) {
-          applyDamage(allAdj[gi], 4);
+          applyDamage(allAdj[gi], 4, u);
           await Promise.all([animateHitFlash(allAdj[gi]), screenShake(80, 2)]);
           log("Grave Pulse hits " + classById(allAdj[gi].classId).name + " (4 true dmg).");
           if (allAdj[gi].hp <= 0) await animateDeath(allAdj[gi]);
@@ -3171,7 +4000,7 @@
         var vbHealTotal = 0;
         for (var vbj = 0; vbj < vbFoes.length; vbj++) {
           var vbDmg = physicalDamage(u, vbFoes[vbj], ab.mult || 0.8);
-          applyDamage(vbFoes[vbj], vbDmg);
+          applyDamage(vbFoes[vbj], vbDmg, u);
           await Promise.all([animateHitFlash(vbFoes[vbj]), screenShake(80, 2)]);
           log("Void Burst hits " + classById(vbFoes[vbj].classId).name + " (" + vbDmg + ").");
           vbHealTotal += 2;
@@ -3193,7 +4022,7 @@
         }
         var deHeal = 0;
         for (var dej = 0; dej < deFoes.length; dej++) {
-          applyDamage(deFoes[dej], 6);
+          applyDamage(deFoes[dej], 6, u);
           await Promise.all([animateHitFlash(deFoes[dej]), screenShake(80, 2)]);
           log("Death's Embrace hits " + classById(deFoes[dej].classId).name + " (6 true dmg).");
           deHeal += 6;
@@ -3215,11 +4044,18 @@
         }
         for (var wwj = 0; wwj < wwFoes.length; wwj++) {
           var wwDmg = physicalDamage(u, wwFoes[wwj], ab.mult || 1.2);
-          applyDamage(wwFoes[wwj], wwDmg);
+          if (wwFoes[wwj].riposteCharges > 0) {
+            applyDamage(u, 5, wwFoes[wwj]);
+            wwFoes[wwj].riposteCharges--;
+            log("Riposte pricks the attacker!");
+          }
+          if (u.hp <= 0) { await animateDeath(u); break; }
+          applyDamage(wwFoes[wwj], wwDmg, u);
           await Promise.all([animateHitFlash(wwFoes[wwj]), screenShake(80, 2)]);
           log("Whirlwind Fury hits " + classById(wwFoes[wwj].classId).name + " (" + wwDmg + ").");
           if (wwFoes[wwj].hp <= 0) await animateDeath(wwFoes[wwj]);
         }
+        if (u.hp <= 0) { endAction(); return; }
         state.battleMode = "shadow_step";
         state.highlightCells.clear();
         for (var wws = 0; wws < BOARD_H; wws++) {
@@ -3233,7 +4069,7 @@
         if (state.highlightCells.size > 0) {
           renderBoard();
           log("Whirlwind — select a tile to reposition.");
-          return;
+          return false;
         }
         endAction();
         return;
@@ -3245,20 +4081,58 @@
         const t = occupantAt(tx, ty);
         if (t && t.team !== u.team) foes.push(t);
       }
+      var _lsTotal = 0;
       for (const f of foes) {
         const dmg = physicalDamage(u, f, ab.mult || 1);
-        if (f.riposteActive) {
-          applyDamage(u, 5);
-          f.riposteActive = false;
-          log("Riposte pricks the whirlwind!");
+        if (f.riposteCharges > 0) {
+          applyDamage(u, 5, f);
+          f.riposteCharges--;
+          log("Riposte pricks the attacker!");
         }
-        applyDamage(f, dmg);
+        applyDamage(f, dmg, u);
         await Promise.all([animateHitFlash(f), screenShake(80, 2)]);
         log(ab.name + " cuts " + classById(f.classId).name + " (" + dmg + ").");
+        if (ab.effect === "lifesteal" && ab.steal && u.hp > 0) {
+          var _lsAmt = (typeof ab.steal === "number" && ab.steal >= 1) ? ab.steal : Math.round(dmg * (ab.steal || 0.25));
+          u.hp = Math.min(u.maxHp, u.hp + _lsAmt);
+          spawnDmgNumber(u, "+" + _lsAmt, "#70d870");
+          _lsTotal += _lsAmt;
+        }
         if (f.hp <= 0) await animateDeath(f);
       }
+      if (_lsTotal > 0) log(ab.name + " heals " + (u.displayName || classById(u.classId).name) + " for " + _lsTotal + " HP.");
       if (!foes.length) log("Whirl in empty air.");
       if (ab.selfDamage) applyDamage(u, ab.selfDamage);
+      endAction();
+      return;
+    }
+
+    if (ab.target === "aoe_range") {
+      var arTargets = [];
+      for (var arDx = -1; arDx <= 1; arDx++) {
+        for (var arDy = -1; arDy <= 1; arDy++) {
+          var arTx = x + arDx, arTy = y + arDy;
+          if (!inBounds(arTx, arTy)) continue;
+          var arOcc = occupantAt(arTx, arTy);
+          if (arOcc && arOcc.team !== u.team && arOcc.hp > 0) arTargets.push(arOcc);
+        }
+      }
+      for (var arI = 0; arI < arTargets.length; arI++) {
+        if (!rollHit(u, arTargets[arI])) {
+          SFX.miss();
+          spawnDmgNumber(arTargets[arI], "MISS", "#aaaaaa");
+          log(ab.name + " misses " + (arTargets[arI].displayName || classById(arTargets[arI].classId).name) + "!");
+          continue;
+        }
+        SFX.hit();
+        var arDmg = physicalDamage(u, arTargets[arI], ab.mult || 0.5);
+        if (arTargets[arI].riposteCharges > 0 && manhattan(u, arTargets[arI]) <= 1) { applyDamage(u, 5, arTargets[arI]); arTargets[arI].riposteCharges--; log("Riposte!"); }
+        applyDamage(arTargets[arI], arDmg, u);
+        await Promise.all([animateHitFlash(arTargets[arI]), screenShake(80, 2)]);
+        log(ab.name + " rains on " + (arTargets[arI].displayName || classById(arTargets[arI].classId).name) + " (" + arDmg + " dmg).");
+        if (arTargets[arI].hp <= 0) await animateDeath(arTargets[arI]);
+      }
+      if (!arTargets.length) log("Arrows rain on empty ground.");
       endAction();
       return;
     }
@@ -3266,7 +4140,7 @@
     if (ab.target === "line") {
       const dx = Math.sign(x - u.x);
       const dy = Math.sign(y - u.y);
-      if (Math.abs(dx) + Math.abs(dy) !== 1) return;
+      if (Math.abs(dx) + Math.abs(dy) !== 1) return false;
       const range = ab.range || 3;
 
       if (ab.effect === "trample") {
@@ -3282,7 +4156,7 @@
         }
         for (var tri = 0; tri < trHits.length; tri++) {
           var trDmg = physicalDamage(u, trHits[tri], ab.mult || 0.6);
-          applyDamage(trHits[tri], trDmg);
+          applyDamage(trHits[tri], trDmg, u);
           await Promise.all([animateHitFlash(trHits[tri]), screenShake(80, 2)]);
           log("Trample hits " + classById(trHits[tri].classId).name + " (" + trDmg + ").");
           if (trHits[tri].hp <= 0) await animateDeath(trHits[tri]);
@@ -3303,7 +4177,7 @@
           supx += dx; supy += dy;
         }
         for (var supi = 0; supi < supHits.length; supi++) {
-          applyDamage(supHits[supi], 3);
+          applyDamage(supHits[supi], 3, u);
           await Promise.all([animateHitFlash(supHits[supi]), screenShake(80, 2)]);
           log("Suppressing Fire hits " + classById(supHits[supi].classId).name + " (3 true dmg).");
           if (supHits[supi].hp <= 0) await animateDeath(supHits[supi]);
@@ -3343,12 +4217,13 @@
       }
       SFX.hit();
       const dmg = physicalDamage(u, hit, ab.mult || 1, ab.ignoreDefPct || 0);
-      if (hit.riposteActive && manhattan(u, hit) <= 1) {
-        applyDamage(u, 5);
-        hit.riposteActive = false;
+      if (hit.riposteCharges > 0 && manhattan(u, hit) <= 1) {
+        applyDamage(u, 5, hit);
+        hit.riposteCharges--;
         log("Riposte!");
       }
-      applyDamage(hit, dmg);
+      if (u.hp <= 0) { await animateDeath(u); endAction(); return; }
+      applyDamage(hit, dmg, u);
       await Promise.all([animateHitFlash(hit), screenShake(80, 2)]);
       log(ab.name + " pierces for " + dmg + ". (" + hitPct + "% hit)");
       if (u.gifted && u.classId === "hoplomachus" && hit.hp > 0) {
@@ -3360,6 +4235,11 @@
           await animateMove(hit, [[pnx, pny]]);
           log("Tremor Thrust pushes back!");
         }
+      }
+      if (ab.effect === "defdebuff" && hit.hp > 0) {
+        hit.defDebuffTurns = 2;
+        hit.defDebuffAmt = 2;
+        log(classById(hit.classId).name + " DEF reduced by 2 for 2 turns!");
       }
       if (ab.effect === "charge" && hit.hp > 0) {
         var adjX = hit.x - dx;
@@ -3374,6 +4254,31 @@
           await animateMove(u, [deadTile]);
         }
       }
+      if (ab.effect === "bleed" && hit.hp > 0 && canDebuff(hit)) {
+        hit.bleedTurns = 3;
+        log(classById(hit.classId).name + " is bleeding!");
+      }
+      if (ab.effect === "stun" && hit.hp > 0 && canDebuff(hit)) {
+        hit.rootedSkip = Math.max(hit.rootedSkip, 1);
+        log(classById(hit.classId).name + " is stunned!");
+      }
+      if (ab.effect === "push" && hit.hp > 0) {
+        var lpnx = hit.x + dx, lpny = hit.y + dy;
+        if (inBounds(lpnx, lpny) && !occupantAt(lpnx, lpny) && !isTileImpassableTerrain(lpnx, lpny) && !isTileCollapsed(lpnx, lpny)) {
+          await animateMove(hit, [[lpnx, lpny]]);
+          log("Pushed back!");
+        }
+      }
+      if (ab.effect === "push2" && hit.hp > 0) {
+        var lp2dx = dx, lp2dy = dy;
+        for (var lp2i = 0; lp2i < 2; lp2i++) {
+          var lp2nx = hit.x + lp2dx, lp2ny = hit.y + lp2dy;
+          if (inBounds(lp2nx, lp2ny) && !occupantAt(lp2nx, lp2ny) && !isTileCollapsed(lp2nx, lp2ny) && !isTileImpassableTerrain(lp2nx, lp2ny)) {
+            await animateMove(hit, [[lp2nx, lp2ny]]);
+          } else break;
+        }
+        log("Pushed 2 tiles!");
+      }
       if (ab.selfDamage) applyDamage(u, ab.selfDamage);
       if (hit.hp <= 0) await animateDeath(hit);
       endAction();
@@ -3382,16 +4287,36 @@
 
     if (ab.target === "adjacent_enemy") {
       const tgt = occupantAt(x, y);
-      if (!tgt || tgt.team === u.team) return;
+      if (!tgt || tgt.team === u.team) return false;
       return executeAbilityOnTarget(u, tgt, ab);
     }
 
     if (ab.target === "adjacent_ally") {
+      var allyTgt = occupantAt(x, y);
+      if (!allyTgt || allyTgt.team !== u.team || allyTgt.id === u.id) return false;
+      if (ab.name === "Abyssal Gate") {
+        return executeAbilitySelf(u, ab);
+      }
+      if (ab.type === "heal") {
+        var healAmt = Math.max(1, Math.round(allyTgt.maxHp * 0.3));
+        allyTgt.hp = Math.min(allyTgt.maxHp, allyTgt.hp + healAmt);
+        spawnDmgNumber(allyTgt, "+" + healAmt, "#70d870");
+        allyTgt.atkDebuffTurns = 0; allyTgt.atkDebuffAmt = 0;
+        allyTgt.defDebuffTurns = 0; allyTgt.defDebuffAmt = 0;
+        allyTgt.bleedTurns = 0;
+        allyTgt.markDebuffTurns = 0; allyTgt.dreadMarkDmg = 0;
+        allyTgt.rootedSkip = 0;
+        log(ab.name + " heals " + (allyTgt.displayName || classById(allyTgt.classId).name) + " for " + healAmt + " HP and cleanses debuffs!");
+        endAction();
+        return true;
+      }
       return executeAbilitySelf(u, ab);
     }
   }
 
   function executeAbilitySelf(u, ab) {
+    recordAction(u, "ability", { abilityName: ab.name });
+    u._statAbilitiesUsed = (u._statAbilitiesUsed || 0) + 1;
     const cid = u.classId;
     const name = ab.name;
 
@@ -3401,8 +4326,11 @@
     } else if (cid === "murmillo" && name === "Testudo") {
       u.testudoBonus = 3;
       log("Testudo — shield raised, +3 DEF this round.");
+    } else if (name === "Defiant Counter") {
+      u.riposteCharges = 2;
+      log("Defiant Counter — ready to counter next 2 melee hits.");
     } else if (cid === "thraex" && name === "Sica Riposte") {
-      u.riposteActive = true;
+      u.riposteCharges = 1;
       log("Sica Riposte — blade ready.");
     } else if (cid === "secutor" && name === "Umbra") {
       u.tempExtraMove = true;
@@ -3436,9 +4364,15 @@
           }
         }
       }
+      if (state.highlightCells.size === 0) {
+        state.battleMode = "idle";
+        log(name + " — no valid tiles in range.");
+        endAction();
+        return;
+      }
       renderBoard();
       log(name + " — select a tile to teleport to.");
-      return;
+      return false;
     } else if (cid === "provocator" && name === "Arena Salute") {
       u.rootedSkip = 0;
       u.crowdSpdDebuff = 0;
@@ -3448,6 +4382,8 @@
       u.bleedTurns = 0;
       u.atkDebuffTurns = 0;
       u.atkDebuffAmt = 0;
+      u.defDebuffTurns = 0;
+      u.defDebuffAmt = 0;
       log("Arena Salute — all debuffs cleansed!");
     } else if (cid === "samnite" && name === "War Cry") {
       var cried = 0;
@@ -3528,7 +4464,7 @@
         var pax = u.x + DIRS[pai][0], pay = u.y + DIRS[pai][1];
         var paAlly = occupantAt(pax, pay);
         if (paAlly && paAlly.team === u.team && paAlly.hp > 0 && paAlly.id !== u.id) {
-          paAlly.atkBonus += 2;
+          paAlly.atkBonus = Math.min((paAlly.atkBonus || 0) + 2, 6);
           paAlly.atkBonusTurns = 2;
           paAlly.tempExtraMove = true;
           paCount++;
@@ -3546,7 +4482,7 @@
         var ipx = u.x + DIRS[ipi][0], ipy = u.y + DIRS[ipi][1];
         var ipAlly = occupantAt(ipx, ipy);
         if (ipAlly && ipAlly.team === u.team && ipAlly.hp > 0 && ipAlly.id !== u.id) {
-          ipAlly.atkBonus += 2;
+          ipAlly.atkBonus = Math.min((ipAlly.atkBonus || 0) + 2, 6);
           ipAlly.atkBonusTurns = 2;
           ipCount++;
         }
@@ -3560,7 +4496,11 @@
     } else if (name === "Champion's Resolve") {
       if (u.resolveUsed) {
         log("Champion's Resolve already used this battle.");
-        return;
+        state.battleMode = "idle";
+        state.highlightCells.clear();
+        state.selectedAbilityIndex = -1;
+        setBattleButtons(u);
+        return false;
       } else {
         u.hp = u.maxHp;
         u.resolveUsed = true;
@@ -3607,15 +4547,53 @@
           state.highlightCells.add(cellKey(agx, agy));
         }
       }
+      if (state.highlightCells.size === 0) {
+        state.battleMode = "idle";
+        log("Abyssal Gate — no adjacent allies to teleport.");
+        endAction();
+        return;
+      }
       renderBoard();
       log("Abyssal Gate — select an adjacent ally to teleport.");
-      return;
+      return false;
 
     } else if (name === "Unholy Resilience") {
       u.battleHardenedTurns = 2;
       u.battleHardenedDef = 3;
       u.battleHardenedAtk = 0;
       log("Unholy Resilience — +3 DEF for 2 turns.");
+
+    } else if (name === "Unyielding") {
+      var healAmt = Math.floor(u.maxHp * 0.2);
+      u.hp = Math.min(u.maxHp, u.hp + healAmt);
+      spawnDmgNumber(u, "+" + healAmt, "#80ff80");
+      u.debuffImmuneTurns = 1;
+      log("Unyielding — healed " + healAmt + " HP, immune to debuffs for 1 turn.");
+
+    } else if (name === "Crowd's Favor") {
+      if (u.crowdsFavorUsed) {
+        log("Crowd's Favor already used this battle.");
+        state.battleMode = "idle";
+        renderBoard();
+        return;
+      }
+      u.crowdsFavorUsed = true;
+      u.hp = u.maxHp;
+      u.battleHardenedTurns = 2;
+      u.battleHardenedAtk = 3;
+      u.battleHardenedDef = 0;
+      spawnDmgNumber(u, "FULL", "#ffdd44");
+      log("Crowd's Favor — fully healed, +3 ATK for 2 turns!");
+
+    } else if (name === "Hold the Line") {
+      u.interceptActive = true;
+      spawnDmgNumber(u, "GUARD", "#70b0ff");
+      log("Hold the Line — intercepting hits on adjacent allies!");
+
+    } else if (name === "Last Stand") {
+      u.lastStandActive = true;
+      spawnDmgNumber(u, "STAND", "#ff6040");
+      log("Last Stand — +5 ATK, +5 DEF while below 30% HP!");
 
     } else {
       log(ab.name + " activated.");
@@ -3624,6 +4602,8 @@
   }
 
   async function executeAbilityOnTarget(u, tgt, ab) {
+    recordAction(u, "ability", { abilityName: ab.name, targetName: tgt.displayName || classById(tgt.classId).name, targetId: tgt.id });
+    u._statAbilitiesUsed = (u._statAbilitiesUsed || 0) + 1;
     const cid = u.classId;
     const name = ab.name;
 
@@ -3657,6 +4637,29 @@
       return;
     }
 
+    if (ab.effect === "double_strike") {
+      for (var _ds = 0; _ds < 2; _ds++) {
+        if (tgt.hp <= 0) break;
+        await animateAttack(u, tgt);
+        var dsHitPct = computeHitChance(u, tgt);
+        if (!rollHit(u, tgt)) {
+          SFX.miss();
+          spawnDmgNumber(tgt, "MISS", "#aaaaaa");
+          log(ab.name + " strike " + (_ds + 1) + " misses! (" + dsHitPct + "% hit)");
+          continue;
+        }
+        SFX.hit();
+        var dsDmg = physicalDamage(u, tgt, ab.mult || 0.7, ab.ignoreDefPct || 0);
+        if (tgt.riposteCharges > 0) { applyDamage(u, 5, tgt); tgt.riposteCharges--; log("Riposte!"); }
+        applyDamage(tgt, dsDmg, u);
+        await Promise.all([animateHitFlash(tgt), screenShake(80, 2)]);
+        log(ab.name + " strike " + (_ds + 1) + " deals " + dsDmg + ". (" + dsHitPct + "% hit)");
+        if (tgt.hp <= 0) await animateDeath(tgt);
+      }
+      endAction();
+      return;
+    }
+
     if (ab.effect === "stun") {
       await animateAttack(u, tgt);
       const hitPct = computeHitChance(u, tgt);
@@ -3669,8 +4672,8 @@
       }
       SFX.hit();
       const dmg = physicalDamage(u, tgt, ab.mult || 1, ab.ignoreDefPct || 0);
-      if (tgt.riposteActive) { applyDamage(u, 5); tgt.riposteActive = false; log("Riposte!"); }
-      applyDamage(tgt, dmg);
+      if (tgt.riposteCharges > 0) { applyDamage(u, 5, tgt); tgt.riposteCharges--; log("Riposte!"); }
+      applyDamage(tgt, dmg, u);
       await Promise.all([animateHitFlash(tgt), screenShake(80, 2)]);
       if (tgt.hp > 0) {
         tgt.rootedSkip = Math.max(tgt.rootedSkip, 1);
@@ -3710,8 +4713,8 @@
       }
       SFX.hit();
       const dmg = physicalDamage(u, tgt, ab.mult || 1, ab.ignoreDefPct || 0);
-      if (tgt.riposteActive) { applyDamage(u, 5); tgt.riposteActive = false; log("Riposte!"); }
-      applyDamage(tgt, dmg);
+      if (tgt.riposteCharges > 0) { applyDamage(u, 5, tgt); tgt.riposteCharges--; log("Riposte!"); }
+      applyDamage(tgt, dmg, u);
       await Promise.all([animateHitFlash(tgt), screenShake(80, 2)]);
       if (tgt.hp > 0) {
         tgt.bleedTurns = 3;
@@ -3737,8 +4740,8 @@
       }
       SFX.hit();
       const dmg = physicalDamage(u, tgt, ab.mult || 1, ab.ignoreDefPct || 0);
-      if (tgt.riposteActive) { applyDamage(u, 5); tgt.riposteActive = false; log("Riposte!"); }
-      applyDamage(tgt, dmg);
+      if (tgt.riposteCharges > 0) { applyDamage(u, 5, tgt); tgt.riposteCharges--; log("Riposte!"); }
+      applyDamage(tgt, dmg, u);
       var stealAmt = ab.steal || 0.25;
       var stolen = typeof stealAmt === "number" && stealAmt < 1 ? Math.round(dmg * stealAmt) : stealAmt;
       u.hp = Math.min(u.maxHp, u.hp + stolen);
@@ -3776,8 +4779,8 @@
         }
         SFX.hit();
         const dmg = physicalDamage(u, tgt, ab.mult, ab.ignoreDefPct || 0);
-        if (tgt.riposteActive) { applyDamage(u, 5); tgt.riposteActive = false; log("Riposte!"); }
-        applyDamage(tgt, dmg);
+        if (tgt.riposteCharges > 0) { applyDamage(u, 5, tgt); tgt.riposteCharges--; log("Riposte!"); }
+        applyDamage(tgt, dmg, u);
         await Promise.all([animateHitFlash(tgt), screenShake(80, 2)]);
         log(ab.name + " deals " + dmg + ". (" + hitPct + "% hit)");
         if (tgt.hp <= 0) { await animateDeath(tgt); endAction(); return; }
@@ -3835,8 +4838,8 @@
       }
       SFX.hit();
       var dragDmg = physicalDamage(u, tgt, ab.mult || 1, 0);
-      if (tgt.riposteActive) { applyDamage(u, 5); tgt.riposteActive = false; log("Riposte!"); }
-      applyDamage(tgt, dragDmg);
+      if (tgt.riposteCharges > 0) { applyDamage(u, 5, tgt); tgt.riposteCharges--; log("Riposte!"); }
+      applyDamage(tgt, dragDmg, u);
       await Promise.all([animateHitFlash(tgt), screenShake(80, 2)]);
       log(ab.name + " deals " + dragDmg + ". (" + dragHitPct + "% hit)");
       if (tgt.hp > 0) {
@@ -3862,6 +4865,26 @@
       return;
     }
 
+    if (ab.effect === "hpswap") {
+      await animateAttack(u, tgt);
+      var swapUPct = Math.max(0, u.hp / u.maxHp);
+      var swapTPct = Math.max(0, tgt.hp / tgt.maxHp);
+      var newUHp = Math.max(1, Math.min(u.maxHp, Math.round(swapTPct * u.maxHp)));
+      var newTHp = Math.max(1, Math.min(tgt.maxHp, Math.round(swapUPct * tgt.maxHp)));
+      var uDelta = newUHp - u.hp;
+      var tDelta = newTHp - tgt.hp;
+      u.hp = newUHp;
+      tgt.hp = newTHp;
+      if (uDelta > 0) spawnDmgNumber(u, "+" + uDelta, "#70d870");
+      else if (uDelta < 0) spawnDmgNumber(u, String(uDelta), "#ff6040");
+      if (tDelta > 0) spawnDmgNumber(tgt, "+" + tDelta, "#70d870");
+      else if (tDelta < 0) spawnDmgNumber(tgt, String(tDelta), "#ff6040");
+      await Promise.all([animateHitFlash(tgt), screenShake(80, 2)]);
+      log(ab.name + " — HP swapped! " + (u.displayName || classById(u.classId).name) + ": " + u.hp + "/" + u.maxHp + ", " + (tgt.displayName || classById(tgt.classId).name) + ": " + tgt.hp + "/" + tgt.maxHp);
+      endAction();
+      return;
+    }
+
     if (ab.effect === "push2") {
       await animateAttack(u, tgt);
       var p2HitPct = computeHitChance(u, tgt);
@@ -3874,8 +4897,8 @@
       }
       SFX.hit();
       var p2Dmg = physicalDamage(u, tgt, ab.mult || 1, 0);
-      if (tgt.riposteActive) { applyDamage(u, 5); tgt.riposteActive = false; log("Riposte!"); }
-      applyDamage(tgt, p2Dmg);
+      if (tgt.riposteCharges > 0) { applyDamage(u, 5, tgt); tgt.riposteCharges--; log("Riposte!"); }
+      applyDamage(tgt, p2Dmg, u);
       await Promise.all([animateHitFlash(tgt), screenShake(80, 2)]);
       log(ab.name + " deals " + p2Dmg + ". (" + p2HitPct + "% hit)");
       if (tgt.hp > 0) {
@@ -3896,10 +4919,83 @@
       return;
     }
 
+    if (ab.effect === "cleanse_self") {
+      var _cleansed = [];
+      if (u.rootedSkip > 0) { u.rootedSkip = 0; _cleansed.push("root"); }
+      if (u.atkDebuffTurns > 0) { u.atkDebuffTurns = 0; u.atkDebuffAmt = 0; _cleansed.push("ATK debuff"); }
+      if (u.defDebuffTurns > 0) { u.defDebuffTurns = 0; u.defDebuffAmt = 0; _cleansed.push("DEF debuff"); }
+      if (u.bleedTurns > 0) { u.bleedTurns = 0; _cleansed.push("bleed"); }
+      if (_cleansed.length) log(ab.name + " cleanses " + _cleansed.join(", ") + "!");
+      else log(ab.name + " — nothing to cleanse.");
+      await animateAttack(u, tgt);
+      var csHitPct = computeHitChance(u, tgt);
+      if (!rollHit(u, tgt, ab)) {
+        SFX.miss();
+        spawnDmgNumber(tgt, "MISS", "#aaaaaa");
+        log(ab.name + " strike misses! (" + csHitPct + "% hit)");
+        endAction();
+        return;
+      }
+      SFX.hit();
+      var csDmg = physicalDamage(u, tgt, ab.mult || 1, ab.ignoreDefPct || 0);
+      if (tgt.riposteCharges > 0) { applyDamage(u, 5, tgt); tgt.riposteCharges--; log("Riposte!"); }
+      applyDamage(tgt, csDmg, u);
+      await Promise.all([animateHitFlash(tgt), screenShake(80, 2)]);
+      log(ab.name + " strikes for " + csDmg + ". (" + csHitPct + "% hit)");
+      if (tgt.hp <= 0) await animateDeath(tgt);
+      endAction();
+      return;
+    }
+
+    if (ab.effect === "duel") {
+      u.duelTarget = tgt.uid;
+      u.duelTurns = 3;
+      tgt.duelTarget = u.uid;
+      tgt.duelTurns = 3;
+      SFX.ability();
+      spawnDmgNumber(u, "DUEL", "#e8c040");
+      spawnDmgNumber(tgt, "DUEL", "#e8c040");
+      log(ab.name + ": " + (u.displayName || classById(u.classId).name) + " and " + (tgt.displayName || classById(tgt.classId).name) + " deal +20% to each other for 3 turns!");
+      endAction();
+      return;
+    }
+
+    if (ab.effect === "teleport_back") {
+      await animateAttack(u, tgt);
+      var tbHitPct = computeHitChance(u, tgt);
+      if (!rollHit(u, tgt, ab)) {
+        SFX.miss();
+        spawnDmgNumber(tgt, "MISS", "#aaaaaa");
+        log(ab.name + " misses! (" + tbHitPct + "% hit)");
+        endAction();
+        return;
+      }
+      SFX.hit();
+      var tbDmg = physicalDamage(u, tgt, ab.mult || 1, ab.ignoreDefPct || 0);
+      if (tgt.riposteCharges > 0) { applyDamage(u, 5, tgt); tgt.riposteCharges--; log("Riposte!"); }
+      applyDamage(tgt, tbDmg, u);
+      await Promise.all([animateHitFlash(tgt), screenShake(80, 2)]);
+      log(ab.name + " hits " + classById(tgt.classId).name + " for " + tbDmg + ". (" + tbHitPct + "% hit)");
+      if (tgt.hp <= 0) await animateDeath(tgt);
+      if (u.hp > 0) {
+        var _tbDx = u.x - tgt.x, _tbDy = u.y - tgt.y;
+        for (var _tbDist = 2; _tbDist >= 1; _tbDist--) {
+          var _tbNx = u.x + _tbDx * _tbDist, _tbNy = u.y + _tbDy * _tbDist;
+          if (inBounds(_tbNx, _tbNy) && !occupantAt(_tbNx, _tbNy) && !isTileImpassableTerrain(_tbNx, _tbNy) && !isTileCollapsed(_tbNx, _tbNy)) {
+            await animateMove(u, [[_tbNx, _tbNy]]);
+            log("Repositions " + _tbDist + " tile(s) back.");
+            break;
+          }
+        }
+      }
+      endAction();
+      return;
+    }
+
     if (ab.type === "attack") {
       await animateAttack(u, tgt);
       const hitPct = computeHitChance(u, tgt);
-      if (!rollHit(u, tgt)) {
+      if (!rollHit(u, tgt, ab)) {
         SFX.miss();
         spawnDmgNumber(tgt, "MISS", "#aaaaaa");
         log(ab.name + " misses! (" + hitPct + "% hit)");
@@ -3909,12 +5005,12 @@
       }
       SFX.hit();
       const dmg = physicalDamage(u, tgt, ab.mult || 1, ab.ignoreDefPct || 0);
-      if (tgt.riposteActive) {
-        applyDamage(u, 5);
-        tgt.riposteActive = false;
+      if (tgt.riposteCharges > 0) {
+        applyDamage(u, 5, tgt);
+        tgt.riposteCharges--;
         log("Riposte!");
       }
-      applyDamage(tgt, dmg);
+      applyDamage(tgt, dmg, u);
       await Promise.all([animateHitFlash(tgt), screenShake(80, 2)]);
       log(ab.name + " deals " + dmg + " to " + classById(tgt.classId).name + ". (" + hitPct + "% hit)");
       if (ab.selfDamage) applyDamage(u, ab.selfDamage);
@@ -3929,7 +5025,8 @@
   function checkVictory() {
     const pAlive = state.units.some((u) => u.team === "player" && u.hp > 0);
     const eAlive = state.units.some((u) => u.team === "enemy" && u.hp > 0);
-    if (!eAlive && pAlive) return "victory";
+    if (!pAlive && !eAlive) return "defeat";
+    if (!eAlive) return "victory";
     if (!pAlive) return "defeat";
     return null;
   }
@@ -3937,6 +5034,7 @@
   async function checkVictoryAsync() {
     const result = checkVictory();
     if (!result) return false;
+    battleLoopRunning = false;
     if (result === "victory") {
       tutorialTip(60, "Victoria! You've completed the practice bout. Surviving fighters carry over to the next mission.");
     }
@@ -3967,19 +5065,58 @@
     html += "<p><strong>" + state.turnCount + "</strong> turns fought</p>";
     html += "<p><strong>" + state.totalDamageDealt + "</strong> damage dealt to enemies</p>";
 
+    var playerUnits = state.units.filter(function (u) { return u.team === "player"; });
+    var mvp = playerUnits.reduce(function(best, u) {
+      return (u._statDmgDealt || 0) > (best._statDmgDealt || 0) ? u : best;
+    }, playerUnits[0]);
+    if (mvp && (mvp._statDmgDealt || 0) > 0) {
+      html += '<p class="result-mvp">MVP: ' + _esc(mvp.displayName || classById(mvp.classId).name) +
+        ' — ' + mvp._statDmgDealt + ' dmg, ' + (mvp._statKills || 0) + ' kills</p>';
+    }
+    if (state._statFirstBlood) {
+      html += '<p style="font-size:0.8rem;color:var(--fft-text-dim);">First blood: ' + _esc(state._statFirstBlood) + '</p>';
+    }
+
+    html += '<div class="result-stats-grid">';
+    playerUnits.sort(function(a, b) { return (b._statDmgDealt || 0) - (a._statDmgDealt || 0); });
+    for (var _ri = 0; _ri < playerUnits.length; _ri++) {
+      var _ru = playerUnits[_ri];
+      var _rn = _esc(_ru.displayName || classById(_ru.classId).name);
+      html += '<div><span>' + _rn + '</span><span>' +
+        (_ru._statDmgDealt || 0) + ' dmg · ' + (_ru._statKills || 0) + 'K · ' +
+        (_ru._statDmgTaken || 0) + ' taken</span></div>';
+    }
+    html += '</div>';
+
     if (campaignState.active && won && mission && !state.trainingBout) {
       var bonus = mission.victoryBonus;
       if (pAlive === pTotal) bonus += mission.perfectBonus;
       html += '<p style="color:var(--fft-gold);margin-top:0.5rem;">+' + bonus + ' denarii earned</p>';
-      var xpRows = state.units.filter(function(u) { return u.team === "player"; });
+      var xpRows = playerUnits;
       if (xpRows.length) {
         html += '<div style="margin-top:0.5rem;font-size:0.85rem;color:var(--fft-text-dim);">';
         for (var xi = 0; xi < xpRows.length; xi++) {
           var xu = xpRows[xi];
-          var xName = xu.displayName || classById(xu.classId).name;
+          var xName = _esc(xu.displayName || classById(xu.classId).name);
           html += '<div>' + xName + ' — Lv.' + (xu.level || 1) + ', ' + (xu.xp || 0) + ' XP, ' + (xu.kills || 0) + ' kills</div>';
         }
         html += '</div>';
+      }
+      if (!state._resultBookkept) {
+        state._resultBookkept = true;
+        campaignState.campaignStats.totalBattles++;
+        campaignState.campaignStats.totalKills += playerUnits.reduce(function(s, u) { return s + (u._statKills || 0); }, 0);
+        campaignState.campaignStats.totalDamage += state.totalDamageDealt;
+        campaignState.campaignStats.totalTurns += state.turnCount;
+        var _battleDeaths = playerUnits.filter(function(u) { return u.hp <= 0; }).length;
+        if (_battleDeaths === 0 && won) {
+          campaignState.campaignStats.deathlessBattles = (campaignState.campaignStats.deathlessBattles || 0) + 1;
+        }
+        if (!campaignState.campaignStats.classesUsed) campaignState.campaignStats.classesUsed = {};
+        for (var _ci = 0; _ci < playerUnits.length; _ci++) {
+          campaignState.campaignStats.classesUsed[playerUnits[_ci].classId] = true;
+        }
+        campaignState.campaignStats.peakDenarii = Math.max(campaignState.campaignStats.peakDenarii || 0, campaignState.denarii || 0);
       }
     } else if (won) {
       html += '<p style="color:var(--fft-gold);margin-top:0.5rem;">The crowd chants your name!</p>';
@@ -3992,14 +5129,62 @@
     if (btnRetry) {
       btnRetry.classList.toggle("is-hidden", !campaignState.active || won);
     }
+    var btnReplay = document.getElementById("btnWatchReplay");
+    if (btnReplay) {
+      btnReplay.classList.toggle("is-hidden", !state.battleRecord || state.battleRecord.length === 0);
+    }
+    trapFocus(resultOverlay);
     setTimeout(function() { ($("#btnResultContinue") || resultOverlay).focus(); }, 100);
+    checkAchievements();
   }
 
   function closeResultAndReset() {
     resultOverlay.classList.add("is-hidden");
+    releaseFocusTrap();
 
+    var promoEligible = collectPendingPromotions();
+    if (promoEligible.length > 0) {
+      processPromotionQueue(promoEligible, 0, function() {
+        _postPromotionContinue();
+      });
+      return;
+    }
+    _postPromotionContinue();
+  }
+
+  function _postPromotionContinue() {
     if (campaignState.active) {
       closeResultCampaign();
+      return;
+    }
+
+    if (state.survivalMode) {
+      var result = checkVictory();
+      if (result === "victory") {
+        for (var i = 0; i < state.picks.length; i++) {
+          var p = state.picks[i];
+          var u = state.units.find(function(u) { return u.uid === p.uid; });
+          if (u && u.hp > 0) { p.hp = u.hp; p.maxHp = u.maxHp; p.level = u.level; p.xp = u.xp; p.kills = u.kills; if (u.promotionId) p.promotionId = u.promotionId; }
+          else { p.hp = 0; }
+        }
+        state.picks = state.picks.filter(function(p) { return p.hp > 0; });
+        state.survivalDenarii += 15 + state.survivalWave * 5;
+        resetMapMods();
+        state.units = [];
+        if (state.picks.length === 0) {
+          survivalDefeat();
+          state.survivalMode = false;
+          showTitleScreen();
+        } else {
+          showSurvivalShop();
+        }
+      } else {
+        survivalDefeat();
+        state.survivalMode = false;
+        resetMapMods();
+        state.units = [];
+        showTitleScreen();
+      }
       return;
     }
 
@@ -4066,6 +5251,16 @@
     }
 
     if (won) {
+      var lootCount = 1 + (gameRng() < 0.4 ? 1 : 0);
+      var lootPool = EQUIPMENT_DB.filter(function(e) {
+        return e.rarity === "common" || (e.rarity === "rare" && gameRng() < 0.4) || (e.rarity === "legendary" && gameRng() < 0.1);
+      });
+      for (var _li = 0; _li < lootCount && lootPool.length > 0; _li++) {
+        var lootItem = lootPool[Math.floor(gameRng() * lootPool.length)];
+        campaignState.inventory.push(lootItem.id);
+        log("Loot: " + lootItem.name + "!", "system");
+      }
+
       var _deployedUids = {};
       state.units.forEach(function (u) { if (u.team === "player") _deployedUids[u.uid] = true; });
       Campaign.saveSurvivors(state.units, mission.carryHp, false, _deployedUids);
@@ -4166,6 +5361,9 @@
         level: s.level || 1,
         xp: s.xp || 0,
         kills: s.kills || 0,
+        nearDeathCount: s.nearDeathCount || 0,
+        battlesSurvived: s.battlesSurvived || 0,
+        title: s.title || "",
         bonusHp:  s.bonusHp  || 0,
         bonusAtk: s.bonusAtk || 0,
         bonusDef: s.bonusDef || 0,
@@ -4173,6 +5371,9 @@
       };
       if (s.gifted) pick.gifted = true;
       if (s.hp != null) { pick.hp = s.hp; pick.maxHp = s.maxHp; }
+      if (s.accent) pick.accent = s.accent;
+      if (s.promotionId && _promotionIndex[s.promotionId]) pick.promotionId = s.promotionId;
+      if (s.equipment) pick.equipment = s.equipment;
       state.picks.push(pick);
     }
 
@@ -4200,7 +5401,7 @@
     updateCampaignHud();
     showPhasePanels();
 
-    Campaign.saveToDisk();
+    safeSave();
 
     if (mission.skipLudus) {
       autoDeployAndStart();
@@ -4231,7 +5432,7 @@
     var gateTiles = [];
     for (var gy = BOARD_H - 2; gy < BOARD_H; gy++) {
       for (var gx = 0; gx < BOARD_W; gx++) {
-        if (!occupantAt(gx, gy) && !isTileImpassableTerrain(gx, gy)) gateTiles.push([gx, gy]);
+        if (!occupantAt(gx, gy) && !isTileImpassableTerrain(gx, gy) && !isTileCollapsed(gx, gy)) gateTiles.push([gx, gy]);
       }
     }
 
@@ -4310,6 +5511,8 @@
       '<p style="color:var(--fft-text-dim);margin-top:0.5rem;">The sand remembers.</p>';
     var btnRetry = $("#btnResultRetry");
     if (btnRetry) btnRetry.classList.add("is-hidden");
+    trapFocus(resultOverlay);
+    setTimeout(function() { ($("#btnResultContinue") || resultOverlay).focus(); }, 100);
   }
 
   function updateCampaignHud() {
@@ -4322,8 +5525,10 @@
     hud.classList.remove("is-hidden");
     var m = Campaign.getMission();
     if (m) {
+      var diffLabel = (DIFFICULTY[campaignState.difficulty] || DIFFICULTY.normal).label;
       hud.innerHTML = '<span class="campaign-hud__mission">' + Campaign.getMissionLabel() + '</span>' +
-        ' &mdash; ' + Campaign.getActLabel();
+        ' &mdash; ' + Campaign.getActLabel() +
+        ' <span class="campaign-hud__diff">[' + _esc(diffLabel) + ']</span>';
     }
   }
 
@@ -4336,6 +5541,7 @@
 
   function stageCutscene(steps) {
     SFX.startAmbient("cutscene");
+    SFX.stopMusic();
     var cs = state.cutscene;
     cs.savedPanX = renderer.panX;
     cs.savedPanY = renderer.panY;
@@ -4460,6 +5666,7 @@
     var startTime = null;
     var dur = 600;
     function tick(ts) {
+      if (!cs.active) { onDone(); return; }
       var t;
       try {
         if (!startTime) startTime = ts;
@@ -4476,11 +5683,11 @@
       if (t >= 1) {
         onDone();
       } else {
-        requestAnimationFrame(tick);
+        cs.rafId = requestAnimationFrame(tick);
       }
     }
     if (cs.rafId) { cancelAnimationFrame(cs.rafId); cs.rafId = null; }
-    requestAnimationFrame(tick);
+    cs.rafId = requestAnimationFrame(tick);
   }
 
   function tickCutscene() {
@@ -4518,6 +5725,11 @@
   }
 
   function runScene(steps, onComplete) {
+    if (sceneQueue && sceneQueue.length > 0 && sceneCallback) {
+      var prevCb = sceneCallback;
+      sceneCallback = null;
+      try { prevCb(); } catch (e) { console.error("Scene callback error:", e); }
+    }
     if (state.cutscene.active) teardownCutscene();
     sceneQueue = steps.slice();
     sceneCallback = onComplete || null;
@@ -4619,7 +5831,7 @@
 
     if (actor && !actor.entered) {
       cs.awaitingEntry = true;
-      _walkInActor(actor).then(startTypewriter);
+      _walkInActor(actor).then(startTypewriter).catch(function() { startTypewriter(); });
     } else {
       startTypewriter();
     }
@@ -4634,6 +5846,7 @@
 
     if (sceneQueue.length === 0) {
       sceneOverlay.classList.add("is-hidden");
+      releaseFocusTrap();
       if (sceneCallback) {
         var cb = sceneCallback;
         sceneCallback = null;
@@ -4676,10 +5889,12 @@
           if (_focusFirst) { setTimeout(function() { btn.focus(); }, 100); _focusFirst = false; }
         })(step.choice.options[i]);
       }
+      trapFocus(sceneOverlay);
       return;
     }
 
     sceneOverlay.classList.remove("is-hidden");
+    trapFocus(sceneOverlay);
     sceneSpeaker.textContent = step.speaker || "";
     sceneOverlay.setAttribute("aria-label", step.speaker || "Narration");
     sceneText.textContent = step.text || "";
@@ -4702,6 +5917,7 @@
     document.getElementById("slotPicker").classList.add("is-hidden");
     if (overlay) {
       overlay.classList.remove("is-hidden");
+      trapFocus(overlay);
       var focusBtn = (btnContinue && !btnContinue.classList.contains("is-hidden")) ? btnContinue : $("#btnNewCampaign");
       setTimeout(function() { (focusBtn || overlay).focus(); }, 100);
     }
@@ -4716,6 +5932,10 @@
     var titleEl = picker.querySelector(".slot-picker__title");
     titleEl.textContent = mode === "new" ? "Pick a Slot for New Campaign" : "Continue Campaign";
     slotsDiv.innerHTML = "";
+
+    var diffPicker = document.getElementById("slotDiffPicker");
+    if (diffPicker) diffPicker.classList.toggle("is-hidden", mode !== "new");
+
     for (var i = 0; i < 3; i++) {
       (function (slot) {
         var summary = Campaign.getSlotSummary(slot);
@@ -4728,9 +5948,29 @@
         } else {
           btn.innerHTML = "<strong>Slot " + (slot + 1) + "</strong><br><em>Empty</em>";
         }
+        var expBtn = document.createElement("button");
+        expBtn.type = "button"; expBtn.className = "btn btn--ghost btn--tiny"; expBtn.textContent = "\u2b07";
+        expBtn.title = "Export save"; expBtn.setAttribute("aria-label", "Export slot " + (slot+1));
+        expBtn.addEventListener("click", function(e) { e.stopPropagation(); exportSlot(slot); });
+        var impBtn = document.createElement("button");
+        impBtn.type = "button"; impBtn.className = "btn btn--ghost btn--tiny"; impBtn.textContent = "\u2b06";
+        impBtn.title = "Import save"; impBtn.setAttribute("aria-label", "Import to slot " + (slot+1));
+        impBtn.addEventListener("click", function(e) { e.stopPropagation(); importSlot(slot); });
+
+        var wrap = document.createElement("div");
+        wrap.className = "slot-picker__slot-wrap";
+        wrap.appendChild(btn);
+        var btns = document.createElement("div");
+        btns.className = "slot-picker__io";
+        btns.appendChild(expBtn);
+        btns.appendChild(impBtn);
+        wrap.appendChild(btns);
+
         btn.addEventListener("click", function () {
           if (mode === "new") {
             if (summary && !confirm("Overwrite Slot " + (slot + 1) + "?")) return;
+            var sel = document.getElementById("slotDiffSelect");
+            campaignState.difficulty = sel ? sel.value : "normal";
             picker.classList.add("is-hidden");
             Campaign.setSlot(slot);
             Campaign.clearSave(slot);
@@ -4743,13 +5983,49 @@
           }
         });
         if (mode === "continue" && !summary) btn.disabled = true;
-        slotsDiv.appendChild(btn);
+        slotsDiv.appendChild(wrap);
       })(i);
     }
     picker.classList.remove("is-hidden");
   }
 
+  function exportSlot(slot) {
+    var json = Campaign.exportSave(slot);
+    if (!json) { alert("Slot " + (slot+1) + " is empty."); return; }
+    var blob = new Blob([json], { type: "application/json" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url; a.download = "geminus_save_slot_" + (slot+1) + ".json";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function importSlot(slot) {
+    var inp = document.createElement("input");
+    inp.type = "file"; inp.accept = ".json";
+    inp.addEventListener("change", function() {
+      if (!inp.files || !inp.files[0]) return;
+      var reader = new FileReader();
+      reader.onload = function() {
+        var importResult = Campaign.importSave(reader.result, slot);
+        if (importResult === true) {
+          alert("Save imported to Slot " + (slot+1) + ".");
+          showSlotPicker(document.getElementById("slotDiffPicker").classList.contains("is-hidden") ? "continue" : "new");
+        } else if (importResult === "quota") {
+          alert("Storage full — cannot import save. Clear browser data or remove other saves.");
+        } else if (importResult === "parse") {
+          alert("Could not read file — not a valid JSON save.");
+        } else {
+          alert("Invalid save file.");
+        }
+      };
+      reader.readAsText(inp.files[0]);
+    });
+    inp.click();
+  }
+
   function hideTitleScreen() {
+    releaseFocusTrap();
     var overlay = $("#titleOverlay");
     if (overlay) overlay.classList.add("is-hidden");
   }
@@ -4804,13 +6080,17 @@
   function showSkirmishSettings() {
     var title = document.getElementById("titleOverlay");
     if (title) title.classList.add("is-hidden");
-    document.getElementById("skirmishSettings").classList.remove("is-hidden");
+    var skEl = document.getElementById("skirmishSettings");
+    skEl.classList.remove("is-hidden");
+    trapFocus(skEl);
+    setTimeout(function() { var b = skEl.querySelector(".btn--gold"); if (b) b.focus(); }, 100);
   }
 
   function hideSkirmishSettings() {
     document.getElementById("skirmishSettings").classList.add("is-hidden");
+    releaseFocusTrap();
     var title = document.getElementById("titleOverlay");
-    if (title) title.classList.remove("is-hidden");
+    if (title) { title.classList.remove("is-hidden"); trapFocus(title); }
   }
 
   function startSkirmish() {
@@ -4834,6 +6114,469 @@
     renderBoard();
   }
 
+  function startSurvival() {
+    var settingsEl = document.getElementById("survivalSettings");
+    var diffSel = document.getElementById("survDifficulty");
+    settingsEl.classList.add("is-hidden");
+    hideTitleScreen();
+    Campaign.reset();
+    resetMapMods();
+    campaignState.difficulty = diffSel ? diffSel.value : "normal";
+    state.survivalMode = true;
+    state.survivalWave = 0;
+    state.survivalScore = 0;
+    state.survivalDenarii = 80;
+    BOARD_W = 12; BOARD_H = 10;
+    budgetCurrent = 140;
+    state.phase = "ludus"; state.picks = []; state.units = [];
+    state.height = buildHeightField(42);
+    state.terrain = buildEmptyTerrain();
+    if (renderer) renderer.resize(BOARD_W, BOARD_H);
+    updateCampaignHud();
+    showPhasePanels();
+    refreshRosterUI();
+    renderBoard();
+  }
+
+  function survivalNextWave() {
+    state.survivalWave++;
+    var wave = state.survivalWave;
+    var enemyCount = Math.min(6, 2 + Math.floor(wave * 0.7));
+    var enemyLevel = Math.min(6, 1 + Math.floor((wave - 1) / 2));
+    var seed = wave * 997 + 42;
+    var rng = seedRng(seed);
+    gameRng = seedRng(seed * 1999 + wave);
+    BOARD_W = 12; BOARD_H = 10;
+    state.height = buildHeightField(seed);
+    state.terrain = buildTerrainMap(seed, null, null);
+    if (renderer) renderer.resize(BOARD_W, BOARD_H);
+
+    for (var i = 0; i < state.picks.length; i++) {
+      var pick = state.picks[i];
+      var u = createUnit("player", pick.classId, 0, 0);
+      u.uid = pick.uid;
+      u.displayName = pick.displayName;
+      applyPickLevel(u, pick);
+      if (pick.hp != null) { u.hp = Math.min(pick.hp, u.maxHp); }
+      state.units.push(u);
+    }
+
+    var usedPositions = {};
+    var classPool = GLADIATOR_CLASSES.slice();
+    for (var j = 0; j < enemyCount; j++) {
+      var cls = classPool[Math.floor(rng() * classPool.length)];
+      var py = (rng() < 0.5) ? 0 : 1;
+      var px;
+      do { px = 1 + Math.floor(rng() * (BOARD_W - 2)); }
+      while (usedPositions[px + "," + py] || isTileImpassableTerrain(px, py));
+      usedPositions[px + "," + py] = true;
+      var eu = createUnit("enemy", cls.id, px, py);
+      eu.aiProfile = _aiProfileKeys[Math.floor(rng() * _aiProfileKeys.length)];
+      eu.level = enemyLevel;
+      if (enemyLevel > 1) {
+        var egb = computeGrowthBonuses(eu.classId, eu.id, enemyLevel);
+        eu.bonusHp = egb.hp; eu.bonusAtk = egb.atk;
+        eu.bonusDef = egb.def; eu.bonusSpd = egb.spd;
+        if (egb.hp > 0) { eu.maxHp += egb.hp; eu.hp = eu.maxHp; }
+      }
+      if (wave >= 5) {
+        var eqPool = EQUIPMENT_DB.filter(function(e) { return e.rarity === "common" || (wave >= 8 && e.rarity === "rare"); });
+        if (eqPool.length) {
+          var eq = eqPool[Math.floor(rng() * eqPool.length)];
+          if (!eu.equipment) eu.equipment = { weapon: null, armor: null, trinket: null };
+          eu.equipment[eq.slot] = eq.id;
+        }
+      }
+      if (wave >= 8 && j === 0) {
+        eu.aiProfile = "tactician";
+        eu.boss = true;
+      }
+      var diff = getDiff();
+      eu.maxHp = Math.round(eu.maxHp * diff.hpMul); eu.hp = eu.maxHp;
+      var _bAtk = classById(eu.classId).atk, _bSpd = classById(eu.classId).spd;
+      eu.bonusAtk = (eu.bonusAtk || 0) + Math.round(_bAtk * (diff.atkMul - 1));
+      eu.bonusSpd = (eu.bonusSpd || 0) + Math.round(_bSpd * (diff.spdMul - 1));
+      state.units.push(eu);
+    }
+  }
+
+  function showSurvivalShop() {
+    var overlay = document.getElementById("survShopOverlay");
+    var body = document.getElementById("survShopBody");
+    var alive = state.picks.filter(function(p) { return p.hp > 0; });
+    state.survivalScore += alive.length * 20 + state.survivalWave * 50 + state.totalDamageDealt;
+
+    var html = '<p>Wave ' + state.survivalWave + ' cleared! Score: ' + state.survivalScore + '</p>';
+    html += '<p>Denarii: ' + state.survivalDenarii + '</p>';
+    for (var i = 0; i < alive.length; i++) {
+      var p = alive[i];
+      var name = _esc(p.displayName || classById(p.classId).name);
+      html += '<div class="surv-unit-row"><span>' + name + ' HP:' + p.hp + '/' + p.maxHp + '</span>';
+      if (p.hp < p.maxHp) {
+        html += '<button type="button" class="btn btn--ghost btn--tiny" data-heal="' + i + '">Heal 10HP (5d)</button>';
+      }
+      html += '</div>';
+    }
+    body.innerHTML = html;
+    body.querySelectorAll("[data-heal]").forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        var idx = parseInt(btn.getAttribute("data-heal"), 10);
+        if (state.survivalDenarii >= 5 && alive[idx].hp < alive[idx].maxHp) {
+          state.survivalDenarii -= 5;
+          alive[idx].hp = Math.min(alive[idx].maxHp, alive[idx].hp + 10);
+          showSurvivalShop();
+        }
+      });
+    });
+    overlay.classList.remove("is-hidden");
+    trapFocus(overlay);
+  }
+
+  function survivalDefeat() {
+    var entry = {
+      wave: state.survivalWave,
+      score: state.survivalScore,
+      date: Date.now(),
+      difficulty: campaignState.difficulty || "normal",
+      roster: state.picks.map(function(p) { return p.classId; }),
+    };
+    try {
+      var raw = localStorage.getItem("geminus_survival_v1");
+      var lb = raw ? JSON.parse(raw) : [];
+      if (!Array.isArray(lb)) lb = [];
+      lb.push(entry);
+      lb.sort(function(a, b) { return b.wave - a.wave || b.score - a.score; });
+      if (lb.length > 10) lb = lb.slice(0, 10);
+      localStorage.setItem("geminus_survival_v1", JSON.stringify(lb));
+    } catch(e) {}
+  }
+
+  function showSurvivalLeaderboard() {
+    var div = document.getElementById("survLeaderboard");
+    try {
+      var raw = localStorage.getItem("geminus_survival_v1");
+      var lb = raw ? JSON.parse(raw) : [];
+      if (!lb.length) { div.innerHTML = "<p>No records yet.</p>"; return; }
+      var html = '<table><tr><th>#</th><th>Wave</th><th>Score</th><th>Diff</th></tr>';
+      for (var i = 0; i < lb.length; i++) {
+        var e = lb[i];
+        html += '<tr><td>' + (i+1) + '</td><td>' + _esc(String(e.wave)) + '</td><td>' + _esc(String(e.score)) + '</td><td>' + _esc(String(e.difficulty || "?")) + '</td></tr>';
+      }
+      html += '</table>';
+      div.innerHTML = html;
+    } catch(e) { div.innerHTML = ""; }
+  }
+
+  var ACHIEVEMENTS = [
+    { id: "first_blood",    name: "First Blood",        desc: "Win your first battle.",                icon: "\u2694" },
+    { id: "veteran",        name: "Veteran Lanista",     desc: "Win 10 battles.",                       icon: "\u2605" },
+    { id: "centurion",      name: "Centurion",           desc: "Win 25 battles.",                       icon: "\u2655" },
+    { id: "flawless",       name: "Flawless Victory",    desc: "Win a battle without losing a unit.",   icon: "\u2727" },
+    { id: "massacre",       name: "Massacre",            desc: "Deal 100+ damage in a single battle.",  icon: "\ud83d\udca5" },
+    { id: "collector",      name: "Collector",           desc: "Own 5 equipment items.",                icon: "\ud83d\udee1\ufe0f" },
+    { id: "hoarder",        name: "Hoarder",             desc: "Own 15 equipment items.",               icon: "\ud83c\udfe6" },
+    { id: "wave_5",         name: "Arena Survivor",      desc: "Reach wave 5 in Survival.",             icon: "\ud83c\udf0a" },
+    { id: "wave_10",        name: "Decimator",           desc: "Reach wave 10 in Survival.",            icon: "\ud83d\udd25" },
+    { id: "wave_15",        name: "Unstoppable",         desc: "Reach wave 15 in Survival.",            icon: "\ud83c\udf1f" },
+    { id: "full_roster",    name: "Full House",          desc: "Have 6 gladiators in your roster.",     icon: "\ud83c\udfe0" },
+    { id: "promotion",      name: "Promoted",            desc: "Promote a unit to an advanced class.",  icon: "\u2b06\ufe0f" },
+    { id: "all_classes",    name: "Diversity",           desc: "Use all 12 base classes in battle.",    icon: "\ud83c\udf08" },
+    { id: "campaign_clear", name: "Ave Imperator",       desc: "Complete the campaign.",                icon: "\ud83c\udfdb\ufe0f" },
+    { id: "campaign_hard",  name: "Invictus",            desc: "Complete the campaign on Lanista.",     icon: "\ud83d\udc51" },
+    { id: "overkill",       name: "Overkill",            desc: "Land a single hit for 20+ damage.",    icon: "\u26a1" },
+    { id: "pacifist_turn",  name: "Mercy",               desc: "Win a battle dealing no kills for 5+ turns.", icon: "\u2618\ufe0f" },
+    { id: "speedrunner",    name: "Speedrunner",         desc: "Win a battle in 5 turns or fewer.",    icon: "\u23f1\ufe0f" },
+    { id: "deathless",      name: "Deathless",           desc: "Complete 5 campaign battles with no deaths.", icon: "\ud83d\udee1\ufe0f" },
+    { id: "hundred_kills",  name: "Hecatomb",            desc: "Accumulate 100 total kills.",           icon: "\ud83d\udc80" },
+    { id: "max_level",      name: "Apex",                desc: "Reach maximum level with any unit.",    icon: "\ud83c\udf1e" },
+    { id: "rich",           name: "Plutocrat",           desc: "Accumulate 500 denarii.",               icon: "\ud83d\udcb0" },
+    { id: "bond_pair",      name: "Brothers in Arms",    desc: "Form a bond between two gladiators.",  icon: "\ud83e\udd1d" },
+    { id: "scarred",        name: "Battle-Scarred",      desc: "Have a unit survive near death 3 times.", icon: "\ud83e\ude78" },
+  ];
+
+  function _loadAchievements() {
+    try {
+      var raw = localStorage.getItem("geminus_achievements_v1");
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) { return {}; }
+  }
+
+  function _saveAchievements(data) {
+    try { localStorage.setItem("geminus_achievements_v1", JSON.stringify(data)); } catch (e) {}
+  }
+
+  function _buildAchievementStats() {
+    var s = {
+      totalBattles: campaignState.campaignStats ? campaignState.campaignStats.totalBattles : 0,
+      totalKills: campaignState.campaignStats ? campaignState.campaignStats.totalKills : 0,
+      totalDamage: campaignState.campaignStats ? campaignState.campaignStats.totalDamage : 0,
+      lastBattleDamage: state.totalDamageDealt || 0,
+      lastBattleTurns: state.turnCount || 0,
+      lastBattleFlawless: false,
+      inventoryCount: campaignState.inventory ? campaignState.inventory.length : 0,
+      rosterSize: state.picks ? state.picks.length : 0,
+      hasPromotion: false,
+      classesUsed: {},
+      campaignComplete: false,
+      campaignCompleteHard: false,
+      survivalBest: 0,
+      maxSingleHit: state._statMaxSingleHit || 0,
+      deathlessBattles: campaignState.campaignStats ? (campaignState.campaignStats.deathlessBattles || 0) : 0,
+      maxDenarii: campaignState.denarii || 0,
+      peakDenarii: campaignState.campaignStats ? (campaignState.campaignStats.peakDenarii || 0) : 0,
+      hasBond: false,
+      maxNearDeath: 0,
+      maxLevel: 1,
+      pacifistTurn: !!state._statPacifistTurn,
+    };
+
+    var playerUnits = state.units ? state.units.filter(function(u) { return u.team === "player"; }) : [];
+    var deadCount = playerUnits.filter(function(u) { return u.hp <= 0; }).length;
+    s.lastBattleFlawless = playerUnits.length > 0 && deadCount === 0;
+
+    var persistedClasses = (campaignState.campaignStats && campaignState.campaignStats.classesUsed) || {};
+    for (var ck in persistedClasses) { if (persistedClasses.hasOwnProperty(ck)) s.classesUsed[ck] = true; }
+    for (var i = 0; i < playerUnits.length; i++) {
+      s.classesUsed[playerUnits[i].classId] = true;
+      if (playerUnits[i].promotionId) s.hasPromotion = true;
+      if ((playerUnits[i].level || 1) >= MAX_LEVEL) s.maxLevel = MAX_LEVEL;
+    }
+    if (state.picks) {
+      for (var j = 0; j < state.picks.length; j++) {
+        if (state.picks[j].promotionId) s.hasPromotion = true;
+        if ((state.picks[j].level || 1) > s.maxLevel) s.maxLevel = state.picks[j].level;
+        if ((state.picks[j].nearDeathCount || 0) >= 3) s.maxNearDeath = 3;
+      }
+    }
+
+    if (campaignState.endingKey) s.campaignComplete = true;
+    if (campaignState.endingKey && campaignState.difficulty === "hard") s.campaignCompleteHard = true;
+
+    try {
+      var survRaw = localStorage.getItem("geminus_survival_v1");
+      var survLb = survRaw ? JSON.parse(survRaw) : [];
+      if (survLb.length) s.survivalBest = survLb[0].wave || 0;
+    } catch (e) {}
+
+    if (campaignState.flags && campaignState.flags._bondPairs && campaignState.flags._bondPairs.length > 0) {
+      s.hasBond = true;
+    }
+
+    return s;
+  }
+
+  function checkAchievements() {
+    var stats = _buildAchievementStats();
+    var data = _loadAchievements();
+    var newUnlocks = [];
+
+    var checks = {
+      first_blood:    function(s) { return s.totalBattles >= 1; },
+      veteran:        function(s) { return s.totalBattles >= 10; },
+      centurion:      function(s) { return s.totalBattles >= 25; },
+      flawless:       function(s) { return s.lastBattleFlawless; },
+      massacre:       function(s) { return s.lastBattleDamage >= 100; },
+      collector:      function(s) { return s.inventoryCount >= 5; },
+      hoarder:        function(s) { return s.inventoryCount >= 15; },
+      wave_5:         function(s) { return s.survivalBest >= 5; },
+      wave_10:        function(s) { return s.survivalBest >= 10; },
+      wave_15:        function(s) { return s.survivalBest >= 15; },
+      full_roster:    function(s) { return s.rosterSize >= 6; },
+      promotion:      function(s) { return s.hasPromotion; },
+      all_classes:    function(s) { return Object.keys(s.classesUsed).length >= 12; },
+      campaign_clear: function(s) { return s.campaignComplete; },
+      campaign_hard:  function(s) { return s.campaignCompleteHard; },
+      overkill:       function(s) { return s.maxSingleHit >= 20; },
+      pacifist_turn:  function(s) { return s.pacifistTurn; },
+      speedrunner:    function(s) { return s.lastBattleTurns > 0 && s.lastBattleTurns <= 5; },
+      deathless:      function(s) { return s.deathlessBattles >= 5; },
+      hundred_kills:  function(s) { return s.totalKills >= 100; },
+      max_level:      function(s) { return s.maxLevel >= MAX_LEVEL; },
+      rich:           function(s) { return Math.max(s.maxDenarii, s.peakDenarii || 0) >= 500; },
+      bond_pair:      function(s) { return s.hasBond; },
+      scarred:        function(s) { return s.maxNearDeath >= 3; },
+    };
+
+    for (var i = 0; i < ACHIEVEMENTS.length; i++) {
+      var ach = ACHIEVEMENTS[i];
+      if (data[ach.id]) continue;
+      var fn = checks[ach.id];
+      if (fn && fn(stats)) {
+        data[ach.id] = Date.now();
+        newUnlocks.push(ach);
+      }
+    }
+
+    if (newUnlocks.length) {
+      _saveAchievements(data);
+      _showAchievementToasts(newUnlocks, 0);
+    }
+  }
+
+  function _showAchievementToasts(list, idx) {
+    if (idx >= list.length) return;
+    var ach = list[idx];
+    var toast = document.getElementById("achieveToast");
+    toast.textContent = ach.icon + " " + ach.name + " — " + ach.desc;
+    toast.classList.remove("is-hidden");
+    toast.classList.add("is-visible");
+    setTimeout(function() {
+      toast.classList.remove("is-visible");
+      setTimeout(function() {
+        toast.classList.add("is-hidden");
+        _showAchievementToasts(list, idx + 1);
+      }, 500);
+    }, 3000);
+  }
+
+  function showTrophyPanel() {
+    var overlay = document.getElementById("trophyOverlay");
+    var grid = document.getElementById("trophyGrid");
+    var data = _loadAchievements();
+    grid.innerHTML = "";
+    for (var i = 0; i < ACHIEVEMENTS.length; i++) {
+      var ach = ACHIEVEMENTS[i];
+      var unlocked = !!data[ach.id];
+      var card = document.createElement("div");
+      card.className = "trophy-card" + (unlocked ? " trophy-card--unlocked" : " trophy-card--locked");
+      var nameEl = document.createElement("div");
+      nameEl.className = "trophy-card__name";
+      nameEl.textContent = unlocked ? (ach.icon + " " + ach.name) : "???";
+      card.appendChild(nameEl);
+      var descEl = document.createElement("div");
+      descEl.textContent = unlocked ? ach.desc : "Locked";
+      card.appendChild(descEl);
+      grid.appendChild(card);
+    }
+    hideTitleScreen();
+    overlay.classList.remove("is-hidden");
+    trapFocus(overlay);
+  }
+
+  function _snapshotPositions() {
+    var snap = [];
+    for (var i = 0; i < state.units.length; i++) {
+      var u = state.units[i];
+      snap.push({ id: u.id, classId: u.classId, team: u.team, col: u.x, row: u.y, hp: u.hp, maxHp: u.maxHp, displayName: u.displayName || null });
+    }
+    return snap;
+  }
+
+  function recordAction(actor, action, details) {
+    if (!state.battleRecord) return;
+    var entry = {
+      turn: state.turnCount,
+      actorId: actor ? actor.id : null,
+      actorName: actor ? (actor.displayName || classById(actor.classId).name) : "?",
+      action: action,
+      details: details || {},
+      snapshot: _snapshotPositions(),
+    };
+    state.battleRecord.push(entry);
+  }
+
+  var _replayIdx = 0;
+
+  function showReplayOverlay() {
+    if (!state.battleRecord || state.battleRecord.length === 0) return;
+    var overlay = document.getElementById("replayOverlay");
+    var canvas = document.getElementById("replayCanvas");
+    var descEl = document.getElementById("replayDesc");
+    var stepEl = document.getElementById("replayStep");
+    _replayIdx = 0;
+
+    function renderReplayStep() {
+      var entry = state.battleRecord[_replayIdx];
+      if (!entry) return;
+      stepEl.textContent = (_replayIdx + 1) + " / " + state.battleRecord.length;
+
+      var desc = "Turn " + entry.turn + ": " + entry.actorName + " ";
+      if (entry.action === "move") desc += "moved to (" + entry.details.toCol + "," + entry.details.toRow + ")";
+      else if (entry.action === "attack") desc += "attacked" + (entry.details.targetName ? " " + entry.details.targetName : "") + (entry.details.damage ? " for " + entry.details.damage + " dmg" : "");
+      else if (entry.action === "ability") desc += "used " + (entry.details.abilityName || "ability") + (entry.details.targetName ? " on " + entry.details.targetName : "");
+      else if (entry.action === "wait") desc += "waited.";
+      else desc += entry.action;
+      descEl.textContent = desc;
+
+      var rCtx = canvas.getContext("2d");
+      var cw = canvas.width;
+      var ch = canvas.height;
+      rCtx.fillStyle = "#181018";
+      rCtx.fillRect(0, 0, cw, ch);
+
+      var snap = entry.snapshot;
+      var maxCol = 0, maxRow = 0;
+      for (var i = 0; i < snap.length; i++) {
+        if (snap[i].col > maxCol) maxCol = snap[i].col;
+        if (snap[i].row > maxRow) maxRow = snap[i].row;
+      }
+      var gridW = Math.max(maxCol + 1, BOARD_W || 12);
+      var gridH = Math.max(maxRow + 1, BOARD_H || 10);
+      var tileW = Math.floor(cw / (gridW + 1));
+      var tileH = Math.floor(ch / (gridH + 1));
+      var tileSize = Math.min(tileW, tileH, 40);
+      var offX = Math.floor((cw - gridW * tileSize) / 2);
+      var offY = Math.floor((ch - gridH * tileSize) / 2);
+
+      rCtx.strokeStyle = "#2a2a2a";
+      rCtx.lineWidth = 1;
+      for (var gr = 0; gr < gridH; gr++) {
+        for (var gc = 0; gc < gridW; gc++) {
+          rCtx.strokeRect(offX + gc * tileSize, offY + gr * tileSize, tileSize, tileSize);
+        }
+      }
+
+      for (var j = 0; j < snap.length; j++) {
+        var su = snap[j];
+        if (su.hp <= 0) continue;
+        var cx = offX + su.col * tileSize + tileSize / 2;
+        var cy = offY + su.row * tileSize + tileSize / 2;
+        var r = tileSize * 0.35;
+        rCtx.beginPath();
+        rCtx.arc(cx, cy, r, 0, Math.PI * 2);
+        rCtx.fillStyle = su.team === "player" ? "#4488cc" : "#cc4444";
+        rCtx.fill();
+        if (entry.actorId === su.id) {
+          rCtx.lineWidth = 2;
+          rCtx.strokeStyle = "#ffdd44";
+          rCtx.stroke();
+        }
+        rCtx.fillStyle = "#fff";
+        rCtx.font = "bold " + Math.max(8, tileSize * 0.25) + "px monospace";
+        rCtx.textAlign = "center";
+        rCtx.textBaseline = "middle";
+        var initial = (su.displayName || su.classId || "?").charAt(0).toUpperCase();
+        rCtx.fillText(initial, cx, cy);
+
+        var barW = tileSize * 0.7;
+        var barH = 3;
+        var barX = cx - barW / 2;
+        var barY = cy + r + 2;
+        rCtx.fillStyle = "#333";
+        rCtx.fillRect(barX, barY, barW, barH);
+        var hpPct = su.maxHp > 0 ? su.hp / su.maxHp : 0;
+        rCtx.fillStyle = hpPct > 0.5 ? "#4a4" : hpPct > 0.25 ? "#aa4" : "#a44";
+        rCtx.fillRect(barX, barY, barW * hpPct, barH);
+      }
+    }
+
+    renderReplayStep();
+    resultOverlay.classList.add("is-hidden");
+    overlay.classList.remove("is-hidden");
+    trapFocus(overlay);
+
+    document.getElementById("btnReplayStart").onclick = function() { _replayIdx = 0; renderReplayStep(); };
+    document.getElementById("btnReplayPrev").onclick = function() { if (_replayIdx > 0) _replayIdx--; renderReplayStep(); };
+    document.getElementById("btnReplayNext").onclick = function() { if (_replayIdx < state.battleRecord.length - 1) _replayIdx++; renderReplayStep(); };
+    document.getElementById("btnReplayEnd").onclick = function() { _replayIdx = state.battleRecord.length - 1; renderReplayStep(); };
+    document.getElementById("btnReplayClose").onclick = function() {
+      overlay.classList.add("is-hidden");
+      releaseFocusTrap();
+      resultOverlay.classList.remove("is-hidden");
+      trapFocus(resultOverlay);
+    };
+  }
+
   async function titusBossAbilities(titus) {
     if (!state.titusForgottenName && titus.hp > 0 && titus.hp <= titus.maxHp * 0.5) {
       state.titusForgottenName = true;
@@ -4854,8 +6597,8 @@
         }
       }
       if (candidates.length > 0) {
-        var pick = candidates[Math.floor(Math.random() * candidates.length)];
-        state.mapMods.collapsedTiles.add(pick.x + "," + pick.y);
+        var pick = candidates[Math.floor(gameRng() * candidates.length)];
+        state.mapMods.collapsedTiles.add(cellKey(pick.x, pick.y));
         recalcGlowTiles();
         await screenShake(120, 3);
         log("Dis Pater's Reach — the arena cracks!", "system");
@@ -4870,11 +6613,15 @@
     const eDef = classById(enemy.classId);
     if (enemy.atkDebuffTurns > 0) enemy.atkDebuffTurns--;
     if (enemy.atkDebuffTurns <= 0) enemy.atkDebuffAmt = 0;
+    if (enemy.defDebuffTurns > 0) enemy.defDebuffTurns--;
+    if (enemy.defDebuffTurns <= 0) enemy.defDebuffAmt = 0;
+    if (enemy.debuffImmuneTurns > 0) enemy.debuffImmuneTurns--;
+    if (enemy.duelTurns > 0) { enemy.duelTurns--; if (enemy.duelTurns <= 0) enemy.duelTarget = null; }
     if (enemy.bleedTurns > 0) {
       enemy.bleedTurns--;
       applyDamage(enemy, 1);
       log(eDef.name + " bleeds! (−1 HP)");
-      if (enemy.hp <= 0) { await animateDeath(enemy); return; }
+      if (enemy.hp <= 0) { tickMarkDebuffIfNeeded(enemy); await animateDeath(enemy); return; }
     }
 
     if (enemy.rootedSkip > 0) {
@@ -4891,9 +6638,21 @@
       await titusBossAbilities(enemy);
     }
 
-    const target = players.reduce((a, b) =>
-      manhattan(enemy, a) <= manhattan(enemy, b) ? a : b
-    );
+    var profile = AI_PROFILES[enemy.aiProfile] || AI_PROFILES.balanced;
+    var target;
+    if (!getDiff().aiFocusFire && gameRng() < 0.3) {
+      target = players[Math.floor(gameRng() * players.length)];
+    } else if (profile.targetPref === "weakest" || profile.targetPref === "lowest_hp") {
+      target = players.reduce((a, b) => a.hp <= b.hp ? a : b);
+    } else if (profile.targetPref === "strongest") {
+      target = players.reduce((a, b) => unitAtk(a) >= unitAtk(b) ? a : b);
+    } else {
+      target = players.reduce((a, b) => manhattan(enemy, a) <= manhattan(enemy, b) ? a : b);
+    }
+
+    if (profile.retreatPct > 0 && enemy.maxHp > 0 && enemy.hp / enemy.maxHp < profile.retreatPct) {
+      target = players.reduce((a, b) => manhattan(enemy, a) >= manhattan(enemy, b) ? a : b);
+    }
 
     var usedAbilityPreMove = false;
     if (unitAbilities(enemy).length && manhattan(enemy, target) > 1) {
@@ -4905,7 +6664,7 @@
       let best = null;
       let bestScore = 1e9;
       for (const [key] of reach) {
-        const [sx, sy] = key.split(",").map(Number);
+        const sx = cellKeyX(key), sy = cellKeyY(key);
         if (occupantAt(sx, sy) && !(sx === enemy.x && sy === enemy.y)) continue;
         const d = manhattan({ x: sx, y: sy }, target);
         const h = state.height[sy][sx];
@@ -4932,10 +6691,16 @@
     }
 
     if (adjTargets.length > 0 && !usedAbilityPreMove) {
-      const adjTarget = adjTargets.reduce((a, b) => a.hp <= b.hp ? a : b);
+      var adjTarget;
+      if (!getDiff().aiFocusFire && gameRng() < 0.3) {
+        adjTarget = adjTargets[Math.floor(gameRng() * adjTargets.length)];
+      } else {
+        adjTarget = adjTargets.reduce((a, b) => a.hp <= b.hp ? a : b);
+      }
 
       var usedAdj = false;
-      if (Math.random() < 0.4 && unitAbilities(enemy).length) {
+      var _abBias = (AI_PROFILES[enemy.aiProfile] || AI_PROFILES.balanced).abilityBias;
+      if (gameRng() < _abBias && unitAbilities(enemy).length) {
         usedAdj = await aiTryAdjacentAbility(enemy, eDef, adjTargets, adjTarget);
       }
 
@@ -4943,11 +6708,15 @@
         await aiBasicAttack(enemy, adjTarget);
       }
     } else if (adjTargets.length === 0 && !usedAbilityPreMove) {
-      if (unitAbilities(enemy).length && !await aiTryLineAttack(enemy, eDef, players)) {
-        log(eDef.name + " closes distance.");
+      var _rangedUsed = false;
+      if (unitAbilities(enemy).length) {
+        _rangedUsed = await aiTryLineAttack(enemy, eDef, players);
+        if (!_rangedUsed) _rangedUsed = await aiTryAoeRangeAbility(enemy, eDef, players);
       }
+      if (!_rangedUsed) log(eDef.name + " closes distance.");
     }
 
+    if (enemy.hp <= 0) { renderBoard(); return; }
     consumeAttackBuffs(enemy);
     var cursedKill = tickCursedTileDamage(enemy);
     if (cursedKill) await animateDeath(enemy);
@@ -4956,7 +6725,7 @@
   }
 
   async function aiTryPreMoveAbility(enemy, eDef, players, target) {
-    var hpPct = enemy.hp / enemy.maxHp;
+    var hpPct = enemy.maxHp > 0 ? enemy.hp / enemy.maxHp : 1;
     for (const ab of unitAbilities(enemy)) {
       var _namedHeals = ["Iron Will", "Shadow Mend", "Guardian Aura", "Champion's Resolve", "Neptune's Favor"];
       if (ab.type === "heal" && ab.target === "self" && hpPct < 0.5 && _namedHeals.indexOf(ab.name) === -1) {
@@ -4968,38 +6737,38 @@
         return true;
       }
       if (ab.type === "buff" && ab.target === "self") {
-        if (ab.name === "Testudo" && Math.random() < 0.5) {
+        if (ab.name === "Testudo" && gameRng() < 0.5) {
           SFX.ability();
           enemy.testudoBonus = 3;
           log(eDef.name + " raises Testudo (+3 DEF).");
           return true;
         }
-        if (ab.name === "Cetus Wall" && Math.random() < 0.4) {
+        if (ab.name === "Cetus Wall" && gameRng() < 0.4) {
           SFX.ability();
           enemy.braceCharges = 1;
           log(eDef.name + " braces with Cetus Wall.");
           return true;
         }
-        if (ab.name === "Sica Riposte" && Math.random() < 0.4 && manhattan(enemy, target) <= 2) {
+        if (ab.name === "Sica Riposte" && gameRng() < 0.4 && manhattan(enemy, target) <= 2) {
           SFX.ability();
-          enemy.riposteActive = true;
+          enemy.riposteCharges = 1;
           log(eDef.name + " readies Sica Riposte.");
           return true;
         }
-        if (ab.name === "Umbra" && Math.random() < 0.6) {
+        if (ab.name === "Umbra" && gameRng() < 0.6) {
           SFX.ability();
           enemy.tempExtraMove = true;
           log(eDef.name + " uses Umbra (+1 move).");
           return false;
         }
-        if (ab.name === "Blind Rush" && Math.random() < 0.4) {
+        if (ab.name === "Blind Rush" && gameRng() < 0.4) {
           SFX.ability();
           enemy.blindRushAtk = 2;
           enemy.blindRushDef = 2;
           log(eDef.name + " uses Blind Rush (+2 ATK, −2 DEF).");
           return false;
         }
-        if (ab.name === "Phalanx Guard" && Math.random() < 0.35) {
+        if (ab.name === "Phalanx Guard" && gameRng() < 0.35) {
           var pAllies = 0;
           for (var pd = 0; pd < DIRS.length; pd++) {
             var ppx = enemy.x + DIRS[pd][0], ppy = enemy.y + DIRS[pd][1];
@@ -5008,22 +6777,23 @@
           }
           if (pAllies) { SFX.ability(); log(eDef.name + " raises Phalanx Guard!"); return true; }
         }
-        if (ab.name === "Arena Salute" && (enemy.rootedSkip || enemy.atkDebuffTurns > 0 || enemy.bleedTurns > 0)) {
+        if (ab.name === "Arena Salute" && (enemy.rootedSkip || enemy.atkDebuffTurns > 0 || enemy.defDebuffTurns > 0 || enemy.bleedTurns > 0)) {
           SFX.ability();
           enemy.rootedSkip = 0; enemy.crowdSpdDebuff = 0; enemy.markDebuffTurns = 0;
           enemy.markFocusId = null; enemy.dreadMarkDmg = 0; enemy.bleedTurns = 0;
           enemy.atkDebuffTurns = 0; enemy.atkDebuffAmt = 0;
+          enemy.defDebuffTurns = 0; enemy.defDebuffAmt = 0;
           log(eDef.name + " uses Arena Salute — cleansed!");
           return true;
         }
-        if (ab.name === "Rally Charge" && Math.random() < 0.4) {
+        if (ab.name === "Rally Charge" && gameRng() < 0.4) {
           SFX.ability();
           enemy.tempExtraMove = true;
           enemy.rallyCharge = true;
           log(eDef.name + " uses Rally Charge (+2 move).");
           return false;
         }
-        if (ab.name === "Phase Walk" && manhattan(enemy, target) > 2 && Math.random() < 0.5) {
+        if (ab.name === "Phase Walk" && manhattan(enemy, target) > 2 && gameRng() < 0.5) {
           var bestTile = null, bestDist = 999;
           for (var pwy = 0; pwy < BOARD_H; pwy++) {
             for (var pwx = 0; pwx < BOARD_W; pwx++) {
@@ -5041,7 +6811,7 @@
             return false;
           }
         }
-        if (ab.name === "Shadow Step" && manhattan(enemy, target) > 2 && Math.random() < 0.4) {
+        if (ab.name === "Shadow Step" && manhattan(enemy, target) > 2 && gameRng() < 0.4) {
           var bst = null, bsd = 999;
           for (var ssy = 0; ssy < BOARD_H; ssy++) {
             for (var ssx = 0; ssx < BOARD_W; ssx++) {
@@ -5059,31 +6829,31 @@
             return false;
           }
         }
-        if (ab.name === "High Ground" && Math.random() < 0.35) {
+        if (ab.name === "High Ground" && gameRng() < 0.35) {
           SFX.ability();
           enemy.highGroundNext = true;
           log(eDef.name + " uses High Ground (+15% accuracy).");
           return false;
         }
-        if (ab.name === "Battle Focus" && Math.random() < 0.35) {
+        if (ab.name === "Battle Focus" && gameRng() < 0.35) {
           SFX.ability();
           enemy.battleFocusNext = true;
           log(eDef.name + " uses Battle Focus (+25% accuracy).");
           return false;
         }
-        if (ab.name === "Evasion" && Math.random() < 0.35 && hpPct < 0.6) {
+        if (ab.name === "Evasion" && gameRng() < 0.35 && hpPct < 0.6) {
           SFX.ability();
           enemy.testudoBonus = 3;
           log(eDef.name + " uses Evasion (+3 DEF).");
           return true;
         }
-        if (ab.name === "Eagle Eye" && Math.random() < 0.35) {
+        if (ab.name === "Eagle Eye" && gameRng() < 0.35) {
           SFX.ability();
           enemy.eagleEyeHits = 2;
           log(eDef.name + " uses Eagle Eye — cannot miss!");
           return false;
         }
-        if (ab.name === "Unholy Resilience" && Math.random() < 0.3 && hpPct < 0.5) {
+        if (ab.name === "Unholy Resilience" && gameRng() < 0.3 && hpPct < 0.5) {
           SFX.ability();
           enemy.battleHardenedTurns = 2;
           enemy.battleHardenedDef = 3;
@@ -5091,13 +6861,13 @@
           log(eDef.name + " uses Unholy Resilience (+3 DEF).");
           return true;
         }
-        if (ab.name === "Parry" && Math.random() < 0.3 && manhattan(enemy, target) <= 2) {
+        if (ab.name === "Parry" && gameRng() < 0.3 && manhattan(enemy, target) <= 2) {
           SFX.ability();
           enemy.parryCharges = 1;
           log(eDef.name + " uses Parry.");
           return true;
         }
-        if (ab.name === "Spear Brace" && Math.random() < 0.3 && manhattan(enemy, target) <= 2) {
+        if (ab.name === "Spear Brace" && gameRng() < 0.3 && manhattan(enemy, target) <= 2) {
           SFX.ability();
           enemy.spearBraceActive = true;
           log(eDef.name + " readies Spear Brace.");
@@ -5139,7 +6909,37 @@
         log(eDef.name + " uses Champion's Resolve — fully healed!");
         return true;
       }
-      if (ab.name === "Battle Hardened" && Math.random() < 0.3) {
+      if (ab.name === "Crowd's Favor" && hpPct < 0.3 && !enemy.crowdsFavorUsed) {
+        SFX.ability();
+        enemy.hp = enemy.maxHp;
+        enemy.crowdsFavorUsed = true;
+        enemy.battleHardenedTurns = 2; enemy.battleHardenedAtk = 3; enemy.battleHardenedDef = 0;
+        spawnDmgNumber(enemy, "FAVOR", "#ffdd44");
+        log(eDef.name + " uses Crowd's Favor — fully healed!");
+        return true;
+      }
+      if (ab.name === "Hold the Line" && hpPct > 0.5 && gameRng() < 0.25) {
+        var htlAdj = false;
+        for (var htli = 0; htli < DIRS.length; htli++) {
+          var htlx = enemy.x + DIRS[htli][0], htly = enemy.y + DIRS[htli][1];
+          var htlt = occupantAt(htlx, htly);
+          if (htlt && htlt.team !== enemy.team && htlt.hp > 0) { htlAdj = true; break; }
+        }
+        if (htlAdj) {
+          SFX.ability();
+          enemy.interceptActive = true;
+          log(eDef.name + " uses Hold the Line!");
+          return true;
+        }
+      }
+      if (ab.name === "Last Stand" && hpPct < 0.35 && !enemy.lastStandActive) {
+        SFX.ability();
+        enemy.lastStandActive = true;
+        spawnDmgNumber(enemy, "STAND", "#ff8844");
+        log(eDef.name + " activates Last Stand!");
+        return true;
+      }
+      if (ab.name === "Battle Hardened" && gameRng() < 0.3) {
         SFX.ability();
         enemy.battleHardenedTurns = 2;
         enemy.battleHardenedAtk = 1;
@@ -5147,7 +6947,7 @@
         log(eDef.name + " uses Battle Hardened (+2 DEF, +1 ATK).");
         return true;
       }
-      if (ab.name === "Intimidating Roar" && manhattan(enemy, target) <= 1 && Math.random() < 0.4) {
+      if (ab.name === "Intimidating Roar" && manhattan(enemy, target) <= 1 && gameRng() < 0.4) {
         var irC = 0;
         for (var iri = 0; iri < DIRS.length; iri++) {
           var eirx = enemy.x + DIRS[iri][0], eiry = enemy.y + DIRS[iri][1];
@@ -5159,30 +6959,30 @@
         }
         if (irC) { SFX.ability(); log(eDef.name + " Intimidating Roar — " + irC + " foes rooted!"); return true; }
       }
-      if (ab.name === "Inspiring Presence" && Math.random() < 0.3) {
+      if (ab.name === "Inspiring Presence" && gameRng() < 0.3) {
         var ipC = 0;
         for (var ipi = 0; ipi < DIRS.length; ipi++) {
           var eipx = enemy.x + DIRS[ipi][0], eipy = enemy.y + DIRS[ipi][1];
           var eipt = occupantAt(eipx, eipy);
-          if (eipt && eipt.team === enemy.team && eipt.hp > 0) { eipt.atkBonus += 2; eipt.atkBonusTurns = 2; ipC++; }
+          if (eipt && eipt.team === enemy.team && eipt.hp > 0) { eipt.atkBonus = Math.min((eipt.atkBonus || 0) + 2, 6); eipt.atkBonusTurns = 2; ipC++; }
         }
         if (ipC) { SFX.ability(); log(eDef.name + " Inspiring Presence — " + ipC + " allies buffed!"); return true; }
       }
       if (ab.name === "War Cry" && ab.type === "debuff" && ab.target === "self") {
-        if (manhattan(enemy, target) <= 1 && Math.random() < 0.35) {
+        if (manhattan(enemy, target) <= 1 && gameRng() < 0.35) {
           SFX.ability();
           var wc = 0;
           for (var wd = 0; wd < DIRS.length; wd++) {
             var ewx = enemy.x + DIRS[wd][0], ewy = enemy.y + DIRS[wd][1];
             var ewt = occupantAt(ewx, ewy);
-            if (ewt && ewt.team !== enemy.team && ewt.hp > 0) { ewt.atkDebuffTurns = 2; ewt.atkDebuffAmt = 2; wc++; }
+            if (ewt && ewt.team !== enemy.team && ewt.hp > 0 && canDebuff(ewt)) { ewt.atkDebuffTurns = 2; ewt.atkDebuffAmt = 2; wc++; }
           }
           if (wc) { log(eDef.name + " War Cry — " + wc + " foes weakened!"); return true; }
         }
       }
       if (ab.type === "debuff" && ab.target === "adjacent_enemy" && ab.name === "Iaculum") {
         if (target.gifted && target.classId === "thraex") continue;
-        if (manhattan(enemy, target) <= 1 && Math.random() < 0.5 && !target.rootedSkip) {
+        if (manhattan(enemy, target) <= 1 && gameRng() < 0.5 && !target.rootedSkip && canDebuff(target)) {
           SFX.ability();
           target.rootedSkip = enemy.gifted ? 2 : 1;
           log(eDef.name + " nets " + classById(target.classId).name + "!" + (enemy.gifted ? " Binding Net!" : ""));
@@ -5198,7 +6998,7 @@
     if (!abilities.length) return false;
 
     for (const ab of abilities) {
-      if (ab.target === "aoe_adjacent" && ab.effect === "grave_pulse" && adjTargets.length >= 1 && Math.random() < 0.4) {
+      if (ab.target === "aoe_adjacent" && ab.effect === "grave_pulse" && adjTargets.length >= 1 && gameRng() < 0.4) {
         SFX.ability();
         var allAdj = [];
         for (var gdi = 0; gdi < DIRS.length; gdi++) {
@@ -5207,21 +7007,23 @@
           if (ggt && ggt.hp > 0 && ggt.team !== enemy.team) allAdj.push(ggt);
         }
         for (var ggi = 0; ggi < allAdj.length; ggi++) {
-          applyDamage(allAdj[ggi], 4);
+          applyDamage(allAdj[ggi], 4, enemy);
           await Promise.all([animateHitFlash(allAdj[ggi]), screenShake(80, 2)]);
           log(eDef.name + " Grave Pulse hits " + classById(allAdj[ggi].classId).name + " (4).");
           if (allAdj[ggi].hp <= 0) await animateDeath(allAdj[ggi]);
+          if (enemy.hp <= 0) break;
         }
-        if (ab.selfDamage) applyDamage(enemy, ab.selfDamage);
+        if (ab.selfDamage && enemy.hp > 0) applyDamage(enemy, ab.selfDamage);
         return true;
       }
 
-      if (ab.target === "aoe_adjacent" && !ab.effect && adjTargets.length >= 2 && Math.random() < 0.6) {
+      if (ab.target === "aoe_adjacent" && !ab.effect && adjTargets.length >= 2 && gameRng() < 0.6) {
         SFX.ability();
         for (const t of adjTargets) {
           const dmg = physicalDamage(enemy, t, ab.mult || 1);
-          if (t.riposteActive) { applyDamage(enemy, 5); t.riposteActive = false; log("Riposte!"); }
-          applyDamage(t, dmg);
+          if (t.riposteCharges > 0) { applyDamage(enemy, 5, t); t.riposteCharges--; log("Riposte!"); }
+          if (enemy.hp <= 0) { await animateDeath(enemy); break; }
+          applyDamage(t, dmg, enemy);
           await Promise.all([animateHitFlash(t), screenShake(80, 2)]);
           log(eDef.name + " uses " + ab.name + " on " + classById(t.classId).name + " (" + dmg + ").");
           if (t.hp <= 0) await animateDeath(t);
@@ -5231,7 +7033,7 @@
 
       if (ab.type === "debuff" && ab.target === "adjacent_enemy" && ab.name === "Provocatio") {
         if (adjTarget.gifted) continue;
-        if (Math.random() < 0.35 && adjTarget.markDebuffTurns <= 0) {
+        if (gameRng() < 0.35 && adjTarget.markDebuffTurns <= 0 && canDebuff(adjTarget)) {
           SFX.ability();
           adjTarget.markDebuffTurns = 2;
           adjTarget.markFocusId = enemy.id;
@@ -5247,7 +7049,7 @@
 
       if (ab.type === "debuff" && ab.target === "adjacent_enemy" && ab.name === "Iaculum") {
         if (adjTarget.gifted && adjTarget.classId === "thraex") continue;
-        if (Math.random() < 0.45 && !adjTarget.rootedSkip) {
+        if (gameRng() < 0.45 && !adjTarget.rootedSkip && canDebuff(adjTarget)) {
           SFX.ability();
           adjTarget.rootedSkip = enemy.gifted ? 2 : 1;
           log(eDef.name + " nets " + classById(adjTarget.classId).name + "!" + (enemy.gifted ? " Binding Net!" : ""));
@@ -5255,14 +7057,31 @@
         }
       }
 
+      if (ab.effect === "duel" && !enemy.duelTarget && gameRng() < 0.3) {
+        var bestDuelTgt = null, bestDuelAtk = -1;
+        for (var dli = 0; dli < adjTargets.length; dli++) {
+          var dtAtk = unitAtk(adjTargets[dli]);
+          if (dtAtk > bestDuelAtk) { bestDuelAtk = dtAtk; bestDuelTgt = adjTargets[dli]; }
+        }
+        if (bestDuelTgt) {
+          SFX.ability();
+          enemy.duelTarget = bestDuelTgt.uid; enemy.duelTurns = 3;
+          bestDuelTgt.duelTarget = enemy.uid; bestDuelTgt.duelTurns = 3;
+          spawnDmgNumber(enemy, "DUEL", "#ffdd44");
+          spawnDmgNumber(bestDuelTgt, "DUEL", "#ffdd44");
+          log(eDef.name + " challenges " + classById(bestDuelTgt.classId).name + " to a duel!");
+          return true;
+        }
+      }
+
       if (ab.type === "attack" && ab.target === "adjacent_enemy" && ab.effect === "push") {
-        if (Math.random() < 0.35) {
+        if (gameRng() < 0.35) {
           SFX.ability();
           await animateAttack(enemy, adjTarget);
           if (rollHit(enemy, adjTarget)) {
             SFX.hit();
             const dmg = physicalDamage(enemy, adjTarget, ab.mult || 1);
-            applyDamage(adjTarget, dmg);
+            applyDamage(adjTarget, dmg, enemy);
             await Promise.all([animateHitFlash(adjTarget), screenShake(80, 2)]);
             log(eDef.name + " uses " + ab.name + " on " + classById(adjTarget.classId).name + " (" + dmg + ").");
             const pdx = adjTarget.x - enemy.x;
@@ -5283,7 +7102,7 @@
       }
 
       if (ab.type === "utility" && ab.effect === "push" && ab.target === "adjacent_enemy") {
-        if (enemy.gifted && enemy.classId === "samnite" && Math.random() < 0.4) {
+        if (enemy.gifted && enemy.classId === "samnite" && gameRng() < 0.4) {
           SFX.ability();
           var pushed = 0;
           for (var di = 0; di < DIRS.length; di++) {
@@ -5300,7 +7119,7 @@
             log(eDef.name + " Tremor Press — " + pushed + " foes shoved!");
             return true;
           }
-        } else if (Math.random() < 0.25) {
+        } else if (gameRng() < 0.25) {
           SFX.ability();
           var sdx = adjTarget.x - enemy.x;
           var sdy = adjTarget.y - enemy.y;
@@ -5314,17 +7133,17 @@
         }
       }
 
-      if (ab.type === "attack" && ab.target === "adjacent_enemy" && ab.effect === "stun" && Math.random() < 0.35) {
+      if (ab.type === "attack" && ab.target === "adjacent_enemy" && ab.effect === "stun" && gameRng() < 0.35) {
         SFX.ability();
         await animateAttack(enemy, adjTarget);
         if (rollHit(enemy, adjTarget)) {
           SFX.hit();
           const dmg = physicalDamage(enemy, adjTarget, ab.mult || 1);
-          if (adjTarget.riposteActive) { applyDamage(enemy, 5); adjTarget.riposteActive = false; }
-          applyDamage(adjTarget, dmg);
+          if (adjTarget.riposteCharges > 0) { applyDamage(enemy, 5, adjTarget); adjTarget.riposteCharges--; }
+          applyDamage(adjTarget, dmg, enemy);
           await Promise.all([animateHitFlash(adjTarget), screenShake(80, 2)]);
-          if (adjTarget.hp > 0) adjTarget.rootedSkip = Math.max(adjTarget.rootedSkip, 1);
-          log(eDef.name + " uses " + ab.name + " on " + classById(adjTarget.classId).name + " (" + dmg + " + stun).");
+          if (adjTarget.hp > 0 && canDebuff(adjTarget)) adjTarget.rootedSkip = Math.max(adjTarget.rootedSkip, 1);
+          log(eDef.name + " uses " + ab.name + " on " + classById(adjTarget.classId).name + " (" + dmg + (canDebuff(adjTarget) ? " + stun" : "") + ").");
           if (adjTarget.hp <= 0) await animateDeath(adjTarget);
         } else {
           SFX.miss();
@@ -5334,7 +7153,7 @@
         return true;
       }
 
-      if (ab.effect === "pull" && ab.target === "adjacent_enemy" && Math.random() < 0.3) {
+      if (ab.effect === "pull" && ab.target === "adjacent_enemy" && gameRng() < 0.3) {
         SFX.ability();
         var plx = enemy.x - adjTarget.x;
         var ply = enemy.y - adjTarget.y;
@@ -5347,17 +7166,17 @@
         return true;
       }
 
-      if (ab.type === "attack" && ab.target === "adjacent_enemy" && ab.effect === "bleed" && Math.random() < 0.35) {
+      if (ab.type === "attack" && ab.target === "adjacent_enemy" && ab.effect === "bleed" && gameRng() < 0.35) {
         SFX.ability();
         await animateAttack(enemy, adjTarget);
         if (rollHit(enemy, adjTarget)) {
           SFX.hit();
           const dmg = physicalDamage(enemy, adjTarget, ab.mult || 1);
-          if (adjTarget.riposteActive) { applyDamage(enemy, 5); adjTarget.riposteActive = false; }
-          applyDamage(adjTarget, dmg);
+          if (adjTarget.riposteCharges > 0) { applyDamage(enemy, 5, adjTarget); adjTarget.riposteCharges--; }
+          applyDamage(adjTarget, dmg, enemy);
           await Promise.all([animateHitFlash(adjTarget), screenShake(80, 2)]);
-          if (adjTarget.hp > 0) adjTarget.bleedTurns = 3;
-          log(eDef.name + " uses " + ab.name + " on " + classById(adjTarget.classId).name + " (" + dmg + " + bleed).");
+          if (adjTarget.hp > 0 && canDebuff(adjTarget)) adjTarget.bleedTurns = 3;
+          log(eDef.name + " uses " + ab.name + " on " + classById(adjTarget.classId).name + " (" + dmg + (adjTarget.hp > 0 && canDebuff(adjTarget) ? " + bleed" : "") + ").");
           if (adjTarget.hp <= 0) await animateDeath(adjTarget);
         } else {
           SFX.miss();
@@ -5367,14 +7186,14 @@
         return true;
       }
 
-      if (ab.type === "attack" && ab.target === "adjacent_enemy" && ab.effect === "lifesteal" && Math.random() < 0.4) {
+      if (ab.type === "attack" && ab.target === "adjacent_enemy" && ab.effect === "lifesteal" && gameRng() < 0.4) {
         SFX.ability();
         await animateAttack(enemy, adjTarget);
         if (rollHit(enemy, adjTarget)) {
           SFX.hit();
           const dmg = physicalDamage(enemy, adjTarget, ab.mult || 1);
-          if (adjTarget.riposteActive) { applyDamage(enemy, 5); adjTarget.riposteActive = false; }
-          applyDamage(adjTarget, dmg);
+          if (adjTarget.riposteCharges > 0) { applyDamage(enemy, 5, adjTarget); adjTarget.riposteCharges--; }
+          applyDamage(adjTarget, dmg, enemy);
           var stealAmt = ab.steal || 0.25;
           var stolen = (typeof stealAmt === "number" && stealAmt < 1) ? Math.round(dmg * stealAmt) : stealAmt;
           enemy.hp = Math.min(enemy.maxHp, enemy.hp + stolen);
@@ -5390,7 +7209,7 @@
         return true;
       }
 
-      if (ab.effect === "atkdebuff" && ab.target === "adjacent_enemy" && Math.random() < 0.35) {
+      if (ab.effect === "atkdebuff" && ab.target === "adjacent_enemy" && gameRng() < 0.35 && canDebuff(adjTarget)) {
         SFX.ability();
         adjTarget.atkDebuffTurns = ab.debuffTurns || 2;
         adjTarget.atkDebuffAmt = ab.debuffAmt || 3;
@@ -5398,7 +7217,7 @@
         return true;
       }
 
-      if (ab.effect === "entangle" && ab.target === "adjacent_enemy" && Math.random() < 0.35 && !adjTarget.rootedSkip) {
+      if (ab.effect === "entangle" && ab.target === "adjacent_enemy" && gameRng() < 0.35 && !adjTarget.rootedSkip && canDebuff(adjTarget)) {
         SFX.ability();
         adjTarget.rootedSkip = Math.max(adjTarget.rootedSkip, 1);
         adjTarget.atkDebuffTurns = 2;
@@ -5407,21 +7226,22 @@
         return true;
       }
 
-      if (ab.effect === "huntermark" && ab.target === "adjacent_enemy" && Math.random() < 0.35) {
+      if (ab.effect === "huntermark" && ab.target === "adjacent_enemy" && gameRng() < 0.35 && canDebuff(adjTarget)) {
         SFX.ability();
         adjTarget.markDebuffTurns = 2;
+        adjTarget.markFocusId = null;
         adjTarget.dreadMarkDmg = 3;
         log(eDef.name + " Hunter's Mark — " + classById(adjTarget.classId).name + " takes +3 damage!");
         return true;
       }
 
-      if (ab.effect === "drag" && ab.target === "adjacent_enemy" && Math.random() < 0.35) {
+      if (ab.effect === "drag" && ab.target === "adjacent_enemy" && gameRng() < 0.35) {
         SFX.ability();
         await animateAttack(enemy, adjTarget);
         if (rollHit(enemy, adjTarget)) {
           SFX.hit();
           var drDmg = physicalDamage(enemy, adjTarget, ab.mult || 1);
-          applyDamage(adjTarget, drDmg);
+          applyDamage(adjTarget, drDmg, enemy);
           await Promise.all([animateHitFlash(adjTarget), screenShake(80, 2)]);
           log(eDef.name + " Drag Under hits " + classById(adjTarget.classId).name + " (" + drDmg + ").");
           if (adjTarget.hp > 0) {
@@ -5440,13 +7260,13 @@
         return true;
       }
 
-      if (ab.effect === "push2" && ab.target === "adjacent_enemy" && Math.random() < 0.35) {
+      if (ab.effect === "push2" && ab.target === "adjacent_enemy" && gameRng() < 0.35) {
         SFX.ability();
         await animateAttack(enemy, adjTarget);
         if (rollHit(enemy, adjTarget)) {
           SFX.hit();
           var p2D = physicalDamage(enemy, adjTarget, ab.mult || 1);
-          applyDamage(adjTarget, p2D);
+          applyDamage(adjTarget, p2D, enemy);
           await Promise.all([animateHitFlash(adjTarget), screenShake(80, 2)]);
           log(eDef.name + " Veteran's Fury (" + p2D + ").");
           if (adjTarget.hp > 0) {
@@ -5469,37 +7289,77 @@
         return true;
       }
 
-      if (ab.target === "aoe_adjacent" && (ab.effect === "voidburst" || ab.effect === "deathembrace" || ab.effect === "whirlwind") && adjTargets.length >= 1 && Math.random() < 0.45) {
+      if (ab.target === "aoe_adjacent" && (ab.effect === "voidburst" || ab.effect === "deathembrace" || ab.effect === "whirlwind") && adjTargets.length >= 1 && gameRng() < 0.45) {
         SFX.ability();
         var aoeD = ab.effect === "deathembrace" ? 6 : 0;
         var totalStolen = 0;
         for (var aoei = 0; aoei < adjTargets.length; aoei++) {
           var aoeDmg = aoeD > 0 ? aoeD : physicalDamage(enemy, adjTargets[aoei], ab.mult || 1);
-          applyDamage(adjTargets[aoei], aoeDmg);
+          applyDamage(adjTargets[aoei], aoeDmg, enemy);
           await Promise.all([animateHitFlash(adjTargets[aoei]), screenShake(80, 2)]);
           log(eDef.name + " " + ab.name + " hits " + classById(adjTargets[aoei].classId).name + " (" + aoeDmg + ").");
           if (ab.effect === "voidburst") totalStolen += 2;
           if (ab.effect === "deathembrace") totalStolen += 6;
           if (adjTargets[aoei].hp <= 0) await animateDeath(adjTargets[aoei]);
+          if (enemy.hp <= 0) break;
         }
-        if (totalStolen > 0) {
+        if (totalStolen > 0 && enemy.hp > 0) {
           enemy.hp = Math.min(enemy.maxHp, enemy.hp + totalStolen);
           spawnDmgNumber(enemy, "+" + totalStolen, "#80ff80");
         }
         return true;
       }
 
-      if (ab.type === "attack" && ab.target === "adjacent_enemy" && !ab.effect && Math.random() < 0.35) {
+      if (ab.type === "attack" && ab.target === "adjacent_enemy" && ab.effect === "double_strike" && gameRng() < 0.4) {
+        SFX.ability();
+        for (var _dsi = 0; _dsi < 2; _dsi++) {
+          if (adjTarget.hp <= 0) break;
+          await animateAttack(enemy, adjTarget);
+          if (rollHit(enemy, adjTarget)) {
+            SFX.hit();
+            var dsDmg = physicalDamage(enemy, adjTarget, ab.mult || 0.7);
+            if (adjTarget.riposteCharges > 0) { applyDamage(enemy, 5, adjTarget); adjTarget.riposteCharges--; log("Riposte!"); }
+            applyDamage(adjTarget, dsDmg, enemy);
+            await Promise.all([animateHitFlash(adjTarget), screenShake(80, 2)]);
+            log(eDef.name + " Frenzy strike " + (_dsi + 1) + " hits " + classById(adjTarget.classId).name + " (" + dsDmg + ").");
+            if (adjTarget.hp <= 0) await animateDeath(adjTarget);
+          } else {
+            SFX.miss();
+            spawnDmgNumber(adjTarget, "MISS", "#aaaaaa");
+            log(eDef.name + " Frenzy strike " + (_dsi + 1) + " misses!");
+          }
+        }
+        return true;
+      }
+
+      if (ab.effect === "hpswap" && ab.target === "adjacent_enemy" && gameRng() < 0.3) {
+        var ePct = enemy.hp / enemy.maxHp;
+        var tPct = adjTarget.hp / adjTarget.maxHp;
+        if (tPct - ePct >= 0.25) {
+          SFX.ability();
+          await animateAttack(enemy, adjTarget);
+          var newEHp = Math.max(1, Math.min(enemy.maxHp, Math.round(tPct * enemy.maxHp)));
+          var newTHp = Math.max(1, Math.min(adjTarget.maxHp, Math.round(ePct * adjTarget.maxHp)));
+          enemy.hp = newEHp;
+          adjTarget.hp = newTHp;
+          await Promise.all([animateHitFlash(adjTarget), screenShake(80, 2)]);
+          log(eDef.name + " Fate's Thread — HP swapped!");
+          return true;
+        }
+      }
+
+      if (ab.type === "attack" && ab.target === "adjacent_enemy" && !ab.effect && gameRng() < 0.35) {
         SFX.ability();
         await animateAttack(enemy, adjTarget);
         if (rollHit(enemy, adjTarget)) {
           SFX.hit();
           const dmg = physicalDamage(enemy, adjTarget, ab.mult || 1, ab.ignoreDefPct || 0);
-          if (adjTarget.riposteActive) { applyDamage(enemy, 5); adjTarget.riposteActive = false; }
-          applyDamage(adjTarget, dmg);
+          if (adjTarget.riposteCharges > 0) { applyDamage(enemy, 5, adjTarget); adjTarget.riposteCharges--; }
+          if (enemy.hp <= 0) { await animateDeath(enemy); return true; }
+          applyDamage(adjTarget, dmg, enemy);
           await Promise.all([animateHitFlash(adjTarget), screenShake(80, 2)]);
           log(eDef.name + " uses " + ab.name + " on " + classById(adjTarget.classId).name + " (" + dmg + ").");
-          if (ab.selfDamage) applyDamage(enemy, ab.selfDamage);
+          if (ab.selfDamage && enemy.hp > 0) applyDamage(enemy, ab.selfDamage);
           if (adjTarget.hp <= 0) await animateDeath(adjTarget);
         } else {
           SFX.miss();
@@ -5537,8 +7397,8 @@
               } else {
                 dmg = physicalDamage(enemy, occ, ab.mult || 1, ab.ignoreDefPct || 0);
               }
-              if (occ.riposteActive && s === 1) { applyDamage(enemy, 5); occ.riposteActive = false; }
-              applyDamage(occ, dmg);
+              if (occ.riposteCharges > 0 && s === 1) { applyDamage(enemy, 5, occ); occ.riposteCharges--; }
+              applyDamage(occ, dmg, enemy);
               await Promise.all([animateHitFlash(occ), screenShake(80, 2)]);
               log(eDef.name + " uses " + ab.name + " on " + classById(occ.classId).name + " (" + dmg + ").");
               if (enemy.gifted && enemy.classId === "hoplomachus" && occ.hp > 0) {
@@ -5547,6 +7407,11 @@
                   await animateMove(occ, [[ppx, ppy]]);
                   log("Tremor Thrust pushes back!");
                 }
+              }
+              if (ab.effect === "defdebuff" && occ.hp > 0 && canDebuff(occ)) {
+                occ.defDebuffTurns = 2;
+                occ.defDebuffAmt = 2;
+                log(classById(occ.classId).name + " DEF reduced by 2 for 2 turns!");
               }
               if (ab.effect === "charge") {
                 var chX = occ.x - dx, chY = occ.y - dy;
@@ -5571,21 +7436,77 @@
     return false;
   }
 
+  async function aiTryAoeRangeAbility(enemy, eDef, players) {
+    var abilities = unitAbilities(enemy);
+    for (var _ari = 0; _ari < abilities.length; _ari++) {
+      var ab = abilities[_ari];
+      if (ab.target !== "aoe_range") continue;
+      if (gameRng() > 0.4) continue;
+      var range = ab.range || 3;
+      var bestCenter = null, bestCount = 0;
+      for (var cx = 0; cx < BOARD_W; cx++) {
+        for (var cy = 0; cy < BOARD_H; cy++) {
+          if (Math.abs(cx - enemy.x) + Math.abs(cy - enemy.y) > range) continue;
+          if (cx === enemy.x && cy === enemy.y) continue;
+          var count = 0;
+          for (var adx = -1; adx <= 1; adx++) {
+            for (var ady = -1; ady <= 1; ady++) {
+              var tx = cx + adx, ty = cy + ady;
+              if (!inBounds(tx, ty)) continue;
+              var occ = occupantAt(tx, ty);
+              if (occ && occ.team === "player" && occ.hp > 0) count++;
+            }
+          }
+          if (count > bestCount) { bestCount = count; bestCenter = { x: cx, y: cy }; }
+        }
+      }
+      if (bestCount === 0 || !bestCenter) continue;
+      SFX.ability();
+      var targets = [];
+      for (var adx2 = -1; adx2 <= 1; adx2++) {
+        for (var ady2 = -1; ady2 <= 1; ady2++) {
+          var tx2 = bestCenter.x + adx2, ty2 = bestCenter.y + ady2;
+          if (!inBounds(tx2, ty2)) continue;
+          var occ2 = occupantAt(tx2, ty2);
+          if (occ2 && occ2.team === "player" && occ2.hp > 0) targets.push(occ2);
+        }
+      }
+      for (var ti = 0; ti < targets.length; ti++) {
+        if (rollHit(enemy, targets[ti])) {
+          SFX.hit();
+          var dmg = physicalDamage(enemy, targets[ti], ab.mult || 0.5);
+          applyDamage(targets[ti], dmg, enemy);
+          await Promise.all([animateHitFlash(targets[ti]), screenShake(80, 2)]);
+          log(eDef.name + " " + ab.name + " hits " + classById(targets[ti].classId).name + " (" + dmg + ").");
+          if (targets[ti].hp <= 0) await animateDeath(targets[ti]);
+        } else {
+          SFX.miss();
+          spawnDmgNumber(targets[ti], "MISS", "#aaaaaa");
+          log(eDef.name + " " + ab.name + " misses " + classById(targets[ti].classId).name + "!");
+        }
+      }
+      return true;
+    }
+    return false;
+  }
+
   async function aiBasicAttack(enemy, adjTarget) {
     const eDef = classById(enemy.classId);
+    recordAction(enemy, "attack", { targetName: adjTarget.displayName || classById(adjTarget.classId).name, targetId: adjTarget.id });
     await animateAttack(enemy, adjTarget);
     const hitPct = computeHitChance(enemy, adjTarget);
     if (rollHit(enemy, adjTarget)) {
       SFX.hit();
       const dmg = physicalDamage(enemy, adjTarget, 1);
-      if (adjTarget.riposteActive) {
-        applyDamage(enemy, 5);
-        adjTarget.riposteActive = false;
+      if (adjTarget.riposteCharges > 0) {
+        applyDamage(enemy, 5, adjTarget);
+        adjTarget.riposteCharges--;
       }
-      applyDamage(adjTarget, dmg);
+      applyDamage(adjTarget, dmg, enemy);
       await Promise.all([animateHitFlash(adjTarget), screenShake(100, 3)]);
       log(eDef.name + " strikes " + classById(adjTarget.classId).name + " for " + dmg + ". (" + hitPct + "%)");
       if (adjTarget.hp <= 0) await animateDeath(adjTarget);
+      if (enemy.hp <= 0) await animateDeath(enemy);
     } else {
       SFX.miss();
       spawnDmgNumber(adjTarget, "MISS", "#aaaaaa");
@@ -5598,6 +7519,13 @@
     renderer.resize(BOARD_W, BOARD_H);
     initSpriteCache();
 
+    isoCanvas.addEventListener("gesturestart", function (e) { e.preventDefault(); }, { passive: false });
+    isoCanvas.addEventListener("gesturechange", function (e) { e.preventDefault(); }, { passive: false });
+    isoCanvas.addEventListener("gestureend", function (e) { e.preventDefault(); }, { passive: false });
+    isoCanvas.addEventListener("touchmove", function (e) {
+      if (e.touches.length > 1) e.preventDefault();
+    }, { passive: false });
+
     isoCanvas.addEventListener("click", function (e) {
       const rect = isoCanvas.getBoundingClientRect();
       const mx = e.clientX - rect.left;
@@ -5606,12 +7534,17 @@
       if (cell) onTileClick(cell.col, cell.row);
     });
 
+    var _lastHoverCol = -1, _lastHoverRow = -1, _lastHoverMode = null;
     isoCanvas.addEventListener("mousemove", function (e) {
       const rect = isoCanvas.getBoundingClientRect();
       const mx = e.clientX - rect.left;
       const my = e.clientY - rect.top;
       const cell = renderer.screenToGrid(mx, my);
       if (cell) {
+        if (cell.col === _lastHoverCol && cell.row === _lastHoverRow && state.battleMode === _lastHoverMode) return;
+        _lastHoverCol = cell.col;
+        _lastHoverRow = cell.row;
+        _lastHoverMode = state.battleMode;
         if (state.phase === "battle" || state.phase === "deploy") {
           showTileInfo(cell.col, cell.row);
         }
@@ -5623,6 +7556,13 @@
             var tgt = occupantAt(cell.col, cell.row);
             if (u && tgt && tgt.team !== u.team) {
               showForecast(u, tgt, state.battleMode === "ability" ? state.selectedAbilityIndex : -1);
+            } else if (u && !tgt && state.battleMode === "ability" && state.selectedAbilityIndex >= 0) {
+              var _hoverAb = unitAbilities(u)[state.selectedAbilityIndex];
+              if (_hoverAb && _hoverAb.target === "aoe_range") {
+                showAreaForecast(u, _hoverAb);
+              } else {
+                hideForecast();
+              }
             } else {
               hideForecast();
             }
@@ -5635,6 +7575,9 @@
           hideForecast();
         }
       } else {
+        if (_lastHoverCol === -1 && _lastHoverRow === -1) return;
+        _lastHoverCol = -1;
+        _lastHoverRow = -1;
         isoCanvas.style.cursor = "default";
         hideTileInfo();
         hideForecast();
@@ -5642,6 +7585,9 @@
     });
 
     isoCanvas.addEventListener("mouseleave", function () {
+      _lastHoverCol = -1;
+      _lastHoverRow = -1;
+      _lastHoverMode = null;
       hideTileInfo();
       hideForecast();
     });
@@ -5652,11 +7598,11 @@
       if (state.cutscene.active) return;
       var delta = e.deltaY > 0 ? -0.1 : 0.1;
       renderer.setZoom(renderer.zoom + delta);
-      renderBoard();
+      scheduleRender();
     }, { passive: false });
 
     window.addEventListener("keydown", function (e) {
-      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.tagName === "SELECT") return;
       if (state.cutscene.active) {
         if (e.key === " " || e.key === "Enter") {
           e.preventDefault();
@@ -5673,16 +7619,17 @@
         return;
       }
       var key = e.key.toLowerCase();
+      if (e.repeat) return;
 
       // Camera controls
-      if (key === "q") { renderer.rotate(-1); renderBoard(); return; }
-      if (key === "e") { renderer.rotate(1); renderBoard(); return; }
-      if (key === "=" || key === "+") { renderer.setZoom(renderer.zoom + 0.15); renderBoard(); return; }
-      if (key === "-" || key === "_") { renderer.setZoom(renderer.zoom - 0.15); renderBoard(); return; }
-      if (key === "r" || key === "home") { renderer.zoom = 1.0; renderer.panX = 0; renderer.panY = 0; renderer.rotStep = 0; renderer._recalcLayout(); renderBoard(); return; }
+      if (key === "q") { renderer.rotate(-1); scheduleRender(); return; }
+      if (key === "e") { renderer.rotate(1); scheduleRender(); return; }
+      if (key === "=" || key === "+") { renderer.setZoom(renderer.zoom + 0.15); scheduleRender(); return; }
+      if (key === "-" || key === "_") { renderer.setZoom(renderer.zoom - 0.15); scheduleRender(); return; }
+      if (key === "r" || key === "home") { renderer.zoom = 1.0; renderer.panX = 0; renderer.panY = 0; renderer.rotStep = 0; renderer._recalcLayout(); scheduleRender(); return; }
 
       // Battle shortcuts — (A)ttack, a(B)ility, (W)ait, E(sc)ape to cancel
-      if (state.phase === "battle" && state.activeUnit && state.activeUnit.team === "player") {
+      if (state.phase === "battle" && !state.animating && state.activeUnit && state.activeUnit.team === "player") {
         if (key === "m" && !btnMove.disabled) { btnMove.click(); return; }
         if (key === "a" && !btnAttack.disabled) { btnAttack.click(); return; }
         if (key === "b" && !btnAbility.disabled) { btnAbility.click(); return; }
@@ -5691,13 +7638,13 @@
         if (key === "escape") { cancelTargeting(); hideAbilityMenu(); return; }
         // Number keys 1-9 to pick ability from the menu
         if (key >= "1" && key <= "9" && !abilityMenu.classList.contains("is-hidden")) {
-          var idx = parseInt(key) - 1;
+          var idx = parseInt(key, 10) - 1;
           var btns = abilityMenu.querySelectorAll(".ability-menu__btn:not(:disabled)");
           if (idx < btns.length) { btns[idx].click(); return; }
         }
       }
 
-      if (key === "m") { btnMute.click(); return; }
+      if (key === "f2") { e.preventDefault(); btnMute.click(); return; }
     });
 
     // Pan via middle-mouse or right-click drag
@@ -5712,11 +7659,18 @@
         renderer._panOriginY = renderer.panY;
       }
     });
+    var _maxPanX = BOARD_W * 64 * 0.5;
+    var _maxPanY = BOARD_H * 32 * 0.5;
+    function _clampPan() {
+      renderer.panX = Math.max(-_maxPanX, Math.min(_maxPanX, renderer.panX));
+      renderer.panY = Math.max(-_maxPanY, Math.min(_maxPanY, renderer.panY));
+    }
     window.addEventListener("mousemove", function (e) {
       if (!renderer._isPanning) return;
       renderer.panX = renderer._panOriginX + (renderer._panStartX - e.clientX) / renderer.zoom;
       renderer.panY = renderer._panOriginY + (renderer._panStartY - e.clientY) / renderer.zoom;
-      renderBoard();
+      _clampPan();
+      scheduleRender();
     });
     window.addEventListener("mouseup", function (e) {
       if (e.button === 1 || e.button === 2) {
@@ -5755,13 +7709,14 @@
         if (_touch.moved) {
           renderer.panX = _touch.panOX + dx / renderer.zoom;
           renderer.panY = _touch.panOY + dy / renderer.zoom;
-          renderBoard();
+          _clampPan();
+          scheduleRender();
         }
       } else if (e.touches.length === 2) {
         var dist = _touchDist(e.touches);
         if (_touch.pinchDist > 0) {
           renderer.setZoom(_touch.pinchZoom * (dist / _touch.pinchDist));
-          renderBoard();
+          scheduleRender();
         }
       }
     }, { passive: false });
@@ -5776,10 +7731,10 @@
     }, { passive: true });
 
     // Camera control buttons
-    btnRotL.addEventListener("click", function () { if (state.cutscene.active) return; renderer.rotate(-1); renderBoard(); });
-    btnRotR.addEventListener("click", function () { if (state.cutscene.active) return; renderer.rotate(1); renderBoard(); });
-    btnZoomIn.addEventListener("click", function () { if (state.cutscene.active) return; renderer.setZoom(renderer.zoom + 0.15); renderBoard(); });
-    btnZoomOut.addEventListener("click", function () { if (state.cutscene.active) return; renderer.setZoom(renderer.zoom - 0.15); renderBoard(); });
+    btnRotL.addEventListener("click", function () { if (state.cutscene.active) return; renderer.rotate(-1); scheduleRender(); });
+    btnRotR.addEventListener("click", function () { if (state.cutscene.active) return; renderer.rotate(1); scheduleRender(); });
+    btnZoomIn.addEventListener("click", function () { if (state.cutscene.active) return; renderer.setZoom(renderer.zoom + 0.15); scheduleRender(); });
+    btnZoomOut.addEventListener("click", function () { if (state.cutscene.active) return; renderer.setZoom(renderer.zoom - 0.15); scheduleRender(); });
     btnCamReset.addEventListener("click", function () {
       if (state.cutscene.active) return;
       renderer.zoom = 1.0;
@@ -5787,7 +7742,7 @@
       renderer.panY = 0;
       renderer.rotStep = 0;
       renderer._recalcLayout();
-      renderBoard();
+      scheduleRender();
     });
 
     btnWait.addEventListener("mouseenter", function () { previewCtStrip("wait"); });
@@ -5795,13 +7750,25 @@
 
     btnMute.addEventListener("click", function () {
       var muted = SFX.mute();
-      btnMute.innerHTML = (muted ? "🔇" : "♪") + "<kbd>M</kbd>";
-      btnMute.setAttribute("aria-label", muted ? "Unmute (M)" : "Mute (M)");
+      btnMute.innerHTML = (muted ? "🔇" : "♪") + "<kbd>F2</kbd>";
+      btnMute.setAttribute("aria-label", muted ? "Unmute (F2)" : "Mute (F2)");
     });
 
+    var _resizeTimer = null;
     window.addEventListener("resize", function () {
-      renderer.resize(BOARD_W, BOARD_H);
-      renderBoard();
+      clearTimeout(_resizeTimer);
+      _resizeTimer = setTimeout(function () {
+        renderer.resize(BOARD_W, BOARD_H);
+        scheduleRender();
+      }, 150);
+    });
+
+    document.addEventListener("visibilitychange", function () {
+      if (document.hidden) {
+        SFX.pause();
+      } else {
+        SFX.resume();
+      }
     });
 
     btnClearRoster.addEventListener("click", () => {
@@ -5821,7 +7788,7 @@
           if (fr.gifted) recruitPick.gifted = true;
           state.picks.push(recruitPick);
         }
-        Campaign.saveToDisk();
+        safeSave();
       }
       refreshRosterUI();
     });
@@ -5835,14 +7802,18 @@
       state.units = [];
       showPhasePanels();
       refreshRosterUI();
-      renderBoard();
+      scheduleRender();
     });
     btnResultContinue.addEventListener("click", closeResultAndReset);
+
+    var btnWatchReplay = document.getElementById("btnWatchReplay");
+    if (btnWatchReplay) btnWatchReplay.addEventListener("click", showReplayOverlay);
 
     var btnRetry = $("#btnResultRetry");
     if (btnRetry) {
       btnRetry.addEventListener("click", function () {
         resultOverlay.classList.add("is-hidden");
+        releaseFocusTrap();
         retryCampaignMission();
       });
     }
@@ -5857,8 +7828,12 @@
 
     var cutsceneAdv = $("#cutsceneAdvance");
     if (cutsceneAdv) {
+      var _lastAdvanceTime = 0;
       function onCutsceneAdvance(e) {
         e.preventDefault();
+        var now = performance.now();
+        if (now - _lastAdvanceTime < 150) return;
+        _lastAdvanceTime = now;
         var cs = state.cutscene;
         if (!cs.active) return;
         if (cs.awaitingEntry) return;
@@ -5872,6 +7847,7 @@
       }
       cutsceneAdv.addEventListener("click", onCutsceneAdvance);
       cutsceneAdv.addEventListener("keydown", function (e) {
+        if (e.repeat) return;
         if (e.key === "Enter" || e.key === " ") onCutsceneAdvance(e);
       });
     }
@@ -5892,22 +7868,86 @@
     var skSeed = document.getElementById("skSeed");
     if (skEnemyCount) {
       skEnemyCount.addEventListener("input", function () {
-        skirmishConfig.enemyCount = parseInt(this.value) || 3;
+        skirmishConfig.enemyCount = parseInt(this.value, 10) || 3;
         document.getElementById("skEnemyVal").textContent = this.value;
       });
       skBudget.addEventListener("input", function () {
-        skirmishConfig.budget = parseInt(this.value) || BUDGET_MAX_DEFAULT;
+        skirmishConfig.budget = parseInt(this.value, 10) || BUDGET_MAX_DEFAULT;
         document.getElementById("skBudgetVal").textContent = this.value;
       });
       skMapSize.addEventListener("change", function () { skirmishConfig.mapSize = this.value; });
       skTerrain.addEventListener("change", function () { skirmishConfig.terrainDensity = this.value; });
       skSeed.addEventListener("input", function () { skirmishConfig.seed = this.value.trim() || null; });
       document.getElementById("skTemplate").addEventListener("change", function () { skirmishConfig.template = this.value || null; });
+      var skDiff = document.getElementById("skDifficulty");
+      if (skDiff) skDiff.addEventListener("change", function () { skirmishConfig.difficulty = this.value; });
       document.getElementById("btnSkirmishStart").addEventListener("click", startSkirmish);
       document.getElementById("btnSkirmishBack").addEventListener("click", hideSkirmishSettings);
     }
     if (btnContinueCampaign) btnContinueCampaign.addEventListener("click", function () {
       showSlotPicker("continue");
+    });
+    var btnSurvival = document.getElementById("btnSurvival");
+    if (btnSurvival) btnSurvival.addEventListener("click", function() {
+      var title = document.getElementById("titleOverlay");
+      if (title) title.classList.add("is-hidden");
+      var survEl = document.getElementById("survivalSettings");
+      showSurvivalLeaderboard();
+      survEl.classList.remove("is-hidden");
+      trapFocus(survEl);
+    });
+    var btnSurvStart = document.getElementById("btnSurvStart");
+    if (btnSurvStart) btnSurvStart.addEventListener("click", startSurvival);
+    var btnSurvBack = document.getElementById("btnSurvBack");
+    if (btnSurvBack) btnSurvBack.addEventListener("click", function() {
+      document.getElementById("survivalSettings").classList.add("is-hidden");
+      releaseFocusTrap();
+      showTitleScreen();
+    });
+    var btnSurvShopNext = document.getElementById("btnSurvShopNext");
+    if (btnSurvShopNext) btnSurvShopNext.addEventListener("click", function() {
+      document.getElementById("survShopOverlay").classList.add("is-hidden");
+      releaseFocusTrap();
+      state.units = [];
+      state._mapSeed = (state.survivalWave + 1) * 997 + 42;
+      survivalNextWave();
+      state.phase = "battle";
+      state.activeUnit = null;
+      state.battleMode = "idle";
+      state.highlightCells.clear();
+      state.turnCount = 0;
+      state.totalDamageDealt = 0;
+      state._statMaxSingleHit = 0;
+      state.battleLog = [];
+      state.battleRecord = [];
+      if (renderer) renderer.floatingTexts = [];
+      for (var si = 0; si < state.units.length; si++) {
+        var su = state.units[si];
+        su._statDmgDealt = 0; su._statDmgTaken = 0; su._statHealing = 0;
+        su._statKills = 0; su._statTilesMoved = 0; su._statAbilitiesUsed = 0;
+      }
+      logFeed.innerHTML = "";
+      initMapModifiers(null);
+      showPhasePanels();
+      unitCard.classList.add("is-hidden");
+      bindBattleButtons();
+      renderBoard();
+      log("Wave " + state.survivalWave + " — Fight!", "system");
+      SFX.click();
+      startBattleLoop();
+      tickBattleTurn().catch(function(e) {
+        console.error("tickBattleTurn:", e);
+        state.animating = false;
+        log("Turn error — you may continue.", "system");
+      });
+    });
+    var btnTrophies = document.getElementById("btnTrophies");
+    if (btnTrophies) btnTrophies.addEventListener("click", showTrophyPanel);
+    var btnTrophyBack = document.getElementById("btnTrophyBack");
+    if (btnTrophyBack) btnTrophyBack.addEventListener("click", function() {
+      document.getElementById("trophyOverlay").classList.add("is-hidden");
+      releaseFocusTrap();
+      showTitleScreen();
     });
     document.getElementById("btnSlotBack").addEventListener("click", function () {
       document.getElementById("slotPicker").classList.add("is-hidden");
@@ -5915,17 +7955,43 @@
 
     budgetMax.textContent = String(budgetCurrent);
     showTitleScreen();
-    setTimeout(renderBoard, 120);
+    setTimeout(scheduleRender, 120);
 
   }
 
   var battleLoopRunning = false;
+  var _renderScheduled = false;
+  var _cameraDirty = false;
+
+  function scheduleRender() {
+    if (battleLoopRunning) {
+      _cameraDirty = true;
+      _battleNeedsRender = true;
+      return;
+    }
+    if (_renderScheduled) return;
+    _renderScheduled = true;
+    requestAnimationFrame(function () {
+      _renderScheduled = false;
+      renderBoard();
+    });
+  }
+
+  var _battleNeedsRender = true;
+  function markBattleDirty() { _battleNeedsRender = true; }
+
   function startBattleLoop() {
     if (battleLoopRunning) return;
     battleLoopRunning = true;
+    _battleNeedsRender = true;
     (function pulseLoop() {
       if (state.phase !== "battle") { battleLoopRunning = false; return; }
-      renderBoard();
+      var needsDraw = _battleNeedsRender || _cameraDirty || state.animating
+        || (renderer && renderer.floatingTexts.length > 0)
+        || state.units.some(function(u) { return u._deathAnim != null; });
+      _cameraDirty = false;
+      _battleNeedsRender = false;
+      if (needsDraw) renderBoard();
       requestAnimationFrame(pulseLoop);
     })();
   }
