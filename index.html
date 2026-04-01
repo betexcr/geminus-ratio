@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" id="htmlRoot">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -124,6 +124,11 @@
       <div class="title-panel__crest" aria-hidden="true">⚔</div>
       <h2 id="titleHeading" class="title-panel__name">Geminus Ratio</h2>
       <p class="title-panel__sub">Ludus Tactics</p>
+      <div class="title-lang" role="group" aria-label="Language">
+        <span class="title-lang__label" id="titleLangLabel">Language</span>
+        <button type="button" id="btnLangEn" class="btn btn--ghost btn--tiny" lang="en">English</button>
+        <button type="button" id="btnLangEs" class="btn btn--ghost btn--tiny" lang="es">Español</button>
+      </div>
       <div class="title-panel__buttons">
         <button type="button" id="btnContinueCampaign" class="btn btn--gold is-hidden">Continue Campaign</button>
         <button type="button" id="btnNewCampaign" class="btn btn--gold">New Campaign</button>
@@ -314,6 +319,7 @@
   <script defer src="js/sfx.js"></script>
   <script defer src="js/renderer.js"></script>
   <script defer src="js/sprites.js"></script>
+  <script defer src="js/i18n.js"></script>
   <script defer src="js/campaign.js"></script>
   <script defer src="js/game.js"></script>
 </body>

@@ -1326,12 +1326,20 @@ var Campaign = {
   getMissionLabel: function () {
     var m = this.getMission();
     if (!m) return "";
+    if (typeof I18n !== "undefined" && I18n.t && I18n.missionTitle) {
+      var title = I18n.missionTitle(m.id) || m.title;
+      return I18n.t("campaign.missionLine", { id: m.id, title: title });
+    }
     return "Mission " + m.id + ": " + m.title;
   },
 
   getActLabel: function () {
     var m = this.getMission();
     if (!m) return "";
+    if (typeof I18n !== "undefined" && I18n.actLabel) {
+      var al = I18n.actLabel(m.act);
+      if (al) return al;
+    }
     var names = { 1: "Act I: The Tournament", 2: "Act II: The Descent", 3: "Act III: The Ratio" };
     return names[m.act] || "";
   },
@@ -1543,9 +1551,20 @@ var Campaign = {
       data = this._sanitizeSaveData(data);
       if (!data) return null;
       var m = CAMPAIGN_MAP[data.missionId];
+      var missionName;
+      if (m) {
+        if (typeof I18n !== "undefined" && I18n.t && I18n.missionTitle) {
+          var mt = I18n.missionTitle(m.id) || m.title;
+          missionName = I18n.t("campaign.slotLine", { id: m.id, title: mt });
+        } else {
+          missionName = "M" + m.id + ": " + m.title;
+        }
+      } else {
+        missionName = (typeof I18n !== "undefined" && I18n.t) ? I18n.t("campaign.completed") : "Completed";
+      }
       return {
         slot: slot,
-        missionName: m ? ("M" + m.id + ": " + m.title) : "Completed",
+        missionName: missionName,
         savedAt: typeof data.savedAt === "number" ? data.savedAt : 0,
         rosterSize: data.survivingRoster.length,
       };

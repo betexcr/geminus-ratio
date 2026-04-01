@@ -60,8 +60,9 @@ Scripts are loaded synchronously at the end of `<body>`, in dependency order:
 2. `js/sfx.js` — exposes `SFX` global
 3. `js/renderer.js` — exposes `IsoRenderer` class
 4. `js/sprites.js` — exposes `TEAM_PAL`, `SPRITE_RECTS` globals
-5. `js/campaign.js` — exposes `CAMPAIGN_MISSIONS`, `campaignState`, `Campaign` globals
-6. `js/game.js` — IIFE that calls `init()` on load; wires all UI and game logic
+5. `js/i18n.js` — exposes `I18n` (en/es UI strings, `localStorage` key `geminus_locale`); must load before `campaign.js` when the latter reads `I18n` for labels
+6. `js/campaign.js` — exposes `CAMPAIGN_MISSIONS`, `campaignState`, `Campaign` globals
+7. `js/game.js` — IIFE that calls `init()` on load; wires all UI and game logic
 
 No bundler, no npm, no transpiler. Everything runs as-is in the browser.
 

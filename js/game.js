@@ -51,6 +51,7 @@
     template: null,
     difficulty: "normal",
   };
+  var lastSlotPickerMode = "new";
   var MAP_SIZES = { small: { w: 8, h: 7 }, medium: { w: 12, h: 10 }, large: { w: 14, h: 12 } };
 
   var ACCENT_COLORS = [
@@ -600,6 +601,12 @@
   function classById(id) {
     const c = GLADIATOR_CLASSES.find((g) => g.id === id);
     if (!c) throw new Error("Unknown gladiator class: " + id);
+    return c;
+  }
+
+  function displayClassById(id) {
+    var c = classById(id);
+    if (typeof I18n !== "undefined" && I18n.localizeClassDef) return I18n.localizeClassDef(c);
     return c;
   }
 
@@ -1301,7 +1308,10 @@
     if (!isTutorial()) return;
     if (state.tutorialStep > step) return;
     state.tutorialStep = step + 1;
-    log(msg, "tutorial");
+    var key = "tutorial.s" + step;
+    var text = (typeof I18n !== "undefined" && I18n.t) ? I18n.t(key) : null;
+    if (!text || text === key) text = msg;
+    log(text, "tutorial");
   }
 
   // -- Animation helpers --
@@ -2303,6 +2313,25 @@
     if (preview) preview.remove();
   }
 
+  function updatePhaseBannerText() {
+    var p = state.phase;
+    var phaseText;
+    if (typeof I18n !== "undefined" && I18n.t) {
+      phaseText = p === "ludus" ? I18n.t("phase.ludus") : p === "deploy" ? I18n.t("phase.gates") : I18n.t("phase.arena");
+      if (campaignState.active) {
+        var m = Campaign.getMission();
+        if (m) phaseText = I18n.t("phase.missionPrefix", { mid: m.id }) + phaseText;
+      }
+    } else {
+      phaseText = p === "ludus" ? "Ludus" : p === "deploy" ? "Gates" : "Arena";
+      if (campaignState.active) {
+        var m2 = Campaign.getMission();
+        if (m2) phaseText = "M" + m2.id + " — " + phaseText;
+      }
+    }
+    phaseLabel.textContent = phaseText;
+  }
+
   function showPhasePanels() {
     syncBodyPhaseClass();
     refreshCtStrip();
@@ -2311,12 +2340,7 @@
     else if (p === "deploy") { SFX.startAmbient("ludus"); SFX.startMusic("deploy"); }
     else if (p === "battle") { SFX.startAmbient("battle"); SFX.startMusic("battle"); }
     else { SFX.startAmbient("ludus"); SFX.startMusic("ludus"); }
-    var phaseText = p === "ludus" ? "Ludus" : p === "deploy" ? "Gates" : "Arena";
-    if (campaignState.active) {
-      var m = Campaign.getMission();
-      if (m) phaseText = "M" + m.id + " — " + phaseText;
-    }
-    phaseLabel.textContent = phaseText;
+    updatePhaseBannerText();
     panelRoster.classList.toggle("is-hidden", p !== "ludus");
     panelDeploy.classList.toggle("is-hidden", p !== "deploy");
     panelBattle.classList.toggle("is-hidden", p !== "battle");
@@ -2378,6 +2402,7 @@
       });
     }
     for (const c of displayClasses) {
+      var dispC = displayClassById(c.id);
       const row = document.createElement("div");
       row.className = "class-row" + (state.selectedClassId === c.id ? " is-selected" : "");
       row.setAttribute("role", "listitem");
@@ -2388,17 +2413,19 @@
       const sprSvg = gladiatorSpriteSvg(c.id, "player", "preview_" + c.id);
       thumb.appendChild(sprSvg);
 
+      var statsLine = "HP " + c.hp + " · ATK " + c.atk + " · DEF " + c.def + " · SPD " + c.spd + " · Move " + c.move + " · Jump " + c.jump;
+      if (typeof I18n !== "undefined" && I18n.t) {
+        statsLine = I18n.t("panel.statsFmt", { hp: c.hp, atk: c.atk, def: c.def, spd: c.spd, mv: c.move, jp: c.jump });
+      }
       const left = document.createElement("div");
       left.className = "class-row__info";
       left.innerHTML =
         '<div class="class-row__name">' +
-        c.name +
+        dispC.name +
         '</div><div class="class-row__meta">' +
-        c.role +
+        dispC.role +
         "</div>" +
-        '<div class="class-row__stats">HP ' + c.hp + ' · ATK ' + c.atk +
-        ' · DEF ' + c.def + ' · SPD ' + c.spd +
-        ' · Move ' + c.move + ' · Jump ' + c.jump + "</div>" +
+        '<div class="class-row__stats">' + statsLine + "</div>" +
         '<div class="class-row__abilities"></div>';
       var abilitiesDiv = left.querySelector(".class-row__abilities");
       c.abilities.forEach(function (a) {
@@ -2434,9 +2461,11 @@
       const addBtn = document.createElement("button");
       addBtn.type = "button";
       addBtn.className = "btn";
-      addBtn.textContent = "Hire";
+      addBtn.textContent = (typeof I18n !== "undefined" && I18n.t) ? I18n.t("panel.hire") : "Hire";
       addBtn.style.margin = "0";
-      addBtn.setAttribute("aria-label", "Hire " + c.name + " for " + c.cost + " denarii");
+      addBtn.setAttribute("aria-label", (typeof I18n !== "undefined" && I18n.t)
+        ? I18n.t("panel.hireAria", { name: dispC.name, cost: c.cost })
+        : ("Hire " + c.name + " for " + c.cost + " denarii"));
       if (c.cost > state.budget || state.picks.length >= MAX_ROSTER) {
         addBtn.disabled = true;
       }
@@ -2466,11 +2495,12 @@
       nameSpan.className = "pick-name";
       var labelSpan = document.createElement("span");
       labelSpan.className = "pick-name-text";
-      var className = def.name;
+      var dispPick = displayClassById(pick.classId);
+      var className = dispPick.name;
       if (pick.promotionId) { var _pr = getPromotion(pick.promotionId); if (_pr) className = _pr.name; }
       var label = className;
       if (pick.displayName) label = pick.displayName + " (" + className + ")";
-      if (pick.isFree) label += " [free]";
+      if (pick.isFree) label += (typeof I18n !== "undefined" && I18n.t) ? I18n.t("panel.freeTag") : " [free]";
       labelSpan.textContent = label;
       nameSpan.appendChild(labelSpan);
       var renameBtn = document.createElement("button");
@@ -3711,11 +3741,14 @@
     if (state.mapMods.glowTiles.has(cellKey(col, row))) txt += " · Glow (+2 ATK)";
     var occ = occupantAt(col, row);
     if (occ) {
-      var def = classById(occ.classId);
-      var occName = def.name;
+      var occDisp = displayClassById(occ.classId);
+      var occName = occDisp.name;
       if (occ.promotionId) { var occPromo = getPromotion(occ.promotionId); if (occPromo) occName = occPromo.name; }
       txt += " \u00b7 " + occName + " (" + occ.team + ") HP:" + occ.hp + "/" + occ.maxHp;
-      if (occ.aiProfile && AI_PROFILES[occ.aiProfile]) txt += " [" + AI_PROFILES[occ.aiProfile].label + "]";
+      if (occ.aiProfile && AI_PROFILES[occ.aiProfile]) {
+        var _aiLab = (typeof I18n !== "undefined" && I18n.aiProfileLabel) ? I18n.aiProfileLabel(occ.aiProfile) : AI_PROFILES[occ.aiProfile].label;
+        txt += " [" + _aiLab + "]";
+      }
     }
     tileInfoEl.textContent = txt;
     tileInfoEl.classList.remove("is-hidden");
@@ -3783,13 +3816,14 @@
 
   function showUnitPanel(u) {
     const def = classById(u.classId);
+    var disp = displayClassById(u.classId);
     unitCard.classList.remove("is-hidden");
-    var uNameStr = u.displayName ? u.displayName : def.name;
+    var uNameStr = u.displayName ? u.displayName : disp.name;
     if (u.title) uNameStr += " the " + u.title;
-    if (u.displayName) uNameStr += " (" + def.name + ")";
+    if (u.displayName) uNameStr += " (" + disp.name + ")";
     if (campaignState.active && u.level > 1) uNameStr += " Lv." + u.level;
     ucName.textContent = uNameStr;
-    ucClass.textContent = def.role;
+    ucClass.textContent = disp.role;
     ucHp.textContent = u.hp + " / " + u.maxHp;
     ucAtk.textContent = String(unitAtk(u));
     ucDef.textContent = String(unitDef(u));
@@ -5321,68 +5355,88 @@
     return true;
   }
 
-  function showResultOverlay(result) {
+  function showResultOverlay(result, opts) {
+    opts = opts || {};
+    var quiet = opts.quiet === true;
     state._lastBattleResult = result;
     const won = result === "victory";
-    SFX.stopAmbient();
-    SFX.stopMusic();
-    if (won) { SFX.victory(); } else { SFX.defeat(); }
-    SFX.playBattleResultMusic(won);
+    if (!quiet) {
+      SFX.stopAmbient();
+      SFX.stopMusic();
+      if (won) { SFX.victory(); } else { SFX.defeat(); }
+      SFX.playBattleResultMusic(won);
+    }
     resultOverlay.classList.remove("is-hidden", "result-overlay--victory", "result-overlay--defeat");
     resultOverlay.classList.add(won ? "result-overlay--victory" : "result-overlay--defeat");
 
     var mission = campaignState.active ? Campaign.getMission() : null;
+    var _i18 = typeof I18n !== "undefined" && I18n.t;
     var titleText;
     if (state.trainingBout) {
-      titleText = won ? "TRAINING — VICTORY" : "TRAINING — DEFEAT";
+      titleText = _i18 ? (won ? I18n.t("result.trainingVictory") : I18n.t("result.trainingDefeat")) : (won ? "TRAINING — VICTORY" : "TRAINING — DEFEAT");
     } else {
-      titleText = won ? "VICTORIA!" : "DEFEAT";
+      titleText = _i18 ? (won ? I18n.t("result.victoria") : I18n.t("result.defeat")) : (won ? "VICTORIA!" : "DEFEAT");
     }
     resultTitle.textContent = titleText;
-    announce(titleText);
+    if (!quiet) announce(titleText);
 
     var pAlive = state.units.filter(function (u) { return u.team === "player" && u.hp > 0; }).length;
     var pTotal = state.units.filter(function (u) { return u.team === "player"; }).length;
-    var html = "<p><strong>" + pAlive + "</strong> of <strong>" + pTotal + "</strong> gladiators standing</p>";
-    html += "<p><strong>" + state.turnCount + "</strong> turns fought</p>";
-    html += "<p><strong>" + state.totalDamageDealt + "</strong> damage dealt to enemies</p>";
+    var html = _i18
+      ? "<p>" + I18n.t("result.standing", { alive: pAlive, total: pTotal }) + "</p>"
+      : "<p><strong>" + pAlive + "</strong> of <strong>" + pTotal + "</strong> gladiators standing</p>";
+    html += _i18
+      ? "<p>" + I18n.t("result.turns", { n: state.turnCount }) + "</p>"
+      : "<p><strong>" + state.turnCount + "</strong> turns fought</p>";
+    html += _i18
+      ? "<p>" + I18n.t("result.damageDealt", { n: state.totalDamageDealt }) + "</p>"
+      : "<p><strong>" + state.totalDamageDealt + "</strong> damage dealt to enemies</p>";
 
     var playerUnits = state.units.filter(function (u) { return u.team === "player"; });
     var mvp = playerUnits.reduce(function(best, u) {
       return (u._statDmgDealt || 0) > (best._statDmgDealt || 0) ? u : best;
     }, playerUnits[0]);
     if (mvp && (mvp._statDmgDealt || 0) > 0) {
-      html += '<p class="result-mvp">MVP: ' + _esc(mvp.displayName || classById(mvp.classId).name) +
-        ' — ' + mvp._statDmgDealt + ' dmg, ' + (mvp._statKills || 0) + ' kills</p>';
+      var mvpName = _esc(mvp.displayName || displayClassById(mvp.classId).name);
+      html += _i18
+        ? '<p class="result-mvp">' + I18n.t("result.mvp", { name: mvpName, dmg: mvp._statDmgDealt, kills: mvp._statKills || 0 }) + "</p>"
+        : '<p class="result-mvp">MVP: ' + mvpName + " — " + mvp._statDmgDealt + " dmg, " + (mvp._statKills || 0) + " kills</p>";
     }
     if (state._statFirstBlood) {
-      html += '<p style="font-size:0.8rem;color:var(--fft-text-dim);">First blood: ' + _esc(state._statFirstBlood) + '</p>';
+      html += _i18
+        ? '<p style="font-size:0.8rem;color:var(--fft-text-dim);">' + I18n.t("result.firstBlood", { name: _esc(state._statFirstBlood) }) + "</p>"
+        : '<p style="font-size:0.8rem;color:var(--fft-text-dim);">First blood: ' + _esc(state._statFirstBlood) + "</p>";
     }
 
     html += '<div class="result-stats-grid">';
     playerUnits.sort(function(a, b) { return (b._statDmgDealt || 0) - (a._statDmgDealt || 0); });
     for (var _ri = 0; _ri < playerUnits.length; _ri++) {
       var _ru = playerUnits[_ri];
-      var _rn = _esc(_ru.displayName || classById(_ru.classId).name);
-      html += '<div><span>' + _rn + '</span><span>' +
-        (_ru._statDmgDealt || 0) + ' dmg · ' + (_ru._statKills || 0) + 'K · ' +
-        (_ru._statDmgTaken || 0) + ' taken</span></div>';
+      var _rn = _esc(_ru.displayName || displayClassById(_ru.classId).name);
+      var _rowStats = _i18
+        ? I18n.t("result.statRow", { dmg: _ru._statDmgDealt || 0, k: _ru._statKills || 0, taken: _ru._statDmgTaken || 0 })
+        : (_ru._statDmgDealt || 0) + " dmg · " + (_ru._statKills || 0) + "K · " + (_ru._statDmgTaken || 0) + " taken";
+      html += "<div><span>" + _rn + "</span><span>" + _rowStats + "</span></div>";
     }
-    html += '</div>';
+    html += "</div>";
 
     if (campaignState.active && won && mission && !state.trainingBout) {
       var bonus = mission.victoryBonus;
       if (pAlive === pTotal) bonus += mission.perfectBonus;
-      html += '<p style="color:var(--fft-gold);margin-top:0.5rem;">+' + bonus + ' denarii earned</p>';
+      html += _i18
+        ? '<p style="color:var(--fft-gold);margin-top:0.5rem;">' + I18n.t("result.denariiEarned", { n: bonus }) + "</p>"
+        : '<p style="color:var(--fft-gold);margin-top:0.5rem;">+' + bonus + " denarii earned</p>";
       var xpRows = playerUnits;
       if (xpRows.length) {
         html += '<div style="margin-top:0.5rem;font-size:0.85rem;color:var(--fft-text-dim);">';
         for (var xi = 0; xi < xpRows.length; xi++) {
           var xu = xpRows[xi];
-          var xName = _esc(xu.displayName || classById(xu.classId).name);
-          html += '<div>' + xName + ' — Lv.' + (xu.level || 1) + ', ' + (xu.xp || 0) + ' XP, ' + (xu.kills || 0) + ' kills</div>';
+          var xName = _esc(xu.displayName || displayClassById(xu.classId).name);
+          html += _i18
+            ? "<div>" + I18n.t("result.xpLine", { name: xName, lv: xu.level || 1, xp: xu.xp || 0, kills: xu.kills || 0 }) + "</div>"
+            : "<div>" + xName + " — Lv." + (xu.level || 1) + ", " + (xu.xp || 0) + " XP, " + (xu.kills || 0) + " kills</div>";
         }
-        html += '</div>';
+        html += "</div>";
       }
       if (!state._resultBookkept) {
         state._resultBookkept = true;
@@ -5401,9 +5455,13 @@
         campaignState.campaignStats.peakDenarii = Math.max(campaignState.campaignStats.peakDenarii || 0, campaignState.denarii || 0);
       }
     } else if (won) {
-      html += '<p style="color:var(--fft-gold);margin-top:0.5rem;">The crowd chants your name!</p>';
+      html += _i18
+        ? '<p style="color:var(--fft-gold);margin-top:0.5rem;">' + I18n.t("result.crowdChants") + "</p>"
+        : '<p style="color:var(--fft-gold);margin-top:0.5rem;">The crowd chants your name!</p>';
     } else {
-      html += '<p style="color:var(--fft-red);margin-top:0.5rem;">The sand claims another lanista\'s pride.</p>';
+      html += _i18
+        ? '<p style="color:var(--fft-red);margin-top:0.5rem;">' + I18n.t("result.sandClaims") + "</p>"
+        : '<p style="color:var(--fft-red);margin-top:0.5rem;">The sand claims another lanista\'s pride.</p>';
     }
     resultBody.innerHTML = html;
 
@@ -5415,9 +5473,11 @@
     if (btnReplay) {
       btnReplay.classList.toggle("is-hidden", !state.battleRecord || state.battleRecord.length === 0);
     }
-    trapFocus(resultOverlay);
-    setTimeout(function() { ($("#btnResultContinue") || resultOverlay).focus(); }, 100);
-    checkAchievements();
+    if (!quiet) {
+      trapFocus(resultOverlay);
+      setTimeout(function() { ($("#btnResultContinue") || resultOverlay).focus(); }, 100);
+      checkAchievements();
+    }
   }
 
   function closeResultAndReset() {
@@ -5565,7 +5625,10 @@
       }
 
       var vignette = pickVignette();
-      var postScene = filterScene(mission.postScene);
+      var rawPost = mission.postScene || [];
+      var locPost = (typeof I18n !== "undefined" && I18n.localizeMissionSteps)
+        ? I18n.localizeMissionSteps(mission.id, "post", rawPost) : rawPost;
+      var postScene = filterScene(locPost);
       var allSteps = vignette.concat(postScene);
       if (allSteps.length > 0) {
         runScene(allSteps, function () {
@@ -5596,14 +5659,18 @@
     state.units = [];
     state.phase = "ludus";
 
-    var preScene = filterScene(nextMission.preScene);
+    var rawPreNext = nextMission.preScene || [];
+    var preScene = filterScene((typeof I18n !== "undefined" && I18n.localizeMissionSteps)
+      ? I18n.localizeMissionSteps(nextMission.id, "pre", rawPreNext) : rawPreNext);
     var choices = nextMission.choices || [];
+    var locChoices = (typeof I18n !== "undefined" && I18n.localizeChoices)
+      ? I18n.localizeChoices(nextMission.id, choices) : choices;
 
-    if (choices.length > 0) {
+    if (locChoices.length > 0) {
       var combined = preScene.slice();
-      for (var i = 0; i < choices.length; i++) {
-        if (Campaign.checkCondition(choices[i].condition)) {
-          combined.push({ choice: choices[i] });
+      for (var i = 0; i < locChoices.length; i++) {
+        if (Campaign.checkCondition(locChoices[i].condition)) {
+          combined.push({ choice: locChoices[i] });
         }
       }
       runScene(combined, function () {
@@ -5781,18 +5848,16 @@
     }
   }
 
-  function showCampaignComplete() {
-    Campaign.clearSave();
-    SFX.stopAmbient();
-    SFX.stopMusic();
-    SFX.startMusic("credits");
-    resultOverlay.classList.remove("is-hidden", "result-overlay--victory", "result-overlay--defeat");
-    resultOverlay.classList.add("result-overlay--victory");
+  function _renderCampaignCompleteBody() {
     var ngBtn = document.getElementById("btnNewGamePlus");
     if (ngBtn) {
       ngBtn.classList.remove("is-hidden");
       var ngLvl = (campaignState.newGamePlus || 0) + 1;
-      ngBtn.textContent = "New Game+ " + (ngLvl > 1 ? "(Cycle " + ngLvl + ")" : "");
+      if (typeof I18n !== "undefined" && I18n.t) {
+        ngBtn.textContent = ngLvl > 1 ? I18n.t("result.ngPlusCycle", { n: ngLvl }) : I18n.t("result.ngPlus");
+      } else {
+        ngBtn.textContent = "New Game+ " + (ngLvl > 1 ? "(Cycle " + ngLvl + ")" : "");
+      }
     }
 
     var endingLabels = {
@@ -5810,12 +5875,27 @@
       e: "The arena burns. The Colosseum screams. Cassius drags his brother from the rubble — alive, human, free. But everyone else is gone. Two brothers, surrounded by the wreckage of every choice that brought them here.",
     };
     var key = campaignState.endingKey || "c";
-
-    resultTitle.textContent = endingLabels[key] || "CAMPAIGN COMPLETE";
-    resultBody.innerHTML = '<p style="color:var(--fft-gold);">' + (endingDescs[key] || "The Ludi Aeternales are over.") + '</p>' +
-      '<p style="color:var(--fft-text-dim);margin-top:0.5rem;">The sand remembers.</p>';
+    var _i18e = typeof I18n !== "undefined" && I18n.t;
+    var titleEnd = _i18e ? I18n.t("endings." + key) : (endingLabels[key] || "CAMPAIGN COMPLETE");
+    if (!titleEnd || titleEnd === "endings." + key) titleEnd = endingLabels[key] || "CAMPAIGN COMPLETE";
+    resultTitle.textContent = titleEnd;
+    var desc = _i18e ? I18n.t("endings.desc." + key) : endingDescs[key];
+    if (!desc || desc === "endings.desc." + key) desc = endingDescs[key] || (_i18e ? I18n.t("result.campaignOver") : "The Ludi Aeternales are over.");
+    var sand = _i18e ? I18n.t("endings.sandRemembers") : "The sand remembers.";
+    resultBody.innerHTML = '<p style="color:var(--fft-gold);">' + desc + '</p>' +
+      '<p style="color:var(--fft-text-dim);margin-top:0.5rem;">' + sand + "</p>";
     var btnRetry = $("#btnResultRetry");
     if (btnRetry) btnRetry.classList.add("is-hidden");
+  }
+
+  function showCampaignComplete() {
+    Campaign.clearSave();
+    SFX.stopAmbient();
+    SFX.stopMusic();
+    SFX.startMusic("credits");
+    resultOverlay.classList.remove("is-hidden", "result-overlay--victory", "result-overlay--defeat");
+    resultOverlay.classList.add("result-overlay--victory");
+    _renderCampaignCompleteBody();
     trapFocus(resultOverlay);
     setTimeout(function() { ($("#btnResultContinue") || resultOverlay).focus(); }, 100);
   }
@@ -5830,10 +5910,12 @@
     hud.classList.remove("is-hidden");
     var m = Campaign.getMission();
     if (m) {
-      var diffLabel = (DIFFICULTY[campaignState.difficulty] || DIFFICULTY.normal).label;
+      var diffLabel = (typeof I18n !== "undefined" && I18n.difficultyLabel)
+        ? I18n.difficultyLabel(campaignState.difficulty || "normal")
+        : (DIFFICULTY[campaignState.difficulty] || DIFFICULTY.normal).label;
       hud.innerHTML = '<span class="campaign-hud__mission">' + Campaign.getMissionLabel() + '</span>' +
         ' &mdash; ' + Campaign.getActLabel() +
-        ' <span class="campaign-hud__diff">[' + _esc(diffLabel) + ']</span>';
+        ' <span class="campaign-hud__diff">' + _esc((typeof I18n !== "undefined" && I18n.t) ? I18n.t("hud.diffBracket", { label: diffLabel }) : ("[" + diffLabel + "]")) + '</span>';
     }
   }
 
@@ -6256,10 +6338,14 @@
   }
 
   function showSlotPicker(mode) {
+    lastSlotPickerMode = mode;
     var picker = document.getElementById("slotPicker");
     var slotsDiv = document.getElementById("slotPickerSlots");
     var titleEl = picker.querySelector(".slot-picker__title");
-    titleEl.textContent = mode === "new" ? "Pick a Slot for New Campaign" : "Continue Campaign";
+    var _sl = typeof I18n !== "undefined" && I18n.t;
+    titleEl.textContent = _sl
+      ? (mode === "new" ? I18n.t("title.slotTitleNew") : I18n.t("title.slotTitleCont"))
+      : (mode === "new" ? "Pick a Slot for New Campaign" : "Continue Campaign");
     slotsDiv.innerHTML = "";
 
     var diffPicker = document.getElementById("slotDiffPicker");
@@ -6273,17 +6359,25 @@
         btn.className = "btn slot-picker__btn";
         if (summary) {
           var d = new Date(summary.savedAt);
-          btn.innerHTML = "<strong>Slot " + (slot + 1) + "</strong><br>" + _esc(summary.missionName) + "<br><small>" + summary.rosterSize + " fighters · " + d.toLocaleDateString() + "</small>";
+          var slotWord = _sl ? I18n.t("title.slotWord") : "Slot";
+          var fightLine = _sl
+            ? I18n.t("title.fightersFmt", { n: summary.rosterSize, date: d.toLocaleDateString() })
+            : (summary.rosterSize + " fighters · " + d.toLocaleDateString());
+          btn.innerHTML = "<strong>" + _esc(slotWord) + " " + (slot + 1) + "</strong><br>" + _esc(summary.missionName) + "<br><small>" + fightLine + "</small>";
         } else {
-          btn.innerHTML = "<strong>Slot " + (slot + 1) + "</strong><br><em>Empty</em>";
+          var slotWordE = _sl ? I18n.t("title.slotWord") : "Slot";
+          var emptyW = _sl ? I18n.t("title.slotEmpty") : "Empty";
+          btn.innerHTML = "<strong>" + _esc(slotWordE) + " " + (slot + 1) + "</strong><br><em>" + _esc(emptyW) + "</em>";
         }
         var expBtn = document.createElement("button");
         expBtn.type = "button"; expBtn.className = "btn btn--ghost btn--tiny"; expBtn.textContent = "\u2b07";
-        expBtn.title = "Export save"; expBtn.setAttribute("aria-label", "Export slot " + (slot+1));
+        expBtn.title = _sl ? I18n.t("title.exportSave") : "Export save";
+        expBtn.setAttribute("aria-label", _sl ? I18n.t("title.exportAria", { n: slot + 1 }) : ("Export slot " + (slot + 1)));
         expBtn.addEventListener("click", function(e) { e.stopPropagation(); exportSlot(slot); });
         var impBtn = document.createElement("button");
         impBtn.type = "button"; impBtn.className = "btn btn--ghost btn--tiny"; impBtn.textContent = "\u2b06";
-        impBtn.title = "Import save"; impBtn.setAttribute("aria-label", "Import to slot " + (slot+1));
+        impBtn.title = _sl ? I18n.t("title.importSave", { n: slot + 1 }) : "Import save";
+        impBtn.setAttribute("aria-label", _sl ? I18n.t("title.importAria", { n: slot + 1 }) : ("Import to slot " + (slot + 1)));
         impBtn.addEventListener("click", function(e) { e.stopPropagation(); importSlot(slot); });
 
         var wrap = document.createElement("div");
@@ -6297,7 +6391,8 @@
 
         btn.addEventListener("click", function () {
           if (mode === "new") {
-            if (summary && !confirm("Overwrite Slot " + (slot + 1) + "?")) return;
+            var omsg = (_sl ? I18n.t("title.overwriteConfirm", { n: slot + 1 }) : ("Overwrite Slot " + (slot + 1) + "?"));
+            if (summary && !confirm(omsg)) return;
             var sel = document.getElementById("slotDiffSelect");
             campaignState.difficulty = sel ? sel.value : "normal";
             picker.classList.add("is-hidden");
@@ -6320,7 +6415,11 @@
 
   function exportSlot(slot) {
     var json = Campaign.exportSave(slot);
-    if (!json) { alert("Slot " + (slot+1) + " is empty."); return; }
+    if (!json) {
+      var em = (typeof I18n !== "undefined" && I18n.t) ? I18n.t("title.slotExportEmpty", { n: slot + 1 }) : ("Slot " + (slot + 1) + " is empty.");
+      alert(em);
+      return;
+    }
     var blob = new Blob([json], { type: "application/json" });
     var url = URL.createObjectURL(blob);
     var a = document.createElement("a");
@@ -6369,13 +6468,17 @@
     var mission = Campaign.getMission();
     budgetCurrent = Campaign.getBudget();
 
-    var preScene = filterScene(mission.preScene);
+    var rawPre = mission.preScene || [];
+    var preScene = filterScene((typeof I18n !== "undefined" && I18n.localizeMissionSteps)
+      ? I18n.localizeMissionSteps(mission.id, "pre", rawPre) : rawPre);
     var choices = mission.choices || [];
+    var locChoices = (typeof I18n !== "undefined" && I18n.localizeChoices)
+      ? I18n.localizeChoices(mission.id, choices) : choices;
 
     var combined = preScene.slice();
-    for (var i = 0; i < choices.length; i++) {
-      if (Campaign.checkCondition(choices[i].condition)) {
-        combined.push({ choice: choices[i] });
+    for (var i = 0; i < locChoices.length; i++) {
+      if (Campaign.checkCondition(locChoices[i].condition)) {
+        combined.push({ choice: locChoices[i] });
       }
     }
 
@@ -7905,6 +8008,37 @@
     renderer = new IsoRenderer(isoCanvas);
     renderer.resize(BOARD_W, BOARD_H);
     initSpriteCache();
+
+    if (typeof I18n !== "undefined") {
+      I18n.applyMeta();
+      I18n.applyStaticLabels();
+      if (I18n.syncLangButtons) I18n.syncLangButtons();
+      document.addEventListener("geminus-locale-change", function () {
+        I18n.applyMeta();
+        I18n.applyStaticLabels();
+        if (I18n.syncLangButtons) I18n.syncLangButtons();
+        updateCampaignHud();
+        updatePhaseBannerText();
+        if (state.phase === "ludus" || state.phase === "deploy") refreshRosterUI();
+        if (I18n.refreshSkirmishLabels) I18n.refreshSkirmishLabels();
+        var sp = document.getElementById("slotPicker");
+        if (sp && !sp.classList.contains("is-hidden")) showSlotPicker(lastSlotPickerMode);
+        var ro = document.getElementById("resultOverlay");
+        if (ro && !ro.classList.contains("is-hidden")) {
+          var ngVis = document.getElementById("btnNewGamePlus");
+          if (ngVis && !ngVis.classList.contains("is-hidden")) _renderCampaignCompleteBody();
+          else if (state._lastBattleResult) showResultOverlay(state._lastBattleResult, { quiet: true });
+        }
+      });
+    }
+    var btnLangEn = document.getElementById("btnLangEn");
+    var btnLangEs = document.getElementById("btnLangEs");
+    if (btnLangEn && typeof I18n !== "undefined" && I18n.setLocale) {
+      btnLangEn.addEventListener("click", function () { I18n.setLocale("en"); });
+    }
+    if (btnLangEs && typeof I18n !== "undefined" && I18n.setLocale) {
+      btnLangEs.addEventListener("click", function () { I18n.setLocale("es"); });
+    }
 
     isoCanvas.addEventListener("gesturestart", function (e) { e.preventDefault(); }, { passive: false });
     isoCanvas.addEventListener("gesturechange", function (e) { e.preventDefault(); }, { passive: false });
