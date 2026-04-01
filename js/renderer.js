@@ -103,11 +103,13 @@ var IsoRenderer = (function () {
   };
 
   var _adjustColorCache = {};
+  var _adjustColorCacheSize = 0;
   function _adjustColor(hex, delta) {
     if (!hex || typeof hex !== "string" || hex.length < 7 || hex[0] !== "#") return hex || "#000";
     var key = hex + delta;
     var cached = _adjustColorCache[key];
     if (cached) return cached;
+    if (_adjustColorCacheSize >= 2000) { _adjustColorCache = {}; _adjustColorCacheSize = 0; }
     var r = parseInt(hex.slice(1, 3), 16);
     var g = parseInt(hex.slice(3, 5), 16);
     var b = parseInt(hex.slice(5, 7), 16);
@@ -116,6 +118,7 @@ var IsoRenderer = (function () {
     b = Math.max(0, Math.min(255, b + delta));
     var result = "rgb(" + r + "," + g + "," + b + ")";
     _adjustColorCache[key] = result;
+    _adjustColorCacheSize++;
     return result;
   }
 
@@ -774,6 +777,7 @@ var IsoRenderer = (function () {
     var collapsedTiles = params.collapsedTiles || null;
     var glowTiles = params.glowTiles || null;
     var darkSky = params.darkSky || false;
+    var cursorTile = params.cursor || null;
 
     this._lastHeights = heights;
     if (!this.reducedMotion) this._pulsePhase = (this._pulsePhase + 0.06) % (Math.PI * 2);
@@ -967,6 +971,17 @@ var IsoRenderer = (function () {
           drawPy += unit.lungeY;
         }
         this._drawUnit(ctx, drawPx, drawPy, unit, unit.id === activeUnitId);
+      }
+
+      if (cursorTile && dc === cursorTile.x && dr === cursorTile.y) {
+        ctx.save();
+        _clipDiamond(ctx, px, py);
+        ctx.globalAlpha = this.reducedMotion ? 0.5 : 0.35 + 0.15 * Math.sin(performance.now() / 200);
+        ctx.strokeStyle = "#ffe066";
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        ctx.restore();
       }
     }
 
@@ -1440,8 +1455,8 @@ var IsoRenderer = (function () {
 
   // -- Sprite caching --
 
-  IsoRenderer.prototype.cacheSpriteFromSvg = function (classId, team, svgEl) {
-    var key = classId + "_" + team;
+  IsoRenderer.prototype.cacheSpriteFromSvg = function (classId, team, svgEl, rawKey) {
+    var key = rawKey ? classId : (classId + "_" + team);
     var w = 128;
     var h = 160;
     var svgStr = new XMLSerializer().serializeToString(svgEl);

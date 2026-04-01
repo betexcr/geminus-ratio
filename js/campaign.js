@@ -1,6 +1,6 @@
 /**
  * Geminus Ratio — Campaign Data & State
- * Defines all 14 missions (tutorial + 13 story), persistent campaign state, and helper functions.
+ * Defines 17 missions (tutorial + 16 story across branching paths), persistent campaign state, and helper functions.
  * Loaded before game.js — exposes globals: CAMPAIGN_MISSIONS, campaignState, Campaign
  */
 
@@ -13,8 +13,10 @@ var CAMPAIGN_MISSIONS = [
   // ─── TUTORIAL ─────────────────────────────────────────────────────
 
   {
-    id: 0,
+    id: "0",
     title: "The Practice Yard",
+    missionNum: 0,
+    next: "1",
     act: 1,
     tutorial: true,
     ritualMeter: 0,
@@ -35,14 +37,16 @@ var CAMPAIGN_MISSIONS = [
     skipLudus: false,
     carryHp: false,
     preScene: [
-      { speaker: null, text: "Before dawn, the ludus of Publius stirs. A small yard of packed sand, cracked wooden posts, and a handful of fighters who dream of more." },
-      { speaker: "CASSIUS", text: "The men need drilling before I spend a single denarius on the arena circuit. Let's see what they're made of.", style: "internal" },
-      { speaker: null, text: "Cassius arranges a practice bout — two of the house fighters will stand in as opponents. No crowd, no glory. Just steel and sweat." },
+      { speaker: null, text: "Before dawn. The ludus of Publius — a piss-poor yard of packed sand, splintered posts, and men too stubborn or too stupid to die somewhere comfortable." },
+      { speaker: "CASSIUS", text: "Half of them can barely hold a sword straight. The other half hold it straight at each other's throats. Gods help me.", style: "internal" },
+      { speaker: null, text: "Cassius drags two groaning fighters out of their cots for a practice bout. No crowd, no coin, no glory. Just iron and the sound of bones learning where they shouldn't bend." },
+      { speaker: "CASSIUS", text: "If any of you die in practice, I swear to Jupiter I will piss on your graves. Get up." },
     ],
     postScene: [
-      { speaker: "CASSIUS", text: "Not bad. We won't embarrass ourselves, at least.", style: "internal" },
-      { speaker: null, text: "A rider dismounts at the gate. He carries a sealed tablet stamped with the Colosseum's sigil." },
-      { speaker: null, text: "The Ludi Aeternales have been announced. Every ludus in the empire is summoned." },
+      { speaker: "CASSIUS", text: "Not terrible. We won't embarrass the old man's name. Not today, anyway.", style: "internal" },
+      { speaker: null, text: "A rider dismounts at the gate. He carries a sealed tablet stamped with the Colosseum's sigil. His horse looks better fed than anyone in the ludus." },
+      { speaker: null, text: "The Ludi Aeternales. The grandest tournament in the Empire. Every ludus summoned. Prize money enough to drown a man's debts — or bury them with him." },
+      { speaker: "CASSIUS", text: "Publius, you old bastard. You died and left me this circus. I hope you're laughing.", style: "internal" },
     ],
     choices: [],
   },
@@ -50,8 +54,10 @@ var CAMPAIGN_MISSIONS = [
   // ─── ACT I: THE TOURNAMENT ────────────────────────────────────────
 
   {
-    id: 1,
+    id: "1",
     title: "The Summons",
+    missionNum: 1,
+    next: "2",
     act: 1,
     ritualMeter: 5,
     budget: 100,
@@ -75,22 +81,26 @@ var CAMPAIGN_MISSIONS = [
     skipLudus: false,
     carryHp: false,
     preScene: [
-      { speaker: null, text: "The Ludi Aeternales have been announced. Every ludus in the empire is summoned to the Colosseum." },
-      { speaker: "CASSIUS", text: "The debts are piling up. Publius's ludus barely fills a practice yard. But the prize money...", style: "internal" },
-      { speaker: null, text: "A messenger arrives with a rumor: a gladiator matching Titus's description has been seen in the qualifying rounds. A twin, fighting under no lanista's name." },
-      { speaker: "CASSIUS", text: "Fifteen years. I'd given up hoping. I haven't stopped looking.", style: "internal" },
+      { speaker: null, text: "Rome swallows them whole. The Colosseum rises over the ludus quarter like a limestone god, its shadow cold even at noon." },
+      { speaker: "CASSIUS", text: "Debts on every wall. Publius's name scratched off half the creditor's lists because they gave up collecting from a dead man. Lucky me — I inherited the list.", style: "internal" },
+      { speaker: null, text: "A runner from the qualifying grounds — breathless, smelling of cheap wine — brings a rumor: a gladiator matching Titus's description. Tall, dark-haired, fights with two blades. No lanista. No name." },
+      { speaker: "CASSIUS", text: "Fifteen years. Fifteen years of looking at every fighter in every piss-stained arena from here to Britannia. And now a rumor. A goddamn rumor.", style: "internal" },
+      { speaker: "CASSIUS", text: "But that's enough. It's always been enough.", style: "internal" },
     ],
     postScene: [
-      { speaker: null, text: "The crowd is indifferent — a qualifying bout, nothing special. But Cassius is in." },
-      { speaker: "CASSIUS", text: "The Colosseum. I never thought I'd stand here.", style: "internal" },
-      { speaker: null, text: "A glimpse across the hypogeum corridor: a tall fighter is led past by two arena officials. His face is turned away. Cassius calls out. The officials walk faster." },
+      { speaker: null, text: "The crowd barely notices — a qualifying bout between no-names. But Cassius is in. His hands are still shaking." },
+      { speaker: "CASSIUS", text: "The Colosseum. I used to dream about this place. Now I'm standing in its guts and all I can think about is whether my brother's somewhere in here, and whether he'd even know my face.", style: "internal" },
+      { speaker: null, text: "A glimpse across the hypogeum corridor: a tall fighter led past by two officials in dark tunics. His face is turned away. Cassius shouts his brother's name. The officials walk faster. The fighter doesn't turn." },
+      { speaker: "CASSIUS", text: "Titus.", style: "internal" },
     ],
     choices: [],
   },
 
   {
-    id: 2,
+    id: "2",
     title: "First Blood",
+    missionNum: 2,
+    next: "3",
     act: 1,
     ritualMeter: 12,
     budget: 110,
@@ -116,22 +126,26 @@ var CAMPAIGN_MISSIONS = [
     skipLudus: false,
     carryHp: false,
     preScene: [
-      { speaker: null, text: "The Colosseum proper. Fifty thousand voices. The air tastes of sand and iron." },
-      { speaker: "LURCO", text: "Publius's boy. I heard the old man died in debt. Fitting you'd come here to do the same." },
-      { speaker: "CASSIUS", text: "We'll see who the sand remembers." },
-      { speaker: "LURCO", text: "My fighters don't lose to strays." },
+      { speaker: null, text: "Fifty thousand throats screaming for blood that isn't theirs. The sand is still wet from the last bout — they didn't bother raking it. Flies everywhere." },
+      { speaker: "LURCO", text: "Well, shit. Publius's whelp actually showed up. Your old man died owing half of Rome. You here to pay it off in teeth?" },
+      { speaker: "CASSIUS", text: "I'm here to knock yours out. But please — keep talking." },
+      { speaker: "LURCO", text: "Cute. My fighters eat boys like you for breakfast. Literally — one of them's Thracian. They do that." },
+      { speaker: "CASSIUS", text: "At least they're eating.", style: "internal" },
     ],
     postScene: [
-      { speaker: null, text: "The crowd stirs. A small ludus beating Lurco's funded brutes — that's a story." },
-      { speaker: "LURCO", text: "You have no idea whose games these are, boy." },
-      { speaker: null, text: "That night, Cassius hears his gladiators talking. Strange dreams. A dark room. Breathing that isn't theirs." },
+      { speaker: null, text: "Lurco's funded brutes lie bleeding in the sand. A small ludus from nowhere just gutted the favorite. The crowd smells an underdog story and they're salivating." },
+      { speaker: "LURCO", text: "Enjoy it, boy. You have no idea whose games these are. And when you find out, you'll wish you'd stayed in that dirt-floor ludus." },
+      { speaker: null, text: "That night, Cassius hears his gladiators whispering. Strange dreams. A dark room beneath stone. Breathing that isn't theirs. One of them was crying in his sleep." },
+      { speaker: "CASSIUS", text: "Just nerves. It's just nerves. We're all nervous.", style: "internal" },
     ],
     choices: [],
   },
 
   {
-    id: 3,
+    id: "3",
     title: "The Conspirator",
+    missionNum: 3,
+    next: [{ condition: "livia_allied_early", goto: "4A" }, { goto: "4B" }],
     act: 1,
     ritualMeter: 20,
     budget: 120,
@@ -157,30 +171,36 @@ var CAMPAIGN_MISSIONS = [
     skipLudus: false,
     carryHp: false,
     preScene: [
-      { speaker: null, text: "A woman in a senator's stola finds Cassius in the ludus quarter after hours." },
-      { speaker: "LIVIA", text: "You beat Lurco. That's not easy. It's also not supposed to happen." },
-      { speaker: "LIVIA", text: "The brackets aren't random. Certain lanistae always advance. Senators who oppose the Emperor have had their gladiators entered — and killed." },
-      { speaker: "LIVIA", text: "I need eyes inside the tournament. Someone the Editor hasn't already bought." },
+      { speaker: null, text: "Past midnight. A woman appears in the ludus quarter — expensive stola, expensive perfume, the kind of calm that comes from having men killed for a living." },
+      { speaker: "LIVIA", text: "You beat Lurco. Impressive. It's also not supposed to happen. The brackets are rigged, gladiator. Have been for years." },
+      { speaker: "CASSIUS", text: "And you know this because...?" },
+      { speaker: "LIVIA", text: "Because my father is a senator, and three of his allies have had their champions murdered in this tournament. Not defeated — murdered. Poisoned water, sabotaged armor, bribed referees." },
+      { speaker: "LIVIA", text: "I need someone inside. Someone the Editor hasn't bought. Someone too poor and too angry to sell." },
+      { speaker: "CASSIUS", text: "Flattering.", style: "internal" },
     ],
     postScene: [
-      { speaker: "NERVA", text: "Not bad for a first outing. I've had worse lanistae. Most of them are dead, but still.", condition: "nerva_alive" },
-      { speaker: null, text: "The dead gladiator from the opposing side is carried out through the hypogeum. As the stretcher passes, the body's hand twitches. A spasm. Probably a spasm." },
+      { speaker: "NERVA", text: "Not bad for a first outing, boss. I've had worse lanistae. Most of them are dead, but still — low bar.", condition: "nerva_alive" },
+      { speaker: "NERVA", text: "One of them once tried to pay me in cheese. Actual cheese. I stayed for two months. It was really good cheese.", condition: "nerva_alive" },
+      { speaker: null, text: "The dead gladiator from the opposing side is carried out through the hypogeum on a stretcher. As it passes, the body's hand twitches. Fingers curl. A spasm. Probably a spasm." },
+      { speaker: "CASSIUS", text: "Probably.", style: "internal" },
     ],
     choices: [
       {
         id: "livia_offer",
-        prompt: "Livia awaits your answer.",
+        prompt: "Livia waits. She doesn't blink often enough.",
         options: [
-          { label: "\"I'm listening.\"", flag: "livia_allied_early" },
-          { label: "\"I'm here for my brother, not your politics.\"", flag: null },
+          { label: "\"I'm listening. But I don't come cheap.\"", flag: "livia_allied_early" },
+          { label: "\"I'm here for my brother, not your Senate shit.\"", flag: null },
         ],
       },
     ],
   },
 
   {
-    id: 4,
+    id: "4A",
     title: "The Rigged Bout",
+    missionNum: 4,
+    next: "5A",
     act: 1,
     ritualMeter: 30,
     budget: 120,
@@ -208,23 +228,77 @@ var CAMPAIGN_MISSIONS = [
     skipLudus: false,
     carryHp: false,
     preScene: [
-      { speaker: null, text: "Before Cassius's match, he watches another bout from the holding area." },
-      { speaker: null, text: "A gladiator named Corvinus — strong, experienced, favored to win — enters against an unremarkable opponent. He fights brilliantly for two rounds, then drops his guard. He dies on the sand." },
-      { speaker: "CASSIUS", text: "He threw that fight. I've seen enough bouts to know. But why?", style: "internal" },
-      { speaker: null, text: "After the match, Corvinus's lanista — Fabius — is found dead in his cell. Officials say heart failure." },
-      { speaker: "LIVIA", text: "Fabius was asking questions about the brackets. Now he's dead. Be careful.", condition: "livia_allied_early" },
+      { speaker: null, text: "From the holding area, Cassius watches the bout before his. A gladiator named Corvinus — big, experienced, the bookmakers' darling — enters against a nobody." },
+      { speaker: null, text: "Corvinus fights beautifully for two rounds. Then he drops his guard like a man setting down a heavy load. The nobody's sword finds his throat. The sand turns dark." },
+      { speaker: "CASSIUS", text: "He threw that fight. I've seen a thousand bouts. A man doesn't forget to block. He chooses not to.", style: "internal" },
+      { speaker: null, text: "An hour later, Corvinus's lanista — a man named Fabius — is found dead in his cell. Heart failure, the officials say. Fabius was forty, built like a bull, and was asking questions about the brackets." },
+      { speaker: "LIVIA", text: "Fabius was getting close to something. Now he's meat. Watch your back — the Editor's people don't warn twice." },
     ],
     postScene: [
-      { speaker: null, text: "Victory. But Cassius is shaken. Fabius is dead. The brackets are rigged. And somewhere in this tournament, his brother is fighting." },
-      { speaker: null, text: "Scaeva appears in the corridor. He says nothing. He looks at Cassius for a long moment, then walks away." },
-      { speaker: "LIVIA", text: "Tomorrow's matches include a fighter from the Editor's personal stable. I've never seen one fight before. Have you?", condition: "livia_allied_early" },
+      { speaker: null, text: "Victory. But it tastes like ashes. Fabius is dead. The brackets are a slaughterhouse conveyor. And somewhere in this machine, Titus fights." },
+      { speaker: null, text: "Scaeva — old, scarred, built like a wall with opinions — appears in the corridor. He says nothing. Looks at Cassius like a man measuring a coffin. Then walks away." },
+      { speaker: "LIVIA", text: "Tomorrow's bout features one of the Editor's personal fighters. Nobody's seen them in training. Nobody knows where they come from. Cassius — be careful what you see." },
+      { speaker: "CASSIUS", text: "I'm always careful. That's why I'm still breathing.", style: "internal" },
+    ],
+    choices: [],
+  },
+
+  // ─── M4B: THE PIT (LONE WOLF PATH) ────────────────────────────────
+
+  {
+    id: "4B",
+    title: "The Pit",
+    missionNum: 4,
+    next: "5B",
+    act: 1,
+    ritualMeter: 28,
+    budget: 115,
+    enemyLevel: 2,
+    unlockedClasses: ["murmillo", "retiarius", "samnite", "thraex", "secutor", "hoplomachus", "sagittarius", "essedarius"],
+    enemies: [
+      { classId: "dimachaerus" },
+      { classId: "provocator" },
+      { classId: "samnite" },
+      { classId: "secutor" },
+      { classId: "dimachaerus" },
+    ],
+    terrain: [
+      { x: 3, y: 3, type: "building" },
+      { x: 8, y: 5, type: "building" },
+      { x: 5, y: 4, type: "water_shallow" },
+      { x: 6, y: 4, type: "water_shallow" },
+    ],
+    mapModifiers: [],
+    winCondition: "defeat_all",
+    victoryBonus: 20,
+    perfectBonus: 5,
+    flagsToSet: ["pit_fought"],
+    freeRecruits: [],
+    skipLudus: false,
+    carryHp: false,
+    preScene: [
+      { speaker: null, text: "Without allies, Cassius walks blind. His next match isn't even in the arena — it's in the undercroft. An unsanctioned bout in a room that smells like old blood and rat piss." },
+      { speaker: null, text: "No medical staff. No missio. No rules except the last man standing walks out. The Editor wants to make a point about what happens to upstarts." },
+      { speaker: "CASSIUS", text: "The Pit. Where they send fighters they want broken before the crowd can fall in love with them. Charming.", style: "internal" },
+      { speaker: null, text: "Word reaches the holding area: Fabius, a lanista who was asking questions about rigged brackets, found dead in his cell. Heart failure, they say. Fabius was forty and could bend iron bars." },
+      { speaker: "CASSIUS", text: "Heart failure. Sure. And I'm the Emperor's nephew.", style: "internal" },
+    ],
+    postScene: [
+      { speaker: null, text: "Five men down. No crowd to cheer, no sand to soak the blood — just stone and silence and the sound of Cassius's own breathing." },
+      { speaker: null, text: "From the corridor above, a woman watches. Senator's stola, eyes like a hawk counting mice." },
+      { speaker: "LIVIA", text: "Stubborn man. I like that. But stubbornness has an expiration date down here." },
+      { speaker: "CASSIUS", text: "I'm not interested in your games." },
+      { speaker: "LIVIA", text: "They're not my games, gladiator. They're the Emperor's. And he plays for keeps." },
+      { speaker: null, text: "At the far end of the corridor, Scaeva leans against the wall. He watches. Says nothing. Then leaves." },
     ],
     choices: [],
   },
 
   {
-    id: 5,
+    id: "5A",
     title: "The Ghost in the Sand",
+    missionNum: 5,
+    next: "6",
     act: 1,
     ritualMeter: 40,
     budget: 130,
@@ -250,38 +324,94 @@ var CAMPAIGN_MISSIONS = [
     skipLudus: false,
     carryHp: false,
     preScene: [
-      { speaker: null, text: "Before Cassius's match, another bout is staged. The crowd is electric — the Editor's champion is fighting." },
-      { speaker: null, text: "Titus enters the arena. Cassius recognizes him instantly — the jawline, the stance, the way he holds his shoulders. But everything else is wrong." },
-      { speaker: null, text: "Titus fights a team of four gladiators. He dismantles them in minutes. He moves like something that learned to move by watching humans and decided it could do better. The crowd screams. Titus's face shows nothing." },
-      { speaker: null, text: "Arena officials in dark tunics block Cassius's path to the hypogeum entrance." },
-      { speaker: "OFFICIAL", text: "The Editor's fighters are in seclusion between bouts. No visitors." },
-      { speaker: "CASSIUS", text: "That's my brother." },
-      { speaker: "OFFICIAL", text: "I don't know what you mean." },
-      { speaker: "LIVIA", text: "You saw him. You see why I need you.", condition: "!livia_allied_early" },
+      { speaker: null, text: "The crowd goes feral before Cassius's bout even begins. The Editor's champion is fighting. They've been waiting for this." },
+      { speaker: null, text: "Titus walks out. Cassius's stomach drops through the floor." },
+      { speaker: null, text: "The jawline. The shoulders. The way he shifts his weight before a strike — that's their father's stance, burned into muscle memory since boyhood. But the eyes are dead glass. The skin has a wrong color. He moves like a wolf wearing a man's skin." },
+      { speaker: null, text: "Four gladiators charge him. Titus takes them apart in ninety seconds. No wasted movement, no expression, no mercy. One of them is still screaming when officials drag him out." },
+      { speaker: "CASSIUS", text: "That's him. That's my brother. What the fuck did they do to him?", style: "internal" },
+      { speaker: null, text: "Officials in dark tunics block the hypogeum entrance, arms crossed." },
+      { speaker: "OFFICIAL", text: "The Editor's fighters are in seclusion. No exceptions." },
+      { speaker: "CASSIUS", text: "That man is my twin brother." },
+      { speaker: "OFFICIAL", text: "Sir, I don't know what you mean. Please return to your holding area." },
     ],
     postScene: [
-      { speaker: "VALERIA", text: "Good fight. Your old man taught you well." },
+      { speaker: "VALERIA", text: "Good fight out there. Your old man taught you well — I can see Publius in the way you move." },
       { speaker: "CASSIUS", text: "You knew Publius?" },
-      { speaker: "VALERIA", text: "My husband did. Before..." },
-      { speaker: null, text: "That night, Cassius dreams of the dark room. The stone floor. The breathing. He wakes with the taste of iron in his mouth." },
+      { speaker: "VALERIA", text: "My husband did. Before the arena took him too. Before it takes everyone." },
+      { speaker: null, text: "That night, Cassius dreams of the dark room again. Stone floor, cold as a tomb. Breathing that isn't his. He wakes with iron on his tongue and tears on his face." },
+      { speaker: "CASSIUS", text: "I found you, brother. I found you and they won't even let me look at you.", style: "internal" },
+    ],
+    choices: [
+      {
+        id: "livia_twin",
+        prompt: "Livia watched your face during Titus's bout. She saw everything.",
+        options: [
+          { label: "\"The champion is my twin brother. They've done something to him.\"", flag: "livia_knows_twin" },
+          { label: "\"It's nothing. I was just... impressed by the fighting.\"", flag: null },
+        ],
+      },
+    ],
+  },
+
+  // ─── M5B: GHOST IN THE SAND (LONE WOLF PATH) ──────────────────────
+
+  {
+    id: "5B",
+    title: "The Ghost in the Sand",
+    missionNum: 5,
+    next: "6",
+    act: 1,
+    ritualMeter: 40,
+    budget: 125,
+    enemyLevel: 2,
+    unlockedClasses: ["murmillo", "retiarius", "samnite", "thraex", "secutor", "hoplomachus", "provocator", "dimachaerus", "sagittarius", "essedarius"],
+    enemies: [
+      { classId: "thraex" },
+      { classId: "dimachaerus" },
+      { classId: "thraex" },
+      { classId: "dimachaerus" },
+      { classId: "secutor" },
+      { classId: "provocator" },
+    ],
+    terrain: [
+      { x: 4, y: 4, type: "building" },
+      { x: 7, y: 4, type: "building" },
+      { x: 5, y: 7, type: "water_shallow" },
+    ],
+    mapModifiers: [],
+    winCondition: "defeat_all",
+    victoryBonus: 15,
+    perfectBonus: 5,
+    flagsToSet: ["titus_glimpsed"],
+    freeRecruits: [],
+    skipLudus: false,
+    carryHp: false,
+    preScene: [
+      { speaker: null, text: "The crowd goes feral. The Editor's champion is fighting — the one nobody's seen in training, the ghost that appears only under the lights." },
+      { speaker: null, text: "Titus walks out. And Cassius's world stops." },
+      { speaker: null, text: "Same face. Same broad shoulders, same way of rolling his wrists before a fight. Their father's stance. But the eyes — dead obsidian. Skin the color of old ash. Something wearing his brother like a suit." },
+      { speaker: null, text: "Four gladiators rush him. Titus carves through them like a butcher jointing meat. Methodical. Silent. One of them crawls toward the gate trailing blood. Titus watches him crawl and does nothing." },
+      { speaker: "CASSIUS", text: "Titus. Oh gods. Oh gods, what did they do to you?", style: "internal" },
+      { speaker: null, text: "Officials block the hypogeum entrance. Arms crossed, faces blank as temple statues." },
+      { speaker: "OFFICIAL", text: "No visitors. The Editor's property is in seclusion." },
+      { speaker: "CASSIUS", text: "Property? That's my brother, you bureaucratic piece of —" },
+      { speaker: "OFFICIAL", text: "Return to your holding area, sir." },
+      { speaker: "LIVIA", text: "You saw him. You see what they've done. I can help you — but you have to let me." },
+    ],
+    postScene: [
+      { speaker: "VALERIA", text: "Not bad out there. Your old man would've been proud — Publius always said his boys were fighters." },
+      { speaker: "CASSIUS", text: "You knew Publius?" },
+      { speaker: "VALERIA", text: "My husband did. Before the arena chewed him up and spat out bones. Same as it does to everyone." },
+      { speaker: null, text: "That night, the dream again. Darker now. Stone floor cold as death, breathing that isn't his, and at the edge of vision — a face. His face. Staring back without recognition." },
+      { speaker: "CASSIUS", text: "I'm coming for you, brother. Even if I have to tear this whole fucking Colosseum apart.", style: "internal" },
     ],
     choices: [
       {
         id: "livia_alliance_late",
-        condition: "!livia_allied_early",
-        prompt: "Livia approaches after the match. \"You saw what they did to that man. I can help you — but I need your help too.\"",
+        prompt: "Livia appears in the corridor, backlit by torchlight. \"You saw what they did to that man. I can help you reach him — but I need something in return.\"",
         options: [
-          { label: "\"After what I just saw… I'm in.\"", flag: "livia_allied_late" },
-          { label: "\"I work alone.\"", flag: null },
-        ],
-      },
-      {
-        id: "livia_twin",
-        condition: "livia_allied_early",
-        prompt: "Livia is watching. She noticed your reaction to the Editor's champion.",
-        options: [
-          { label: "Tell Livia about Titus.", flag: "livia_knows_twin" },
-          { label: "Keep Titus secret.", flag: null },
+          { label: "\"After what I just saw… I'm in. Whatever it takes.\"", flag: "livia_allied_late" },
+          { label: "\"I don't need a politician's help. I work alone.\"", flag: null },
         ],
       },
     ],
@@ -290,8 +420,10 @@ var CAMPAIGN_MISSIONS = [
   // ─── ACT II: THE DESCENT ──────────────────────────────────────────
 
   {
-    id: 6,
+    id: "6",
     title: "Into the Dark",
+    missionNum: 6,
+    next: "7",
     act: 2,
     ritualMeter: 50,
     budget: 130,
@@ -323,26 +455,41 @@ var CAMPAIGN_MISSIONS = [
     skipLudus: false,
     carryHp: false,
     preScene: [
-      { speaker: null, text: "Cassius descends into the hypogeum after hours, following the corridor Titus was led through." },
-      { speaker: null, text: "The brick gives way to older stone. The air changes — colder, wetter, wrong. Torches on the walls flicker in unison, a slow pulse like breathing." },
-      { speaker: null, text: "In a chamber below, Ferox sits motionless on a stone bench. His eyes are open but unfocused." },
-      { speaker: "FEROX", text: "You should not be here. The Editor does not allow visitors." },
-      { speaker: "CASSIUS", text: "What did they do to you?" },
-      { speaker: "FEROX", text: "They made me better." },
-      { speaker: null, text: "Arena officials discover Cassius. He is escorted out. His next match has been \"moved up.\" This is a warning." },
+      { speaker: null, text: "After midnight, Cassius descends into the hypogeum. Past the guard rotation, past the holding pens that smell of sweat and fear, following the corridor Titus was led through." },
+      { speaker: null, text: "The brick gives way to older stone — Republican-era, maybe older. The air turns cold and wet and wrong. Torches along the walls flicker in unison, a slow pulse like something enormous breathing through the walls." },
+      { speaker: "CASSIUS", text: "This doesn't feel like a building. It feels like a throat.", style: "internal" },
+      { speaker: null, text: "In a chamber below, a man sits motionless on a stone bench. Ferox. His eyes are open but focused on nothing — or something nobody else can see." },
+      { speaker: "FEROX", text: "You should not be here. The Editor does not allow visitors. The Editor does not allow. The Editor." },
+      { speaker: "CASSIUS", text: "What did they do to you, man?" },
+      { speaker: "FEROX", text: "They made me better. I am better. I do not remember being worse but I was. I was worse. I was..." },
+      { speaker: null, text: "Arena officials find Cassius before Ferox can finish. He's escorted out at spear-point. His next match has been 'moved up.' The official smiles when he says it." },
+      { speaker: "CASSIUS", text: "A warning. They're sending me a goddamn warning.", style: "internal" },
     ],
     postScene: [
-      { speaker: null, text: "Ferox, when defeated, does not collapse like normal gladiators. He kneels, slowly, and his eyes focus for the first time." },
-      { speaker: "FEROX", text: "...I remember mornings." },
-      { speaker: null, text: "The crowd is silent for three heartbeats. Then they cheer. They don't know why they were silent." },
-      { speaker: "NERVA", text: "That fighter... he wasn't right. His eyes. Did you see his eyes?", condition: "nerva_alive" },
+      { speaker: null, text: "When Ferox falls, he doesn't collapse like a man. He kneels, slowly, deliberately, like a puppet whose strings are being cut one by one. His eyes focus for the first time." },
+      { speaker: "FEROX", text: "...I remember mornings. Bread. Warm bread, and someone's hand on my shoulder, and I can't remember whose hand." },
+      { speaker: null, text: "The crowd goes silent. Fifty thousand people, mid-scream, suddenly mute. Three heartbeats. Then they cheer, and none of them know why they stopped." },
+      { speaker: "NERVA", text: "Boss. That fighter — his eyes. They weren't human eyes. Something was looking out of them. Something old.", condition: "nerva_alive" },
+      { speaker: null, text: "Ferox lies still. His breathing is shallow, mechanical. Whatever they made him into, the man underneath is a ruin. Shattered pottery with a few painted fragments still showing.", condition: "ferox_mercy" },
+      { speaker: null, text: "Ferox kneels in the sand, trembling. He's trying to remember something — you can see it in the way his lips move, shaping words he can't find. Clinging to scraps of himself like a drowning man.", condition: "ferox_spared" },
     ],
-    choices: [],
+    choices: [
+      {
+        id: "ferox_fate",
+        prompt: "Ferox kneels in the sand, trembling. A broken thing. His lips move, shaping words he can't find. The crowd waits. Your sword is in your hand.",
+        options: [
+          { label: "Put him down. No one should live like that.", flag: "ferox_mercy" },
+          { label: "Let him live. He remembered mornings. That's something.", flag: "ferox_spared" },
+        ],
+      },
+    ],
   },
 
   {
-    id: 7,
+    id: "7",
     title: "The Old Wolf",
+    missionNum: 7,
+    next: "8",
     act: 2,
     ritualMeter: 58,
     budget: 140,
@@ -369,34 +516,38 @@ var CAMPAIGN_MISSIONS = [
     skipLudus: false,
     carryHp: false,
     preScene: [
-      { speaker: null, text: "Scaeva corners Cassius in the ludus quarter." },
-      { speaker: "SCAEVA", text: "I've been doing this for thirty years. I've seen lanistae poke around the lower levels. Ask questions. I've seen what happens to them." },
-      { speaker: "CASSIUS", text: "What happens?" },
-      { speaker: "SCAEVA", text: "They stop asking. One way or another." },
-      { speaker: "SCAEVA", text: "Your father was a man who asked questions too. I knew Gaius Geminus. I know what he died for." },
-      { speaker: "SCAEVA", text: "What's down there is bigger than one man's courage." },
+      { speaker: null, text: "Scaeva blocks Cassius's path in the ludus quarter. Up close, the old man looks like a leather map of every bad decision the arena ever made." },
+      { speaker: "SCAEVA", text: "Thirty years in this meat grinder, boy. I've watched lanistae poke around the lower levels. Ask the wrong questions. Every single one of them stopped asking." },
+      { speaker: "CASSIUS", text: "Stopped how?" },
+      { speaker: "SCAEVA", text: "Some stopped breathing. Some just... stopped being themselves. Got that look in their eyes, like the lights were on but nobody was home. Sound familiar?" },
+      { speaker: "SCAEVA", text: "I knew your father. Gaius Geminus. Tough bastard, good heart, terrible judgment. He found something under this arena that scared him shitless. And he didn't scare easy." },
+      { speaker: "CASSIUS", text: "My father died in a border skirmish." },
+      { speaker: "SCAEVA", text: "Is that what they told you? That's cute." },
     ],
     postScene: [
-      { speaker: "LURCO", text: "The Emperor will hear of this!" },
-      { speaker: null, text: "He's right. The Emperor does hear. And the Emperor is not displeased — Lurco was always expendable." },
-      { speaker: "SCAEVA", text: "Aemilia. She's one of mine. Sharp eyes, sharper spear. She'll watch your back.", condition: "scaeva_allied" },
-      { speaker: "AEMILIA", text: "I've seen those fighters. The empty ones. Something feeds them. I can feel it in the sand.", condition: "scaeva_allied" },
+      { speaker: "LURCO", text: "The Emperor will hear of this! You're finished, all of you!" },
+      { speaker: null, text: "He's right. The Emperor hears. And the Emperor doesn't mind at all — Lurco was always expendable. The old wolf whimpers off to lick his wounds." },
+      { speaker: "SCAEVA", text: "Aemilia. She's mine. Best eyes in the arena and she can put a spear through a denarius at thirty paces. She'll watch your back.", condition: "scaeva_allied" },
+      { speaker: "AEMILIA", text: "I've seen the Gifted up close. Those empty-eyed bastards. Something feeds them — I can feel it through the sand, like a heartbeat under the floor.", condition: "scaeva_allied" },
+      { speaker: "AEMILIA", text: "Don't give me that look. I'm not crazy. You've felt it too.", condition: "scaeva_allied" },
     ],
     choices: [
       {
         id: "scaeva_help",
-        prompt: "Scaeva has shown his hand. He knows more than he says.",
+        prompt: "Scaeva's said more in five minutes than he has in thirty years. He's scared. And he's offering to help anyway.",
         options: [
-          { label: "\"Then help me.\"", flag: "scaeva_allied" },
-          { label: "\"I understand the warning.\"", flag: null },
+          { label: "\"Then fight with me. Whatever's down there — we face it together.\"", flag: "scaeva_allied" },
+          { label: "\"I appreciate the warning, old man. But this is my fight.\"", flag: null },
         ],
       },
     ],
   },
 
   {
-    id: 8,
+    id: "8",
     title: "Valeria's Reckoning",
+    missionNum: 8,
+    next: "9",
     act: 2,
     ritualMeter: 65,
     budget: 140,
@@ -426,29 +577,37 @@ var CAMPAIGN_MISSIONS = [
     skipLudus: false,
     carryHp: false,
     preScene: [
-      { speaker: null, text: "Cassius has found maintenance logs in the hypogeum referencing \"Corvus, M.\" — Valeria's husband. The logs describe a \"containment incident\" in the lower levels." },
-      { speaker: null, text: "Marcus Corvus found something he shouldn't have. The \"malfunction\" that killed him was no accident." },
+      { speaker: null, text: "Cassius finds maintenance logs in a forgotten hypogeum office. Yellowed paper, cramped handwriting. One name keeps appearing: 'Corvus, M.' — Valeria's husband, Marcus." },
+      { speaker: null, text: "The logs describe a 'containment incident' in the lower levels. A maintenance worker breached an unauthorized area. The 'malfunction' that killed him involved no machinery. The body showed signs of 'accelerated senescence.' He aged thirty years in minutes." },
+      { speaker: "CASSIUS", text: "Marcus didn't die in an accident. He found something, and they killed him for it. And Valeria has no idea.", style: "internal" },
     ],
     postScene: [
-      { speaker: "VALERIA", text: "Marcus died trying to stop this. I won't let that be for nothing.", condition: "valeria_allied" },
-      { speaker: null, text: "Cassius hears that Valeria Corvus's ludus suffered a fire overnight. No survivors among the gladiators. Valeria herself has vanished.", condition: "valeria_unwarned" },
-      { speaker: null, text: "That night, Cassius dreams again. The dark room. But this time he sees the stone — black, polished, with symbols carved deep. At the edge of the room, a figure turns toward him. It has his face." },
+      { speaker: "VALERIA", text: "I always knew it wasn't an accident. I knew it in my gut. Marcus was careful — he didn't make mistakes. They murdered him.", condition: "valeria_allied" },
+      { speaker: "VALERIA", text: "Thank you for telling me. Most men in this place would have kept their mouths shut. Marcus died trying to stop something terrible. I won't let that be for nothing.", condition: "valeria_allied" },
+      { speaker: null, text: "A fire breaks out in Valeria's ludus overnight. By dawn, it's ashes. No survivors among the gladiators. Valeria herself has vanished — fled or buried in the rubble.", condition: "valeria_unwarned" },
+      { speaker: "CASSIUS", text: "I should have told her. I should have goddamn told her.", style: "internal", condition: "valeria_unwarned" },
+      { speaker: null, text: "The Editor's man delivers a leather pouch. Fifty denarii, freshly minted. That night, Valeria's ludus burns. Cassius hears the screaming from across the quarter.", condition: "valeria_betrayed" },
+      { speaker: "CASSIUS", text: "Fifty denarii. I sold a woman's husband's memory for fifty denarii. I sold her gladiators' lives for fifty denarii. I'll count them in hell.", style: "internal", condition: "valeria_betrayed" },
+      { speaker: null, text: "The dream comes again. Darker. The room is colder. The black stone has symbols carved deep — not in any alphabet Cassius knows. At the edge of the room, a figure turns toward him. It has his face. It smiles." },
     ],
     choices: [
       {
         id: "valeria_truth",
-        prompt: "You know the truth about Valeria's husband. What do you do?",
+        prompt: "The logs prove Marcus Corvus was murdered. Valeria deserves to know. The Editor would pay for this information. And silence is always an option.",
         options: [
-          { label: "Tell Valeria the truth.", flag: "valeria_allied" },
-          { label: "Keep her in the dark.", flag: "valeria_unwarned" },
+          { label: "Tell Valeria everything. She deserves the truth.", flag: "valeria_allied" },
+          { label: "Say nothing. The less she knows, the safer she is.", flag: "valeria_unwarned" },
+          { label: "Sell the logs to the Editor. Fifty denarii buys a lot of survival.", flag: "valeria_betrayed" },
         ],
       },
     ],
   },
 
   {
-    id: 9,
+    id: "9",
     title: "The Temple",
+    missionNum: 9,
+    next: [{ condition: "nero_deal", goto: "10D" }, { goto: "10" }],
     act: 2,
     ritualMeter: 75,
     budget: 150,
@@ -475,29 +634,97 @@ var CAMPAIGN_MISSIONS = [
     winCondition: "defeat_all",
     victoryBonus: 20,
     perfectBonus: 5,
-    flagsToSet: ["temple_visited", "emperor_refused"],
+    flagsToSet: ["temple_visited"],
     freeRecruits: [],
     skipLudus: false,
     carryHp: false,
     preScene: [
-      { speaker: null, text: "Cassius descends to the lowest level. Past the old stone. Past the carvings. Into the temple." },
-      { speaker: null, text: "The chamber is circular. The floor is black stone, smooth as glass. In the center, a basin of dark liquid — the black water. On the far wall, scratched with broken fingernails: T-I-T-V-S." },
-      { speaker: "CASSIUS", text: "He was here. He tried to remember his own name. And they took even that.", style: "internal" },
-      { speaker: null, text: "The temperature drops. The black water ripples without being touched. Something vast and patient becomes aware of Cassius." },
-      { speaker: null, text: "He flees. The corridors rearrange behind him. He emerges twenty minutes later — but only five have passed above." },
-      { speaker: null, text: "Praetorian guards escort Cassius to the Imperial Box." },
-      { speaker: "NERO", text: "You've been to the temple. I can smell it on you. The stone has a scent — something between iron and rain." },
-      { speaker: "NERO", text: "I am dying. The ritual can save me. The cost is your blood and your brother's." },
-      { speaker: "NERO", text: "Come willingly. Be remembered as heroes of Rome. Your names carved in the Colosseum itself." },
-      { speaker: "CASSIUS", text: "And if I refuse?" },
-      { speaker: "NERO", text: "Then you die as a traitor, and I take your blood anyway." },
-      { speaker: null, text: "Cassius refuses. The Emperor nods, unsurprised." },
-      { speaker: "NERO", text: "Then we do it the hard way. Your next matches will be... interesting." },
+      { speaker: null, text: "Cassius descends past the last torch. Past the Roman brick, past the Republican stone, into something older. The walls aren't carved — they were grown. The corridor breathes." },
+      { speaker: null, text: "The temple. Circular, domed, the floor black stone polished smooth as a mirror. In the center: a basin of liquid so dark it seems to drink the light. The black water." },
+      { speaker: null, text: "On the far wall, scratched into stone with broken fingernails: T-I-T-V-S." },
+      { speaker: "CASSIUS", text: "He was here. Locked in this hole, and he tried to scratch his own name into the wall so he wouldn't forget who he was. And they took even that from him.", style: "internal" },
+      { speaker: null, text: "The temperature drops twenty degrees in a heartbeat. The black water ripples without being touched. Something vast and patient — something that has been waiting since before Rome had a name — becomes aware of Cassius." },
+      { speaker: "CASSIUS", text: "Run. RUN.", style: "internal" },
+      { speaker: null, text: "He flees. The corridors rearrange behind him — walls where doors were, doors where walls were. He emerges twenty minutes later, gasping, hands shaking. The guards tell him only five minutes have passed." },
+      { speaker: null, text: "Praetorian guards escort him to the Imperial Box. Nero Aurelius sits in a chair too large for a man visibly dying. His skin is the color of old parchment. His eyes are terrifyingly sharp." },
+      { speaker: "NERO", text: "Ah. You've been to the temple. I can smell it on you — something between iron and rain. The stone has a particular fragrance." },
+      { speaker: "NERO", text: "I am dying, gladiator. Quite slowly, quite painfully. The ritual beneath this arena can save me. The cost is twin blood — yours and your brother's. Poured on the stone, under the proper stars." },
+      { speaker: "NERO", text: "Come willingly. Be remembered as heroes of Rome. Your names carved in the Colosseum for a thousand years. Or —" },
+      { speaker: "CASSIUS", text: "Or?" },
+      { speaker: "NERO", text: "Or you die as traitors, I take your blood anyway, and nobody remembers either of you ever existed. I find the second option less elegant, but equally effective." },
     ],
     postScene: [
-      { speaker: null, text: "The crowd is different now. Their cheering has a rhythm — pulsing, synchronized. Some sway in their seats." },
-      { speaker: "LIVIA", text: "My father is preparing to address the Senate. We can expose the political conspiracy — the rigged bouts, the murders.", condition: "livia_allied" },
-      { speaker: "CASSIUS", text: "It won't be enough. Politics can't stop what's under the arena. But it might buy time.", style: "internal" },
+      { speaker: null, text: "The crowd is different now. Their cheering has a rhythm — pulsing, synchronized, like a fifty-thousand-person heartbeat. Some sway in their seats with their eyes half-closed." },
+      { speaker: "NERO", text: "Then we do it the hard way. A pity — you would have made a fine sacrifice. Your next matches will be... educational.", condition: "!nero_deal" },
+      { speaker: "NERO", text: "Wise choice. You will fight under my banner. My enemies become your enemies, and your brother lives. A fair trade, no?", condition: "nero_deal" },
+      { speaker: "CASSIUS", text: "Nothing about this is fair.", condition: "nero_deal" },
+      { speaker: "LIVIA", text: "My father is preparing to address the Senate. Rigged brackets, murdered lanistae, political purges — we can blow this whole conspiracy open.", condition: "livia_allied" },
+      { speaker: "LIVIA", text: "And Cassius — I know why you're really here. Your brother. The champion. I've had people watching him. Whatever they did to him, it's connected to the ritual.", condition: "livia_knows_twin" },
+      { speaker: "CASSIUS", text: "Politics won't stop what's under this arena. But it might slow the bastards down.", style: "internal", condition: "!nero_deal" },
+      { speaker: "CASSIUS", text: "I sold myself to a dying emperor to save my brother's life. Titus, if you could see me now — would you even want to be saved by what I've become?", style: "internal", condition: "nero_deal" },
+    ],
+    choices: [
+      {
+        id: "nero_deal",
+        prompt: "Nero's dying eyes bore into you. He's offering survival, protection, and your brother's life. The price is your soul and everyone else's blood.",
+        options: [
+          { label: "\"Fine. I'll be your dog. But Titus lives — that's the deal.\"", flag: "nero_deal" },
+          { label: "\"I'd sooner eat my own sword than serve a dying tyrant.\"", flag: "emperor_refused" },
+        ],
+      },
+    ],
+  },
+
+  // ─── M10D: THE EMPEROR'S DOG (NERO DEAL PATH) ──────────────────────
+
+  {
+    id: "10D",
+    title: "The Emperor's Dog",
+    missionNum: 10,
+    next: "12",
+    act: 3,
+    ritualMeter: 88,
+    budget: 180,
+    enemyLevel: 4,
+    unlockedClasses: ["murmillo", "retiarius", "samnite", "thraex", "secutor", "hoplomachus", "provocator", "dimachaerus", "sagittarius", "essedarius", "umbra", "vestige"],
+    enemies: [
+      { classId: "hoplomachus", gifted: true },
+      { classId: "samnite", gifted: true },
+      { classId: "thraex", gifted: true },
+      { classId: "murmillo" },
+      { classId: "retiarius" },
+      { classId: "provocator" },
+    ],
+    terrain: [
+      { x: 3, y: 2, type: "building" },
+      { x: 8, y: 2, type: "building" },
+      { x: 5, y: 5, type: "building" },
+      { x: 3, y: 6, type: "water_deep" },
+      { x: 8, y: 6, type: "water_deep" },
+    ],
+    mapModifiers: ["cursed_8", "ritual_pulse_3"],
+    winCondition: "defeat_all",
+    victoryBonus: 25,
+    perfectBonus: 10,
+    flagsToSet: ["emperor_champion"],
+    freeRecruits: [],
+    skipLudus: false,
+    carryHp: false,
+    preScene: [
+      { speaker: null, text: "Cassius wears the Emperor's sigil on his shoulder now. A golden eagle. It weighs nothing and it weighs everything. The Praetorian escort clears the hypogeum like Moses parting the Red Sea of shit." },
+      { speaker: null, text: "His opponents are senators' champions — good men fighting for masters who dared to question Nero. Their lanistae are already dead or fled. These gladiators have nothing left to fight for except dying well." },
+      { speaker: "NERO", text: "These men serve traitors who would see Rome dissolve into factional chaos. Destroy them, and prove the strength of imperial order." },
+      { speaker: "CASSIUS", text: "They're gladiators. Same as me. Meat on someone else's table. But I'll kill them because a dying emperor told me to, so I can save my brother from a fate worse than dying. What a world.", style: "internal" },
+      { speaker: null, text: "A figure in black emerges from the hypogeum gate — Varro Umbra, the Editor, the architect of every rigged bracket and murdered lanista. He moves like smoke, and his voice carries the easy confidence of a man who has never lost a game he designed." },
+      { speaker: "VARRO", text: "The Emperor's new dog. How quickly you learned to heel. Does the leash chafe, or have you grown to like it?" },
+      { speaker: "CASSIUS", text: "One day, Varro. One day I will wrap that leash around your throat and find out how long it takes you to stop twitching." },
+      { speaker: "VARRO", text: "Promises, promises." },
+    ],
+    postScene: [
+      { speaker: null, text: "The senators' champions lie in the sand. Some dead, some not yet. The crowd chants NERO, NERO, NERO, and Cassius's hands won't stop shaking." },
+      { speaker: "NERO", text: "Excellent work, gladiator. You've earned your brother's life. One final bout — the culmination — and our arrangement is complete." },
+      { speaker: "CASSIUS", text: "I killed men whose only sin was having the wrong master. I'm worse than Lurco. At least that animal was honest about being a piece of shit.", style: "internal" },
+      { speaker: null, text: "In the corridor, Scaeva passes. Doesn't look at Cassius. Doesn't need to. The silence says everything.", condition: "scaeva_allied" },
     ],
     choices: [],
   },
@@ -505,8 +732,10 @@ var CAMPAIGN_MISSIONS = [
   // ─── ACT III: THE RATIO ───────────────────────────────────────────
 
   {
-    id: 10,
+    id: "10",
     title: "The Gauntlet",
+    missionNum: 10,
+    next: "11",
     act: 3,
     ritualMeter: 83,
     budget: 150,
@@ -538,25 +767,29 @@ var CAMPAIGN_MISSIONS = [
     skipLudus: false,
     carryHp: false,
     preScene: [
-      { speaker: null, text: "The brackets have been rewritten overnight. Cassius's ludus faces the Cult's strongest stable. The Editor is no longer pretending." },
-      { speaker: null, text: "Varro Umbra appears for the first time in person." },
-      { speaker: "VARRO", text: "You visited the temple. You heard the voice. You know what waits below." },
-      { speaker: "CASSIUS", text: "I know what you've done to my brother." },
-      { speaker: "VARRO", text: "I made him sacred. When the rite completes, his name will outlast Rome. Yours too." },
-      { speaker: "VARRO", text: "The sand is hungry tonight." },
+      { speaker: null, text: "The brackets have been rewritten overnight. Cassius's ludus draws the Cult's strongest stable — every Gifted fighter, every enhanced killer. The Editor has stopped pretending this is a tournament." },
+      { speaker: null, text: "Varro Umbra appears in the arena for the first time in person. Tall, thin, dressed in black that doesn't reflect light properly. Up close, his face is wrong — too smooth, too symmetrical, like a mask that learned to smile." },
+      { speaker: "VARRO", text: "You visited the temple. You heard the voice beneath the stone. You know what waits below this sand." },
+      { speaker: "CASSIUS", text: "I know what you've done to my brother, you sick bastard." },
+      { speaker: "VARRO", text: "Done? I elevated him. When the rite completes, his name will outlast Rome. Yours too — both sides of the Geminus coin, spent at last for a worthy purchase." },
+      { speaker: "VARRO", text: "The sand is hungry tonight, gladiator. Can you feel it pulling at your feet? It wants to drink." },
+      { speaker: "CASSIUS", text: "It can drink your blood for all I care." },
+      { speaker: "VARRO", text: "Oh, it will. Eventually, everything drinks." },
     ],
     postScene: [
-      { speaker: null, text: "The arena is a wreck. Sand stained dark. The crowd screams with a harmonic quality — like a choir that doesn't know it's singing." },
-      { speaker: "NERVA", text: "I felt something during the fight. When I stood on that dark sand — something was looking up at me through the ground. Cassius... what are we fighting in?", condition: "nerva_alive" },
-      { speaker: "AEMILIA", text: "The Gifted — their movements aren't from training. Something else is moving their bodies. The same something that's under the sand.", condition: "scaeva_allied" },
-      { speaker: null, text: "Two more matches. Then the final bout." },
+      { speaker: null, text: "The arena is a ruin. Sand stained black in places. The crowd screams in harmony — a rising, falling chord, like a choir that doesn't know it's singing, led by a conductor buried under the floor." },
+      { speaker: "NERVA", text: "Boss. During the fight, I stood on that dark sand and I swear to every god — something was looking up at me through the ground. Like an eye. What are we fighting in?", condition: "nerva_alive" },
+      { speaker: "AEMILIA", text: "The Gifted aren't fighters. They're puppets. Something else is pulling the strings — the same something that's pulsing under the sand. I could feel it in my teeth.", condition: "scaeva_allied" },
+      { speaker: null, text: "Two more matches. Then the final bout. The one the entire tournament was designed to produce." },
     ],
     choices: [],
   },
 
   {
-    id: 11,
+    id: "11",
     title: "Alliance and Sacrifice",
+    missionNum: 11,
+    next: "12",
     act: 3,
     ritualMeter: 90,
     budget: 160,
@@ -586,28 +819,48 @@ var CAMPAIGN_MISSIONS = [
     allianceRecruits: [
       { flag: "livia_allied", name: "Livia's Agent", classId: "secutor" },
       { flag: "scaeva_allied", name: "Scaeva's Veteran", classId: "murmillo" },
-      { flag: "valeria_allied", name: "Ferox", classId: "dimachaerus", gifted: true },
+      { flag: "valeria_allied", name: "Ferox", classId: "dimachaerus", gifted: true, condition: "ferox_spared" },
     ],
     skipLudus: false,
     carryHp: false,
     preScene: [
-      { speaker: null, text: "Cassius gathers his allies." },
-      { speaker: "LIVIA", text: "My father speaks to the Senate tomorrow. Once the conspiracy is public, the Emperor loses his political shield. But the ritual... that's on you.", condition: "livia_allied" },
-      { speaker: "SCAEVA", text: "I'll send what fighters I can spare. They're old, like me. But they know their craft.", condition: "scaeva_allied" },
-      { speaker: "VALERIA", text: "My husband died in that place. I'm sending my best. Make it count.", condition: "valeria_allied" },
+      { speaker: null, text: "The night before the final matches. Cassius gathers what allies he has in a cramped room beneath the ludus. The air smells of cheap wine and fear." },
+      { speaker: "LIVIA", text: "My father addresses the Senate at dawn. Evidence of rigged brackets, murdered lanistae, political assassinations. Once it's public, Nero loses his political shield. But the ritual — that nightmare under the arena — that's on you.", condition: "livia_allied" },
+      { speaker: "CASSIUS", text: "No pressure." },
+      { speaker: "LIVIA", text: "All the pressure. But I wouldn't have bet on you if I thought you'd fold.", condition: "livia_allied" },
+      { speaker: "LIVIA", text: "Your brother — my agents tracked his movements. He's being kept in the temple between bouts. Whatever they pumped into him, it's the same energy source as the ritual. Break one, you might break the other.", condition: "livia_knows_twin" },
+      { speaker: "SCAEVA", text: "I'm sending what fighters I've got. They're old, scarred, mean as snakes. Like me. But they know their business, and they won't break.", condition: "scaeva_allied" },
+      { speaker: "VALERIA", text: "Marcus died in that hole. My best fighters are yours. Make every swing count — for him.", condition: "valeria_allied" },
     ],
     postScene: [
-      { speaker: null, text: "The arena is quiet. Not silent — quiet in the way a held breath is quiet. Fifty thousand people, staring at the sand, waiting." },
-      { speaker: "VARRO", text: "One match remains. The ratio must balance. Brother will face brother, as it was always meant to be." },
-      { speaker: "CASSIUS", text: "Tomorrow. Titus. The arena. The thing beneath. I don't know if I can save him. I don't know if there's anything left to save. But I have to try.", style: "internal" },
-      { speaker: "NERVA", text: "Whatever happens in there tomorrow — we're with you. All of us. To the sand and beyond.", condition: "nerva_alive" },
+      { speaker: null, text: "The arena falls quiet. Not silent — quiet in the way a held breath is quiet. Fifty thousand people staring at the sand, every one of them feeling the pulse beneath their feet without knowing what it is." },
+      { speaker: "VARRO", text: "One match remains. The ratio must balance. Brother against brother — the geminus completed, as the old rituals demand. Isn't it beautiful?" },
+      { speaker: "CASSIUS", text: "Tomorrow I face my own twin brother. The brother I've spent fifteen years searching for. The brother they broke and rebuilt into a weapon. And I have to fight him, or something worse than death swallows us both.", style: "internal" },
+      { speaker: "CASSIUS", text: "I don't know if I can save him. I don't know if there's a him left to save. But I have to try. I have to fucking try.", style: "internal" },
+      { speaker: "NERVA", text: "Boss. Whatever happens in that sand tomorrow — we're with you. Every last one of us. To the sand and through the other side of it.", condition: "nerva_alive" },
+      { speaker: "CASSIUS", text: "Nerva...", condition: "nerva_alive" },
+      { speaker: "NERVA", text: "Don't get sentimental on me. I'll start crying, and you know how ugly I look when I cry.", condition: "nerva_alive" },
+      { speaker: null, text: "Nerva held the rear guard alone. The Gifted came in waves and he held them, laughing, cursing, fighting with a net in one hand and a broken bottle in the other. He didn't come back. He never expected to.", condition: "nerva_sacrificed" },
+      { speaker: "CASSIUS", text: "Sleep well, old friend. You earned it.", style: "internal", condition: "nerva_sacrificed" },
     ],
-    choices: [],
+    choices: [
+      {
+        id: "nerva_sacrifice",
+        condition: "nerva_alive",
+        prompt: "Nerva grabs your arm after the others leave. \"Boss. They'll come from behind in the final bout — the Gifted, through the hypogeum. I can hold that corridor. I'm old, I'm mean, and I've got nothing to lose. But I won't be walking out.\"",
+        options: [
+          { label: "\"Make it count, old friend. I'll pour one out for you.\"", flag: "nerva_sacrificed" },
+          { label: "\"No. We walk in together and we walk out together. That's final.\"", flag: null },
+        ],
+      },
+    ],
   },
 
   {
-    id: 12,
+    id: "12",
     title: "The Unmasking",
+    missionNum: 12,
+    next: "13",
     act: 3,
     ritualMeter: 95,
     budget: 160,
@@ -637,25 +890,31 @@ var CAMPAIGN_MISSIONS = [
     skipLudus: false,
     carryHp: true,
     preScene: [
-      { speaker: null, text: "Senator Pulcher speaks to the Senate. Livia's network has distributed evidence — rigged brackets, murdered lanistae, political purges. The Senate erupts." },
-      { speaker: null, text: "But in the Colosseum, nothing changes. The crowd cannot leave. They do not want to leave. The ritual holds them." },
-      { speaker: null, text: "Nero Aurelius appears in the Imperial Box, visibly decaying. He is a dying man watching his last gamble play out." },
-      { speaker: "NERO", text: "One final bout! The culmination of the Ludi Aeternales!" },
-      { speaker: "VARRO", text: "You cannot prevent this. The energy is gathered. The threshold is reached. All that remains is the spark. You and your brother. In the sand. Together." },
+      { speaker: null, text: "At dawn, Senator Pulcher stands before the Senate. Behind him, Livia's dossier: forged brackets, murdered lanistae, a body count that would shame a battlefield. The Senate erupts into chaos.", condition: "livia_allied" },
+      { speaker: null, text: "At dawn, Senator Pulcher stands before the Senate. Anonymous evidence has reached him — forged brackets, murdered lanistae, a body count that would shame a battlefield. The Senate erupts into chaos.", condition: "!livia_allied" },
+      { speaker: null, text: "But in the Colosseum, nothing changes. The crowd cannot leave. They don't want to leave. Fifty thousand people locked in a collective trance, the ritual's grip tightening like a fist around their minds." },
+      { speaker: null, text: "Nero Aurelius drags himself into the Imperial Box. He looks like a corpse that forgot to lie down — skin like wet paper, eyes burning with the desperate hunger of a dying man watching his last chance." },
+      { speaker: "NERO", text: "THE CULMINATION! THE LUDI AETERNALES REACH THEIR GLORIOUS CONCLUSION!" },
+      { speaker: "VARRO", text: "You cannot prevent this, gladiator. The energy is gathered over months of blood. The threshold is reached. All that remains is the spark — twin blood on the stone. You and your brother, together at last." },
+      { speaker: "CASSIUS", text: "I've been looking for my brother for fifteen years, and this is how I find him. In a death trap built by a lunatic and a dying emperor. Some reunion.", style: "internal" },
     ],
     postScene: [
-      { speaker: null, text: "The arena floor is cracked. Through the gaps, a faint glow pulses from below — the temple, directly beneath." },
-      { speaker: null, text: "The gate at the far end opens. Titus walks out. Alone." },
-      { speaker: null, text: "He is larger than Cassius remembers. His skin has a faint grey cast. His eyes are the color of polished obsidian. He carries two swords." },
-      { speaker: null, text: "Titus stops in the center. Looks at Cassius. For one half-second — a flicker. Recognition. Then it's gone." },
+      { speaker: null, text: "The arena floor cracks open. Through the fissures, a faint glow pulses from below — the temple, directly beneath, its light seeping through stone like infection through a wound." },
+      { speaker: null, text: "The far gate opens. Titus walks out. Alone." },
+      { speaker: null, text: "He is bigger than Cassius remembers. Broader, taller, wrong. His skin has the grey cast of something left too long in dark water. His eyes are polished obsidian — beautiful and completely dead. He carries two swords." },
+      { speaker: null, text: "Titus stops in the center of the arena. Looks at Cassius. And for one half-second — barely a heartbeat — something flickers behind those dead eyes. Recognition. A drowning man reaching the surface for one breath." },
+      { speaker: null, text: "Then it's gone. The obsidian closes over." },
+      { speaker: "LIVIA", text: "That's him, isn't it? Your twin. Gods, Cassius — he looks like you. He looks exactly like you, except for the eyes.", condition: "livia_knows_twin" },
       { speaker: "VARRO", text: "Begin." },
     ],
     choices: [],
   },
 
   {
-    id: 13,
+    id: "13",
     title: "Geminus Ratio",
+    missionNum: 13,
+    next: "end",
     act: 3,
     ritualMeter: 99,
     budget: 0,
@@ -687,36 +946,78 @@ var CAMPAIGN_MISSIONS = [
     skipLudus: true,
     carryHp: true,
     preScene: [
-      { speaker: null, text: "No preparation. No rest. The arena has changed — the floor is fractured, glyphs pulse across every tile, and the hypogeum is visible through cracks in the sand." },
-      { speaker: null, text: "Titus stands in the center. The Gifted honor guard flanks him. The crowd's chanting is continuous, involuntary." },
-      { speaker: "CASSIUS", text: "Titus. If any part of you is still in there — I'm here. I came for you.", style: "internal" },
+      { speaker: null, text: "No preparation. No rest. No mercy. The arena has transformed — the floor is fractured glass over a glowing abyss, glyphs pulse across every tile like a fever, and the hypogeum is visible through cracks in the sand. It looks like a wound." },
+      { speaker: null, text: "Titus stands in the center. The Gifted honor guard flanks him, empty-eyed and trembling with stolen power. The crowd's chanting is continuous, involuntary — a fifty-thousand-voice prayer to something that does not love them." },
+      { speaker: "CASSIUS", text: "Titus. Brother. If any scrap of you is still in there — if you can hear me through whatever they've buried you under — I'm here. I came for you. Like I always said I would.", style: "internal" },
+      { speaker: "CASSIUS", text: "Fifteen years, you stubborn bastard. Fifteen years and a thousand miles and I found you in the belly of the worst place in the world. So don't you dare be gone.", style: "internal" },
     ],
     postScene: [],
     endingScenes: {
       a: [
-        { speaker: null, text: "Titus's eyes clear. For one moment he speaks." },
+        { speaker: null, text: "Cassius stands beside Titus. Not fighting. Just... standing there. The ritual energy writhes around them both — twin blood, twin heartbeats, the geminus ratio completed — but not as a weapon. As a choice." },
+        { speaker: null, text: "Titus's dead obsidian eyes crack. Something warm and terrified pushes through from underneath. His mouth moves. His voice sounds like a man who hasn't spoken in years." },
         { speaker: "TITUS", text: "...Cassius?" },
-        { speaker: null, text: "The ritual energy discharges through the temple below. The arena shakes. The cursed tiles go dark. The crowd falls truly silent for the first time." },
-        { speaker: null, text: "The temple collapses. The Colosseum cracks but stands. The Emperor exhales once and does not inhale again." },
-        { speaker: "TITUS", text: "I remember the room. The water. The voice. I remember forgetting you." },
-        { speaker: "TITUS", text: "I remember you finding me." },
+        { speaker: "CASSIUS", text: "Yeah. Yeah, it's me, you idiot." },
+        { speaker: null, text: "The ritual energy discharges harmlessly through the temple below. The arena shakes. The cursed tiles go dark like lanterns snuffed. The crowd falls truly silent — the first honest silence in months." },
+        { speaker: null, text: "The temple collapses in on itself. The Colosseum cracks but stands. Up in the Imperial Box, Nero Aurelius exhales once and does not inhale again. No one mourns." },
+        { speaker: "TITUS", text: "I remember... the room. The water. The voice in the dark. I remember forgetting your name. I remember trying to carve mine into the wall so I wouldn't forget my own." },
+        { speaker: "TITUS", text: "And I remember you finding me. Standing next to me when anyone sane would have run." },
+        { speaker: "CASSIUS", text: "Since when have I ever been sane?" },
+        { speaker: null, text: "For the first time in fifteen years, the twins stand in sunlight together. The crowd is leaving, dazed, blinking, wondering what happened. The sand is just sand again." },
+        { speaker: "CASSIUS", text: "Let's go home, brother." },
+        { speaker: "TITUS", text: "I don't remember where home is." },
+        { speaker: "CASSIUS", text: "Neither do I. We'll figure it out." },
       ],
       b: [
-        { speaker: null, text: "Titus falls. The ritual energy, unchanneled, begins to rupture outward." },
-        { speaker: "LIVIA", text: "The energy — it's going to tear the Colosseum apart. Thousands of people —" },
-        { speaker: null, text: "Cassius descends through the cracked arena floor into the temple. He places his hands on the ritual stone." },
-        { speaker: null, text: "He channels the energy through himself, burning the ritual out from within. The temple collapses. The glow dies." },
-        { speaker: null, text: "Titus wakes in the arena, restored. Below, the temple is rubble. Cassius is in the rubble." },
-        { speaker: "TITUS", text: "You found me. I couldn't find you in time." },
+        { speaker: null, text: "Titus falls. The ritual energy — unchanneled, unbound — begins to rupture outward like a cracked dam. The floor splits. Light pours up through every fissure." },
+        { speaker: "LIVIA", text: "The energy — it's cascading! It's going to tear the Colosseum apart! Fifty thousand people, Cassius!" },
+        { speaker: "CASSIUS", text: "I know. I know what I have to do.", style: "internal" },
+        { speaker: null, text: "Cassius drops through the cracked arena floor into the temple below. The black stone pulses like a heart. He places his hands on it." },
+        { speaker: null, text: "Pain. Pain like being unmade molecule by molecule. The ritual energy pours through him — twin blood is the bridge, and he makes himself the channel. He burns the ritual out from within, screaming." },
+        { speaker: null, text: "The temple collapses. The glow dies. The Colosseum settles. Above, the crowd blinks awake, confused, free." },
+        { speaker: null, text: "Titus wakes on the arena floor, whole. The grey gone from his skin. His eyes brown again, human, scared. He looks down through the cracked floor into the rubble below." },
+        { speaker: "TITUS", text: "...Cassius? CASSIUS!" },
+        { speaker: null, text: "Silence from below. Then, faintly, a cough." },
+        { speaker: "CASSIUS", text: "Still... here. Mostly." },
+        { speaker: "TITUS", text: "You absolute idiot. You beautiful, suicidal idiot." },
+        { speaker: "TITUS", text: "I couldn't find you in time. You found me." },
+        { speaker: null, text: "They pull Cassius from the rubble. He's alive, barely. Livia's people are already moving — senators, soldiers, a physician. The cost of love is a broken body and a temple full of dust." },
       ],
       c: [
-        { speaker: null, text: "Titus falls. The energy ruptures. Cassius has no allies to warn him." },
-        { speaker: null, text: "In desperation, he reaches into the boundary. The voice answers." },
-        { speaker: "DIS PATER", text: "A vessel. A bridge. Carry the weight. The price is what you were.", style: "internal" },
-        { speaker: null, text: "The energy flows through Cassius. He contains it. The temple seals. The crowd is freed. Titus wakes." },
-        { speaker: null, text: "Titus looks at his brother. Cassius looks back. But something in his eyes has changed — darker, calmer, old." },
-        { speaker: "TITUS", text: "...Cassius?" },
+        { speaker: null, text: "Titus falls. The energy ruptures. No allies to warn him. No voice of reason. Just Cassius, alone, with an exploding temple and a dying arena." },
+        { speaker: null, text: "In desperation, he reaches past the boundary of the ritual. Into the dark beneath the dark. The voice that has been waiting since before Rome answers." },
+        { speaker: "DIS PATER", text: "A vessel. A bridge. You can contain what your brother cannot. The price is simple: everything you were.", style: "internal" },
+        { speaker: "CASSIUS", text: "Take it. Take all of it. Just save him.", style: "internal" },
+        { speaker: null, text: "The energy floods through Cassius like a river through a broken dam. He contains it. All of it. The temple seals. The cracks close. The crowd is freed, stumbling out into daylight they didn't know they'd missed." },
+        { speaker: null, text: "Titus wakes on the sand. Human again. Scared, shaking, crying. He looks at his brother." },
+        { speaker: null, text: "Cassius looks back. Same face. Same scars. But the eyes... deeper now. Older. Something ancient and calm looking out through them, like a lantern lit in a very dark room." },
+        { speaker: "TITUS", text: "...Cassius? Is that you?" },
         { speaker: "CASSIUS", text: "Yes. I'm here." },
+        { speaker: null, text: "But the pause before he answers is one heartbeat too long. And when he smiles, it doesn't quite reach whatever is looking out through his eyes." },
+      ],
+      d: [
+        { speaker: null, text: "Titus falls. The ritual completes — not as Varro planned, but as Nero demanded. The Emperor's champion has delivered. The twin blood is on the stone." },
+        { speaker: null, text: "Nero rises from his chair in the Imperial Box. For one terrible moment, the decay reverses — his skin smooths, his spine straightens, his eyes blaze with stolen life." },
+        { speaker: "NERO", text: "YES. The compact holds. The stones remember. I am renewed!" },
+        { speaker: null, text: "Then the temple rejects the parasitic connection. The stone cracks. The energy backfires. Nero ages a hundred years in ten seconds. He crumbles like a sand sculpture in the rain." },
+        { speaker: null, text: "Titus wakes on the sand. Whole. Human. He looks up at Cassius — and doesn't recognize him." },
+        { speaker: "TITUS", text: "Who... who are you? Why are you wearing the Emperor's sigil?" },
+        { speaker: "CASSIUS", text: "I'm your brother. I came to save you." },
+        { speaker: "TITUS", text: "My brother wouldn't serve a tyrant. My brother wouldn't have the Emperor's eagle on his shoulder and other men's blood on his hands." },
+        { speaker: null, text: "The crowd disperses. Nero is dead. Titus walks away. Cassius stands in the empty arena holding a golden eagle badge and wondering when he stopped being the man his brother would recognize." },
+        { speaker: "CASSIUS", text: "I saved him. I saved him and he won't even look at me. Was it worth it?", style: "internal" },
+        { speaker: "CASSIUS", text: "Was any of it worth it?", style: "internal" },
+      ],
+      e: [
+        { speaker: null, text: "Titus falls. The arena is coming apart. Stone raining from the upper tiers, the floor cracking open like an egg. No allies left. No Livia, no Scaeva, no Nerva. Just a betrayer, alone, reaping what he sowed." },
+        { speaker: null, text: "The ritual energy erupts outward, uncontained. The Colosseum groans. Pillars crack. The crowd screams — real screams now, human screams, the trance broken by primal terror." },
+        { speaker: "CASSIUS", text: "Everyone I touched, I destroyed. Valeria. Nerva. Everyone. And now fifty thousand people are going to die because I was too selfish, too stupid, and too goddamn late.", style: "internal" },
+        { speaker: null, text: "Cassius drags Titus's body through collapsing corridors. Stone falls. Dust blinds. He carries his brother on his back through the hypogeum, through fire, through rubble, out into the grey dawn." },
+        { speaker: null, text: "Behind them, the Colosseum's inner ring collapses. Thousands flee. Some don't make it. The greatest arena in the world dies screaming." },
+        { speaker: null, text: "Titus wakes in the dust, coughing. Human again. He looks at the ruin behind them, then at Cassius." },
+        { speaker: "TITUS", text: "What happened?" },
+        { speaker: "CASSIUS", text: "I happened." },
+        { speaker: null, text: "They sit in the rubble as Rome burns behind them. Two brothers. Alive. And nothing else." },
       ],
     },
     choices: [],
@@ -728,40 +1029,69 @@ var CAMPAIGN_MISSIONS = [
 
 var VIGNETTE_POOL = [
   { id: "v_mur_ret", classA: "murmillo", classB: "retiarius", condition: "both_survived",
-    lines: [{ speaker: "A", text: "Good net work out there. Almost tangled me with that last throw." }, { speaker: "B", text: "Almost? I had you dead to rights — you just move too fast in that armor." }] },
+    lines: [{ speaker: "A", text: "Your net caught my ankle out there. My own ally's net." }, { speaker: "B", text: "I saved your life, you ungrateful tin can. That secutor was about to gut you." }, { speaker: "A", text: "...Fair point. Buy you a drink?" }, { speaker: "B", text: "You can't afford my drinks." }] },
   { id: "v_mur_hop", classA: "murmillo", classB: "hoplomachus", condition: "both_survived",
-    lines: [{ speaker: "A", text: "That shield wall of yours — I thought nothing would get through." }, { speaker: "B", text: "Nothing does. Except maybe your stubbornness." }] },
+    lines: [{ speaker: "A", text: "Your shield work out there — beautiful. Absolutely beautiful." }, { speaker: "B", text: "Quit flirting." }, { speaker: "A", text: "I'm serious! That wall you made? Nothing got through." }, { speaker: "B", text: "Nothing except your ego. That barely fit behind it." }] },
   { id: "v_ret_dim", classA: "retiarius", classB: "dimachaerus", condition: "both_survived",
-    lines: [{ speaker: "A", text: "Two blades against a net and trident. Seems unfair." }, { speaker: "B", text: "For you, maybe. I only need one to cut your net." }] },
+    lines: [{ speaker: "A", text: "Two blades against a net and trident. How is that fair?" }, { speaker: "B", text: "It's not. That's why I use two blades." }, { speaker: "A", text: "Smartass." }, { speaker: "B", text: "Fast-ass. There's a difference." }] },
   { id: "v_sec_thr", classA: "secutor", classB: "thraex", condition: "both_survived",
-    lines: [{ speaker: "A", text: "You're fast. Dangerously fast." }, { speaker: "B", text: "Speed is all I have. Unlike you with your wall of iron." }] },
+    lines: [{ speaker: "A", text: "Slow down next time. I can't keep up and I'm supposed to be the pursuer." }, { speaker: "B", text: "Maybe eat less bread and more violence, heavy-legs." }] },
   { id: "v_hop_sag", classA: "hoplomachus", classB: "sagittarius", condition: "both_survived",
-    lines: [{ speaker: "B", text: "I kept count. Seven arrows, seven hits." }, { speaker: "A", text: "And I kept seven enemies off your back. You're welcome." }] },
+    lines: [{ speaker: "B", text: "Seven arrows, seven hits. I'm a goddamn poet with a bow." }, { speaker: "A", text: "And I blocked seven swords that were aimed at your 'poetic' hide. You're welcome." }, { speaker: "B", text: "...The arrangement works." }] },
   { id: "v_dim_ess", classA: "dimachaerus", classB: "essedarius", condition: "both_survived",
-    lines: [{ speaker: "A", text: "Your charge nearly trampled our own side." }, { speaker: "B", text: "Nearly. That's what makes it exciting." }] },
+    lines: [{ speaker: "A", text: "Your charge almost ran over our own murmillo." }, { speaker: "B", text: "Almost is the key word. Besides, the look on his face was worth it." }, { speaker: "A", text: "He's filing a complaint." }, { speaker: "B", text: "He can file it with my horse." }] },
   { id: "v_pro_ves", classA: "provocator", classB: "vestige", condition: "both_survived",
-    lines: [{ speaker: "A", text: "You went down — I saw it. Then you just... stood back up." }, { speaker: "B", text: "Death and I have an arrangement. She waits." }] },
+    lines: [{ speaker: "A", text: "I watched you go down. Sword through the chest. Dead. Then you just... got back up." }, { speaker: "B", text: "It's a thing I do." }, { speaker: "A", text: "That's not NORMAL." }, { speaker: "B", text: "Nothing about this place is normal. Relax." }] },
   { id: "v_mur_sag", classA: "murmillo", classB: "sagittarius", condition: "both_survived",
-    lines: [{ speaker: "A", text: "Stay behind me next time. Arrows don't stop swords." }, { speaker: "B", text: "They do when they hit first." }] },
+    lines: [{ speaker: "A", text: "Stay behind me. I didn't drag my shield here so you could play hero." }, { speaker: "B", text: "I don't need a shield. I have range." }, { speaker: "A", text: "You have range until someone closes the gap. Then you have my shield." }, { speaker: "B", text: "...Thanks, I guess." }] },
   { id: "v_thr_ess", classA: "thraex", classB: "essedarius", condition: "both_survived",
-    lines: [{ speaker: "A", text: "That charging trick — where did you learn that?" }, { speaker: "B", text: "The streets. Everything's a weapon when you grow up hungry." }] },
+    lines: [{ speaker: "A", text: "Where did you learn that charging trick? Some military academy?" }, { speaker: "B", text: "The streets of Subura. Everything's a weapon when you grow up hungry enough." }, { speaker: "A", text: "Remind me never to go to Subura." }] },
   { id: "v_sec_hop", classA: "secutor", classB: "hoplomachus", condition: "both_survived",
-    lines: [{ speaker: "B", text: "You pursued that retreating gladiator across the whole arena." }, { speaker: "A", text: "Once I start running, I don't stop until they do." }] },
+    lines: [{ speaker: "B", text: "You chased that retreating gladiator clear across the arena. Like a dog after a rabbit." }, { speaker: "A", text: "I'm a secutor. The pursuer. It's literally in the name." }, { speaker: "B", text: "You looked ridiculous." }, { speaker: "A", text: "I looked effective." }] },
   { id: "v_ret_sag", classA: "retiarius", classB: "sagittarius", condition: "both_survived",
-    lines: [{ speaker: "A", text: "We make a good pair — you pin them down, I reel them in." }, { speaker: "B", text: "Just don't reel me in by accident. Again." }] },
+    lines: [{ speaker: "A", text: "Good combination out there — you pin them, I reel them in. Like fishing." }, { speaker: "B", text: "Just don't reel me in again. I still have rope burns from last time." }, { speaker: "A", text: "That was once!" }, { speaker: "B", text: "Once was plenty!" }] },
   { id: "v_dim_mur", classA: "dimachaerus", classB: "murmillo", condition: "both_survived",
-    lines: [{ speaker: "A", text: "How do you fight with just one blade? Feels like you're missing a hand." }, { speaker: "B", text: "That missing hand holds a shield. Ask the enemies it stopped." }] },
+    lines: [{ speaker: "A", text: "One blade. One shield. Doesn't that feel like you're missing a hand?" }, { speaker: "B", text: "My 'missing hand' stopped three killing blows today. Show some respect to the wood." }] },
   { id: "v_scaeva", classA: "murmillo", classB: null, condition: "scaeva_allied",
-    lines: [{ speaker: "A", text: "Scaeva fought beside us today. Something changed in his eyes." }, { speaker: "A", text: "Whatever the arena made him into — maybe we can unmake it." }] },
+    lines: [{ speaker: "A", text: "Scaeva fought beside us today. Thirty years in the arena and the old bastard still hits like a siege engine." }, { speaker: "A", text: "After the bout, he sat in the corner cleaning his blade and humming a lullaby. Scariest thing I've ever seen." }] },
   { id: "v_livia", classA: "thraex", classB: null, condition: "livia_allied",
-    lines: [{ speaker: "A", text: "Livia's blade is faster than anything I've seen in the ludus." }, { speaker: "A", text: "She fights like she has nothing left to lose." }] },
+    lines: [{ speaker: "A", text: "Livia sent one of her agents to fight with us. Senator's spy, my ass — that woman handles a blade like she was born with it." }, { speaker: "A", text: "She killed a man and then straightened her hair. Didn't even breathe hard." }] },
+  { id: "v_ferox_mercy", classA: "retiarius", classB: null, condition: "ferox_mercy",
+    lines: [{ speaker: "A", text: "Cassius put Ferox down. Quick. Clean. Merciful." }, { speaker: "A", text: "I keep thinking about his eyes in that last moment. Almost looked grateful." }] },
+  { id: "v_ferox_spared", classA: "retiarius", classB: null, condition: "ferox_spared",
+    lines: [{ speaker: "A", text: "Ferox is alive. Mumbles to himself in the corner of the infirmary. Something about mornings." }, { speaker: "A", text: "The physicians say he's broken beyond repair. But yesterday he smiled at a piece of bread. That's something, right?" }] },
+  { id: "v_betrayal", classA: "murmillo", classB: null, condition: "valeria_betrayed",
+    lines: [{ speaker: "A", text: "Word in the barracks is Cassius sold someone out for coin. Valeria's people." }, { speaker: "A", text: "I don't judge. We all do ugly things to survive. But I'm sleeping with my eyes open from now on." }] },
+  { id: "v_nero_dog", classA: "thraex", classB: null, condition: "nero_deal",
+    lines: [{ speaker: "A", text: "We're fighting under the Emperor's eagle now. Fancy shield, fancy armor, same blood." }, { speaker: "A", text: "The crowd loves it. The other gladiators won't look at us. Funny how that works." }] },
+  { id: "v_nerva_jokes", classA: "retiarius", classB: "thraex", condition: "both_survived",
+    lines: [{ speaker: "A", text: "What's the difference between a gladiator and a donkey?" }, { speaker: "B", text: "I swear if this is another one of Nerva's jokes —" }, { speaker: "A", text: "The donkey gets to retire. Ha!" }, { speaker: "B", text: "...I hate you." }] },
+  { id: "v_sam_pro", classA: "samnite", classB: "provocator", condition: "both_survived",
+    lines: [{ speaker: "A", text: "You kept taunting that secutor until he charged right into my spear." }, { speaker: "B", text: "Provocator. It's in the name." }, { speaker: "A", text: "He looked really angry." }, { speaker: "B", text: "They always look angry. Right up until they don't." }] },
 ];
+
+// ─── Mission Lookup Map ──────────────────────────────────────────────
+
+var CAMPAIGN_MAP = {};
+(function () {
+  for (var i = 0; i < CAMPAIGN_MISSIONS.length; i++) {
+    CAMPAIGN_MAP[CAMPAIGN_MISSIONS[i].id] = CAMPAIGN_MISSIONS[i];
+  }
+})();
+
+function _hashMissionId(id) {
+  var h = 0;
+  for (var i = 0; i < id.length; i++) {
+    h = ((h << 5) - h + id.charCodeAt(i)) | 0;
+  }
+  return Math.abs(h) || 1;
+}
 
 // ─── Campaign State ─────────────────────────────────────────────────
 
 var campaignState = {
   active: false,
-  missionIndex: 0,
+  missionId: "0",
   denarii: 0,
   flags: {},
   survivingRoster: [],
@@ -771,6 +1101,7 @@ var campaignState = {
   difficulty: "normal",
   campaignStats: { totalBattles: 0, totalKills: 0, totalDamage: 0, totalTurns: 0, deathlessBattles: 0, classesUsed: {}, peakDenarii: 0 },
   inventory: [],
+  newGamePlus: 0,
 };
 
 // ─── Helper Functions ───────────────────────────────────────────────
@@ -779,7 +1110,7 @@ var Campaign = {
 
   getMission: function () {
     if (!campaignState.active) return null;
-    return CAMPAIGN_MISSIONS[campaignState.missionIndex] || null;
+    return CAMPAIGN_MAP[campaignState.missionId] || null;
   },
 
   getBudget: function () {
@@ -821,7 +1152,7 @@ var Campaign = {
   checkCondition: function (cond) {
     if (!cond) return true;
     if (cond.charAt(0) === "!") return !this.checkCondition(cond.slice(1));
-    if (cond.indexOf("_alive") > -1) return this.isNamedAlive(cond.replace("_alive", ""));
+    if (cond.length > 6 && cond.slice(-6) === "_alive") return this.isNamedAlive(cond.slice(0, -6));
     return this.getFlag(cond);
   },
 
@@ -904,6 +1235,20 @@ var Campaign = {
     return { survivors: survivors, dead: dead };
   },
 
+  _resolveNext: function (next) {
+    if (!next || next === "end") return null;
+    if (typeof next === "string") return next;
+    if (Array.isArray(next)) {
+      for (var i = 0; i < next.length; i++) {
+        var entry = next[i];
+        if (!entry.condition || this.checkCondition(entry.condition)) {
+          return entry.goto || null;
+        }
+      }
+    }
+    return null;
+  },
+
   advance: function (won) {
     var m = this.getMission();
     if (!m) return null;
@@ -920,25 +1265,32 @@ var Campaign = {
       }
       campaignState.ritualMeter = (m.ritualMeter || 0);
 
-      campaignState.missionIndex++;
+      if (campaignState.flags.nerva_sacrificed) {
+        campaignState.survivingRoster = campaignState.survivingRoster.filter(function (s) {
+          return s.name !== "Nerva";
+        });
+      }
+
+      var nextId = this._resolveNext(m.next);
+      campaignState.missionId = nextId;
     }
 
     return this.getMission();
   },
 
   isFinished: function () {
-    return campaignState.missionIndex >= CAMPAIGN_MISSIONS.length;
+    return campaignState.missionId == null;
   },
 
   getEndingScenes: function (key) {
-    var m13 = CAMPAIGN_MISSIONS[13];
+    var m13 = CAMPAIGN_MAP["13"];
     if (!m13 || !m13.endingScenes) return [];
     return m13.endingScenes[key] || [];
   },
 
   reset: function () {
     campaignState.active = false;
-    campaignState.missionIndex = 0;
+    campaignState.missionId = "0";
     campaignState.denarii = 0;
     campaignState.flags = {};
     campaignState.survivingRoster = [];
@@ -949,6 +1301,7 @@ var Campaign = {
     campaignState.difficulty = "normal";
     campaignState.campaignStats = { totalBattles: 0, totalKills: 0, totalDamage: 0, totalTurns: 0, deathlessBattles: 0, classesUsed: {}, peakDenarii: 0 };
     campaignState.inventory = [];
+    campaignState.newGamePlus = 0;
   },
 
   start: function () {
@@ -962,8 +1315,9 @@ var Campaign = {
     var recruits = (m.freeRecruits || []).slice();
     var alliance = m.allianceRecruits || [];
     for (var i = 0; i < alliance.length; i++) {
-      if (this.getFlag(alliance[i].flag)) {
-        recruits.push(alliance[i]);
+      var ar = alliance[i];
+      if (this.getFlag(ar.flag) && (!ar.condition || this.checkCondition(ar.condition))) {
+        recruits.push(ar);
       }
     }
     return recruits;
@@ -999,9 +1353,9 @@ var Campaign = {
     if (!campaignState.active) return true;
     try {
       var data = {
-        version: 2,
+        version: 3,
         active: campaignState.active,
-        missionIndex: campaignState.missionIndex,
+        missionId: campaignState.missionId,
         denarii: campaignState.denarii,
         flags: campaignState.flags,
         survivingRoster: campaignState.survivingRoster,
@@ -1012,6 +1366,7 @@ var Campaign = {
         difficulty: campaignState.difficulty || "normal",
         campaignStats: campaignState.campaignStats || {},
         inventory: campaignState.inventory || [],
+        newGamePlus: campaignState.newGamePlus || 0,
         savedAt: Date.now(),
       };
       if (data.campaignStats) {
@@ -1024,6 +1379,8 @@ var Campaign = {
     }
   },
 
+  _V2_INDEX_TO_ID: ["0","1","2","3","4A","5A","6","7","8","9","10","11","12","13"],
+
   _sanitizeSaveData: function (data) {
     if (!data || typeof data !== "object" || !data.active) return null;
     var saveVersion = parseInt(data.version, 10) || 1;
@@ -1031,8 +1388,13 @@ var Campaign = {
       if (!data.campaignStats) data.campaignStats = { totalBattles: 0, totalKills: 0, totalDamage: 0, totalTurns: 0, deathlessBattles: 0, classesUsed: {}, peakDenarii: 0 };
       if (!Array.isArray(data.inventory)) data.inventory = [];
     }
-    var idx = parseInt(data.missionIndex, 10) || 0;
-    if (idx < 0 || idx > CAMPAIGN_MISSIONS.length) return null;
+    if (saveVersion < 3) {
+      var idx = parseInt(data.missionIndex, 10) || 0;
+      data.missionId = this._V2_INDEX_TO_ID[idx] || "0";
+      delete data.missionIndex;
+    }
+    var mid = (typeof data.missionId === "string") ? data.missionId : null;
+    if (mid !== null && !CAMPAIGN_MAP[mid]) return null;
     var roster = Array.isArray(data.survivingRoster) ? data.survivingRoster : [];
     roster = roster.filter(function (s) {
       return s && typeof s.classId === "string" && _VALID_CLASS_IDS.indexOf(s.classId) !== -1;
@@ -1062,9 +1424,14 @@ var Campaign = {
       s.gifted = !!s.gifted;
       if (s.promotionId != null && typeof s.promotionId !== "string") s.promotionId = null;
       if (s.accent != null && (typeof s.accent !== "string" || s.accent.length > 30)) s.accent = null;
-      s.equipment = (Array.isArray(s.equipment) ? s.equipment : []).filter(function(eq) {
-        return eq && typeof eq === "object" && typeof eq.id === "string";
-      });
+      if (s.equipment && typeof s.equipment === "object" && !Array.isArray(s.equipment)) {
+        var _validSlot = function(v) { return v === null || typeof v === "string"; };
+        if (!_validSlot(s.equipment.weapon)) s.equipment.weapon = null;
+        if (!_validSlot(s.equipment.armor))  s.equipment.armor  = null;
+        if (!_validSlot(s.equipment.trinket)) s.equipment.trinket = null;
+      } else {
+        s.equipment = null;
+      }
       return s;
     });
     if (typeof data.flags !== "object" || data.flags === null || Array.isArray(data.flags)) data.flags = {};
@@ -1080,12 +1447,12 @@ var Campaign = {
         if (_bc.hasOwnProperty(_bk)) _bc[_bk] = Math.max(0, parseInt(_bc[_bk], 10) || 0);
       }
     }
-    data.missionIndex = idx;
+    data.missionId = mid;
     data.survivingRoster = roster;
     data.denarii = Math.max(0, parseInt(data.denarii, 10) || 0);
     data.ritualMeter = Math.max(0, parseInt(data.ritualMeter, 10) || 0);
     data.totalDeaths = Math.max(0, parseInt(data.totalDeaths, 10) || 0);
-    data.endingKey = (data.endingKey === "a" || data.endingKey === "b" || data.endingKey === "c") ? data.endingKey : null;
+    data.endingKey = (typeof data.endingKey === "string" && /^[a-e]$/.test(data.endingKey)) ? data.endingKey : null;
     data.difficulty = (data.difficulty === "easy" || data.difficulty === "hard") ? data.difficulty : "normal";
     var rawStats = (typeof data.campaignStats === "object" && data.campaignStats) ? data.campaignStats : {};
     data.campaignStats = {
@@ -1098,8 +1465,9 @@ var Campaign = {
       peakDenarii:     Math.max(0, parseInt(rawStats.peakDenarii, 10) || 0),
     };
     data.inventory = (Array.isArray(data.inventory) ? data.inventory : []).filter(function(it) {
-      return it && typeof it === "object" && typeof it.id === "string";
+      return typeof it === "string" && it.length > 0;
     });
+    data.newGamePlus = Math.max(0, parseInt(data.newGamePlus, 10) || 0);
     data.savedAt = (typeof data.savedAt === "number" && isFinite(data.savedAt)) ? data.savedAt : 0;
     var _pbc = parseInt(data._preBattleCount, 10);
     data._preBattleCount = (_pbc > 0 && _pbc <= roster.length) ? _pbc : roster.length;
@@ -1115,7 +1483,7 @@ var Campaign = {
       data = this._sanitizeSaveData(data);
       if (!data) return false;
       campaignState.active = true;
-      campaignState.missionIndex = data.missionIndex;
+      campaignState.missionId = data.missionId;
       campaignState.denarii = data.denarii;
       campaignState.flags = data.flags;
       campaignState.survivingRoster = data.survivingRoster;
@@ -1127,8 +1495,28 @@ var Campaign = {
       campaignState.difficulty = data.difficulty;
       campaignState.campaignStats = data.campaignStats;
       campaignState.inventory = data.inventory;
+      campaignState.newGamePlus = parseInt(data.newGamePlus, 10) || 0;
       return true;
     } catch (e) { return false; }
+  },
+
+  startNewGamePlus: function () {
+    var ngLevel = (campaignState.newGamePlus || 0) + 1;
+    var roster = campaignState.survivingRoster.slice();
+    var inventory = (campaignState.inventory || []).slice();
+    var denarii = campaignState.denarii || 0;
+    var diff = campaignState.difficulty || "normal";
+    var stats = campaignState.campaignStats;
+    this.reset();
+    campaignState.active = true;
+    campaignState.missionId = "0";
+    campaignState.newGamePlus = ngLevel;
+    campaignState.survivingRoster = roster;
+    campaignState.inventory = inventory;
+    campaignState.denarii = denarii;
+    campaignState.difficulty = diff;
+    campaignState.campaignStats = stats;
+    this.saveToDisk();
   },
 
   clearSave: function (slot) {
@@ -1154,7 +1542,7 @@ var Campaign = {
       var data = JSON.parse(raw);
       data = this._sanitizeSaveData(data);
       if (!data) return null;
-      var m = CAMPAIGN_MISSIONS[data.missionIndex];
+      var m = CAMPAIGN_MAP[data.missionId];
       return {
         slot: slot,
         missionName: m ? ("M" + m.id + ": " + m.title) : "Completed",

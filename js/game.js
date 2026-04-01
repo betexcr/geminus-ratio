@@ -27,6 +27,20 @@
   };
 
   function getDiff() { return DIFFICULTY[(campaignState.active ? campaignState.difficulty : null) || skirmishConfig.difficulty] || DIFFICULTY.normal; }
+  function ngPlusScale(stat) {
+    var ng = campaignState.newGamePlus || 0;
+    if (ng <= 0) return 1;
+    if (stat === "hp") return 1 + 0.2 * ng;
+    if (stat === "atk") return 1 + 0.15 * ng;
+    if (stat === "spd") return 1 + 0.05 * ng;
+    return 1;
+  }
+
+  var _animSpeed = 1;
+  var _ANIM_SPEEDS = [1, 2, 0];
+  var _ANIM_LABELS = ["1×", "2×", "⚡"];
+  try { var _savedSpeed = parseInt(localStorage.getItem("geminus_anim_speed"), 10); if (_ANIM_SPEEDS.indexOf(_savedSpeed) !== -1) _animSpeed = _savedSpeed; } catch (e) {}
+  function adjDelay(ms) { return _animSpeed === 0 ? 0 : Math.round(ms / _animSpeed); }
 
   var skirmishConfig = {
     enemyCount: 3,
@@ -692,8 +706,9 @@
     defs.appendChild(lg);
   }
 
-  function appendSpriteGradients(defs, team, uid) {
+  function appendSpriteGradients(defs, team, uid, accentOverride) {
     const p = TEAM_PAL[team];
+    var accent = accentOverride || p.accent;
     addLinearGradient(defs, uid + "-gmain", p.light, p.main);
     addLinearGradient(defs, uid + "-gmain_mid", p.main, p.main_mid);
     addLinearGradient(defs, uid + "-gleatherHi", p.leather_hi, p.leather);
@@ -705,7 +720,7 @@
     addLinearGradient(defs, uid + "-giron", p.iron_hi, p.iron);
     addLinearGradient(defs, uid + "-giron_dark", p.iron, p.iron_dark);
     addLinearGradient(defs, uid + "-ggold", p.gold, p.gold_dark);
-    addLinearGradient(defs, uid + "-gaccent", p.accent, p.main);
+    addLinearGradient(defs, uid + "-gaccent", accent, p.main);
   }
 
   function resolveSpriteFill(team, ref, uid) {
@@ -720,7 +735,7 @@
     return palColor(team, ref);
   }
 
-  function gladiatorSpriteSvg(classId, team, uniqueId) {
+  function gladiatorSpriteSvg(classId, team, uniqueId, accentHex) {
     const uid = "spr" + uniqueId;
     const data = SPRITE_RECTS[classId] || SPRITE_RECTS.murmillo;
     const svg = document.createElementNS(SVG_NS, "svg");
@@ -729,7 +744,7 @@
     svg.setAttribute("aria-hidden", "true");
     svg.setAttribute("focusable", "false");
     const defs = document.createElementNS(SVG_NS, "defs");
-    appendSpriteGradients(defs, team, uid);
+    appendSpriteGradients(defs, team, uid, accentHex);
     svg.appendChild(defs);
     const g = document.createElementNS(SVG_NS, "g");
     for (let i = 0; i < data.length; i++) {
@@ -815,6 +830,79 @@
         if (x % 3 === 1 && y % 3 === 1) return "building";
         return null;
       }
+    },
+    colosseum: {
+      name: "Grand Colosseum",
+      heightFn: function (x, y, w, h) {
+        var cx = w / 2 - 0.5, cy = h / 2 - 0.5;
+        var d = Math.sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy));
+        var maxR = Math.min(cx, cy);
+        if (d < 2.5) return 0;
+        if (d > maxR - 1) return 2;
+        return 1;
+      },
+      terrainFn: function (x, y, w, h) {
+        var cx = w / 2 - 0.5, cy = h / 2 - 0.5;
+        var d = Math.sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy));
+        if (d < 1.5) return "trap_spike";
+        return null;
+      }
+    },
+    ruins: {
+      name: "Crumbling Ruins",
+      heightFn: function (x, y, w, h) {
+        var s = Math.sin(x * 2.3 + y * 1.7);
+        if (s > 0.6) return 2;
+        if (s > -0.2) return 1;
+        return 0;
+      },
+      terrainFn: function (x, y, w, h) {
+        var s = Math.sin(x * 2.3 + y * 1.7);
+        if (s > 0.85 && x > 0 && y > 0 && x < w - 1 && y < h - 1) return "building";
+        if ((x + y) % 7 === 0 && x > 0 && y > 0) return "trap_fire";
+        return null;
+      }
+    },
+    marshland: {
+      name: "Marshland",
+      heightFn: function (x, y, w, h) {
+        if ((x === 3 || x === 8) && y >= 2 && y <= h - 3) return 1;
+        return 0;
+      },
+      terrainFn: function (x, y, w, h) {
+        if ((x === 3 || x === 8) && y >= 2 && y <= h - 3) return null;
+        if (x > 0 && x < w - 1 && y > 0 && y < h - 1) {
+          if ((x + y * 3) % 5 === 0) return "fountain";
+          return "water_shallow";
+        }
+        return null;
+      }
+    },
+    fortress: {
+      name: "Fortress Gate",
+      heightFn: function (x, y, w, h) {
+        if (x >= w - 3) return 2;
+        if (x >= w - 5) return 1;
+        return 0;
+      },
+      terrainFn: function (x, y, w, h) {
+        if (x === w - 5 && y !== Math.floor(h / 2)) return "barricade";
+        if (x === w - 3 && (y === 1 || y === h - 2)) return "trap_fire";
+        return null;
+      }
+    },
+    labyrinth: {
+      name: "The Labyrinth",
+      heightFn: function (x, y, w, h) {
+        if (x % 2 === 0 && y % 2 === 0) return 0;
+        if ((x % 4 === 2 && y > 0 && y < h - 1) || (y % 4 === 2 && x > 0 && x < w - 1)) return 2;
+        return 0;
+      },
+      terrainFn: function (x, y, w, h) {
+        if ((x % 4 === 2 && y > 0 && y < h - 1 && y % 2 !== 0) || (y % 4 === 2 && x > 0 && x < w - 1 && x % 2 !== 0)) return "building";
+        if (x % 4 === 0 && y % 4 === 0 && x > 0 && y > 0) return "fountain";
+        return null;
+      }
     }
   };
 
@@ -865,6 +953,7 @@
             T[ty][tx] = tt;
             if (tt === "building") state.height[ty][tx] = 2;
             if (tt === "water_deep" || tt === "water_shallow") state.height[ty][tx] = 0;
+            if (tt === "barricade") { if (!state.barricadeHp) state.barricadeHp = {}; state.barricadeHp[tx + "," + ty] = 8; }
           }
         }
       }
@@ -983,7 +1072,7 @@
       crowdSurgeApplied: false,
       collapsedTiles: new Set(),
       collapsingActive: false,
-      collapsingMission: 0,
+      collapsingMission: "0",
       glowTiles: new Set(),
       shiftingSand: false,
       symbolFlashTurn: 0,
@@ -995,6 +1084,7 @@
     endingATriggered: false,
     titusTurnCounter: 0,
     tutorialStep: 0,
+    cursor: { x: 0, y: 0, visible: false },
     survivalMode: false,
     survivalWave: 0,
     survivalScore: 0,
@@ -1096,7 +1186,7 @@
     function handler(e) {
       if (e.key !== "Tab") return;
       var focusable = el.querySelectorAll(_focusableSelector);
-      if (!focusable.length) return;
+      if (!focusable.length) { e.preventDefault(); el.focus(); return; }
       var first = focusable[0];
       var last = focusable[focusable.length - 1];
       if (e.shiftKey) {
@@ -1160,8 +1250,15 @@
     overlay.setAttribute("aria-label", "Full battle log");
     var header = document.createElement("div");
     header.className = "log-overlay__header";
-    header.innerHTML = '<span>Full Battle Log</span><button type="button" class="btn btn--ghost" aria-label="Close log">✕</button>';
-    header.querySelector("button").onclick = function () {
+    header.innerHTML = '<span>Full Battle Log</span><button type="button" class="btn btn--ghost btn--tiny" id="btnCopyLog" aria-label="Copy log">Copy</button><button type="button" class="btn btn--ghost" aria-label="Close log">✕</button>';
+    header.querySelector("#btnCopyLog").onclick = function () {
+      var text = state.battleLog.map(function(e) { return "[T" + e.turn + "] " + e.msg; }).join("\n");
+      navigator.clipboard.writeText(text).then(function() {
+        var btn = document.getElementById("btnCopyLog");
+        if (btn) { btn.textContent = "Copied!"; setTimeout(function() { btn.textContent = "Copy"; }, 1500); }
+      }).catch(function() {});
+    };
+    header.querySelector("button[aria-label='Close log']").onclick = function () {
       releaseFocusTrap();
       overlay.remove();
       if (trigger) { trigger.setAttribute("aria-expanded", "false"); trigger.focus(); }
@@ -1208,7 +1305,7 @@
   }
 
   // -- Animation helpers --
-  function delay(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+  function delay(ms) { return new Promise(function (r) { setTimeout(r, adjDelay(ms)); }); }
 
   function animateMove(unit, path) {
     if (!path || path.length === 0) return Promise.resolve();
@@ -1218,9 +1315,16 @@
     SFX.move();
     unit._animGen = (unit._animGen || 0) + 1;
     var gen = unit._animGen;
+    if (_animSpeed === 0) {
+      var last2 = path[path.length - 1];
+      unit.x = last2[0]; unit.y = last2[1];
+      delete unit.animX; delete unit.animY;
+      triggerTerrainStep(unit);
+      return Promise.resolve();
+    }
     return new Promise(function (resolve) {
       var stepIdx = 0;
-      var stepDur = 80;
+      var stepDur = adjDelay(80);
       var startTime = null;
       var fromX = unit.x, fromY = unit.y;
       function tick(ts) {
@@ -1253,6 +1357,7 @@
   }
 
   function animateAttack(attacker, target) {
+    if (_animSpeed === 0) return Promise.resolve();
     return new Promise(function (resolve) {
       var dx = target.x - attacker.x;
       var dy = target.y - attacker.y;
@@ -1263,19 +1368,20 @@
         delete attacker.lungeX;
         delete attacker.lungeY;
         resolve();
-      }, 120);
+      }, adjDelay(120));
     });
   }
 
   function animateHitFlash(unit) {
     unit._animGen = (unit._animGen || 0) + 1;
     var gen = unit._animGen;
+    if (_animSpeed === 0) { delete unit._flashAnim; return Promise.resolve(); }
     return new Promise(function (resolve) {
       unit._flashAnim = 1;
       var start = performance.now();
       function tick() {
         if (unit._animGen !== gen) { delete unit._flashAnim; resolve(); return; }
-        var t = (performance.now() - start) / 150;
+        var t = (performance.now() - start) / adjDelay(150);
         if (t >= 1) { delete unit._flashAnim; resolve(); return; }
         unit._flashAnim = 1 - t;
         requestAnimationFrame(tick);
@@ -1286,13 +1392,13 @@
 
   var _shakeGen = 0;
   function screenShake(dur, intensity) {
-    if (!renderer || renderer.reducedMotion) return Promise.resolve();
+    if (!renderer || renderer.reducedMotion || _animSpeed === 0) return Promise.resolve();
     var gen = ++_shakeGen;
     return new Promise(function (resolve) {
       var start = performance.now();
       function tick() {
         if (_shakeGen !== gen) { renderer.shakeX = 0; renderer.shakeY = 0; resolve(); return; }
-        var t = (performance.now() - start) / dur;
+        var t = (performance.now() - start) / adjDelay(dur);
         if (t >= 1) { renderer.shakeX = 0; renderer.shakeY = 0; resolve(); return; }
         var amt = intensity * (1 - t);
         renderer.shakeX = (Math.random() - 0.5) * amt * 2;
@@ -1314,13 +1420,19 @@
       awardXp(state.activeUnit, Math.round(XP_PER_KILL * getDiff().xpMul));
       state.activeUnit.kills = (state.activeUnit.kills || 0) + 1;
     }
-    if (state.activeUnit) state.activeUnit._statKills = (state.activeUnit._statKills || 0) + 1;
+    if (state.activeUnit && unit.team !== state.activeUnit.team) {
+      state.activeUnit._statKills = (state.activeUnit._statKills || 0) + 1;
+    }
+    if (unit.team === "enemy" && state.activeUnit && state.activeUnit.team === "player") {
+      state._playerKilledThisTurn = true;
+    }
     if (!state._statFirstBlood) state._statFirstBlood = unit.displayName || classById(unit.classId).name;
     unit._animGen = (unit._animGen || 0) + 1;
     var gen = unit._animGen;
+    if (_animSpeed === 0) { delete unit._deathAnim; return Promise.resolve(); }
     return new Promise(function (resolve) {
       var start = performance.now();
-      var dur = 400;
+      var dur = adjDelay(400);
       function tick() {
         if (unit._animGen !== gen) { delete unit._deathAnim; resolve(); return; }
         var t = Math.min(1, (performance.now() - start) / dur);
@@ -1333,9 +1445,11 @@
     });
   }
 
+  function _h(y, x) { return state.height[y] ? state.height[y][x] || 0 : 0; }
+
   function spawnDmgNumber(unit, text, color) {
     if (!renderer) return;
-    var h = state.height[unit.y] ? state.height[unit.y][unit.x] || 0 : 0;
+    var h = _h(unit.y, unit.x);
     renderer.spawnText(unit.x, unit.y, h, text, color);
   }
 
@@ -1435,6 +1549,12 @@
     if (u.momentumBonus > 0) icons.push(STATUS_DEFS.momentum);
     if (u.bondBuff) icons.push(STATUS_DEFS.bond);
     if ((u.nearDeathCount || 0) >= 2) icons.push(STATUS_DEFS.scarred);
+    if (u.statuses) {
+      for (var _si = 0; _si < u.statuses.length; _si++) {
+        var _ss = u.statuses[_si];
+        icons.push({ glyph: _ss.icon || "?", color: _ss.debuff ? "#ff4040" : "#88ffcc", label: _ss.name + " (" + _ss.duration + "t)" });
+      }
+    }
     return icons;
   }
 
@@ -1474,9 +1594,9 @@
     return y >= BOARD_H - 2;
   }
 
-  function unitAtk(u)  { return Math.max(1, (u.giftedAtk || classById(u.classId).atk) + levelBonus(u, "Atk") + equipMod(u, "atk") + (u.blindRushAtk || 0) + (u.atkBonus || 0) + (u.momentumBonus || 0) + (u.battleHardenedTurns > 0 ? (u.battleHardenedAtk || 0) : 0) - (u.shadowMendAtkPenalty || 0) - (u.atkDebuffAmt && u.atkDebuffTurns > 0 ? u.atkDebuffAmt : 0) + (u.promoStatBonus ? (u.promoStatBonus.atk || 0) : 0) + (u.lastStandActive && u.hp <= u.maxHp * 0.3 ? 5 : 0)); }
-  function unitDef(u)  { return Math.max(0, (u.giftedDef || classById(u.classId).def) + levelBonus(u, "Def") + equipMod(u, "def") + (u.phalanxBonus || 0) + (u.battleHardenedTurns > 0 ? (u.battleHardenedDef || 0) : 0) - (u.blindRushDef || 0) + (u.bondBuff ? 1 : 0) + (u.promoStatBonus ? (u.promoStatBonus.def || 0) : 0) - (u.defDebuffAmt && u.defDebuffTurns > 0 ? u.defDebuffAmt : 0) + (u.lastStandActive && u.hp <= u.maxHp * 0.3 ? 5 : 0)); }
-  function unitSpd(u)  { return Math.max(1, (u.giftedSpd || classById(u.classId).spd) + levelBonus(u, "Spd") + equipMod(u, "spd") - (u.crowdSpdDebuff || 0) + (u.promoStatBonus ? (u.promoStatBonus.spd || 0) : 0)); }
+  function unitAtk(u)  { return Math.max(1, (u.giftedAtk || classById(u.classId).atk) + levelBonus(u, "Atk") + equipMod(u, "atk") + (u.blindRushAtk || 0) + (u.atkBonus || 0) + (u.momentumBonus || 0) + (u.battleHardenedTurns > 0 ? (u.battleHardenedAtk || 0) : 0) - (u.shadowMendAtkPenalty || 0) - (u.atkDebuffAmt && u.atkDebuffTurns > 0 ? u.atkDebuffAmt : 0) + (u.promoStatBonus ? (u.promoStatBonus.atk || 0) : 0) + (u.lastStandActive && u.hp <= u.maxHp * 0.3 ? 5 : 0) + _statusMod(u, "atk")); }
+  function unitDef(u)  { return Math.max(0, (u.giftedDef || classById(u.classId).def) + levelBonus(u, "Def") + equipMod(u, "def") + (u.phalanxBonus || 0) + (u.battleHardenedTurns > 0 ? (u.battleHardenedDef || 0) : 0) - (u.blindRushDef || 0) + (u.bondBuff ? 1 : 0) + (u.promoStatBonus ? (u.promoStatBonus.def || 0) : 0) - (u.defDebuffAmt && u.defDebuffTurns > 0 ? u.defDebuffAmt : 0) + (u.lastStandActive && u.hp <= u.maxHp * 0.3 ? 5 : 0) + _statusMod(u, "def")); }
+  function unitSpd(u)  { return Math.max(1, (u.giftedSpd || classById(u.classId).spd) + levelBonus(u, "Spd") + equipMod(u, "spd") - (u.crowdSpdDebuff || 0) + (u.promoStatBonus ? (u.promoStatBonus.spd || 0) : 0) + _statusMod(u, "spd")); }
   function unitMove(u) { return (u.giftedMove || classById(u.classId).move) + equipMod(u, "move"); }
   function unitJump(u) { return u.giftedJump || classById(u.classId).jump; }
 
@@ -1497,7 +1617,7 @@
   }
 
   function effectiveMove(unit) {
-    let m = unitMove(unit);
+    let m = unitMove(unit) + _statusMod(unit, "move");
     if (unit.tempExtraMove) m += (unit.rallyCharge ? 2 : 1);
     return Math.max(1, m);
   }
@@ -1568,8 +1688,8 @@
     const aSpd = unitSpd(attacker);
     const dSpd = unitSpd(defender);
     let chance = 80 + (aSpd - dSpd) * 5;
-    const aH = state.height[attacker.y][attacker.x];
-    const dH = state.height[defender.y][defender.x];
+    const aH = _h(attacker.y, attacker.x);
+    const dH = _h(defender.y, defender.x);
     if (aH > dH) chance += 10;
     else if (aH < dH) chance -= 10;
     if (attacker.battleFocusNext) chance += 25;
@@ -1599,8 +1719,8 @@
     const effectiveDef = clampedIgnore
       ? Math.round(baseDef * (1 - clampedIgnore))
       : baseDef;
-    const aH = state.height[attacker.y][attacker.x];
-    const dH = state.height[defender.y][defender.x];
+    const aH = _h(attacker.y, attacker.x);
+    const dH = _h(defender.y, defender.x);
     let heightMult = 1;
     if (aH > dH) heightMult = 1.15;
     else if (aH < dH) heightMult = 0.85;
@@ -1710,6 +1830,7 @@
     const id = state.unitSeq++;
     return {
       id,
+      uid: "unit_" + Math.random().toString(36).slice(2, 8),
       team,
       classId,
       x,
@@ -1769,8 +1890,76 @@
       defDebuffAmt: 0,
       debuffImmuneTurns: 0,
       title: null,
+      statuses: [],
     };
   }
+
+  var STATUS_REGISTRY = {};
+  STATUS_REGISTRY.poison = { id: "poison", name: "Poison", icon: "☠", debuff: true, duration: 3, stackable: true, mods: null, onTick: function(u, s) { if (u.hp <= 0) return; var dmg = 2 * (s.stacks || 1); applyDamage(u, dmg); var n = u.displayName || classById(u.classId).name; log(n + " takes " + dmg + " poison damage!", "system"); } };
+  STATUS_REGISTRY.bleed_s = { id: "bleed_s", name: "Bleed", icon: "🩸", debuff: true, duration: 2, stackable: false, mods: null, onTick: function(u, s) { if (u.hp <= 0) return; applyDamage(u, 3); var n = u.displayName || classById(u.classId).name; log(n + " bleeds for 3 damage!", "system"); } };
+  STATUS_REGISTRY.stun = { id: "stun", name: "Stun", icon: "⚡", debuff: true, duration: 1, stackable: false, mods: null };
+  STATUS_REGISTRY.slow = { id: "slow", name: "Slow", icon: "🐌", debuff: true, duration: 2, stackable: false, mods: { spd: -3 } };
+  STATUS_REGISTRY.burn = { id: "burn", name: "Burn", icon: "🔥", debuff: true, duration: 2, stackable: false, mods: null, onTick: function(u, s) { if (u.hp <= 0) return; applyDamage(u, 4); var n = u.displayName || classById(u.classId).name; log(n + " burns for 4 damage!", "system"); } };
+  STATUS_REGISTRY.fortify = { id: "fortify", name: "Fortify", icon: "🛡", debuff: false, duration: 2, stackable: false, mods: { def: 3 } };
+  STATUS_REGISTRY.haste = { id: "haste", name: "Haste", icon: "💨", debuff: false, duration: 2, stackable: false, mods: { spd: 3, move: 1 } };
+
+  function _statusMod(unit, stat) {
+    var total = 0;
+    if (!unit.statuses) return 0;
+    for (var i = 0; i < unit.statuses.length; i++) {
+      var s = unit.statuses[i];
+      if (s.mods && s.mods[stat]) total += s.mods[stat];
+    }
+    return total;
+  }
+  function applyStatus(unit, defOrId, source) {
+    if (!unit.statuses) unit.statuses = [];
+    var def = typeof defOrId === "string" ? STATUS_REGISTRY[defOrId] : defOrId;
+    if (!def) return;
+    if (unit.debuffImmuneTurns > 0 && def.debuff) return;
+    var existing = null;
+    for (var i = 0; i < unit.statuses.length; i++) { if (unit.statuses[i].id === def.id) { existing = unit.statuses[i]; break; } }
+    if (existing) {
+      if (def.stackable) { existing.stacks = (existing.stacks || 1) + 1; }
+      existing.duration = def.duration;
+      return;
+    }
+    var inst = { id: def.id, name: def.name, icon: def.icon, duration: def.duration, debuff: !!def.debuff, stackable: !!def.stackable, stacks: 1, mods: def.mods || null, onTick: def.onTick || null, onExpire: def.onExpire || null };
+    unit.statuses.push(inst);
+    var uName = unit.displayName || classById(unit.classId).name;
+    log(uName + " gains " + def.icon + " " + def.name + "!", "system");
+  }
+  function removeStatus(unit, statusId) {
+    if (!unit.statuses) return;
+    for (var i = unit.statuses.length - 1; i >= 0; i--) {
+      if (unit.statuses[i].id === statusId) {
+        var s = unit.statuses[i];
+        if (s.onExpire) s.onExpire(unit, s);
+        unit.statuses.splice(i, 1);
+        return;
+      }
+    }
+  }
+  function tickStatuses(unit) {
+    if (!unit.statuses || !unit.statuses.length) return;
+    for (var i = unit.statuses.length - 1; i >= 0; i--) {
+      var s = unit.statuses[i];
+      if (s.onTick) s.onTick(unit, s);
+      s.duration--;
+      if (s.duration <= 0) {
+        if (s.onExpire) s.onExpire(unit, s);
+        var uName = unit.displayName || classById(unit.classId).name;
+        log(uName + "'s " + s.name + " fades.", "system");
+        unit.statuses.splice(i, 1);
+      }
+    }
+  }
+  function hasStatus(unit, statusId) {
+    if (!unit.statuses) return false;
+    for (var i = 0; i < unit.statuses.length; i++) { if (unit.statuses[i].id === statusId) return true; }
+    return false;
+  }
+  function unitStunned(unit) { return hasStatus(unit, "stun"); }
 
   var _cachedZoneMap = null;
   var _zoneMapTerrain = null;
@@ -1892,6 +2081,12 @@
         if (u.momentumBonus > 0) icons.push(STATUS_DEFS.momentum);
         if (u.bondBuff) icons.push(STATUS_DEFS.bond);
         if ((u.nearDeathCount || 0) >= 2) icons.push(STATUS_DEFS.scarred);
+        if (u.statuses) {
+          for (var _si = 0; _si < u.statuses.length; _si++) {
+            var _st = u.statuses[_si];
+            if (_st.icon) icons.push({ icon: _st.icon, label: _st.name || _st.id });
+          }
+        }
         entry.statusIcons = icons;
       }
       udIdx++;
@@ -1924,6 +2119,7 @@
     dp.collapsedTiles = state.mapMods.collapsedTiles.size ? state.mapMods.collapsedTiles : null;
     dp.glowTiles = state.mapMods.glowTiles.size ? state.mapMods.glowTiles : null;
     dp.darkSky = state.mapMods.darkSky;
+    dp.cursor = state.cursor.visible ? { x: state.cursor.x, y: state.cursor.y } : null;
     dp.letterbox = undefined;
     dp.cutsceneBubble = undefined;
 
@@ -1990,6 +2186,17 @@
     }
   }
 
+  function ensureAccentSprite(unit) {
+    if (!unit.accentColor || !renderer) return;
+    var team = unit.gifted ? "gifted" : unit.team;
+    var key = unit.classId + "_" + team + "_" + unit.accentColor;
+    if (!renderer.spriteCache[key]) {
+      var svg = gladiatorSpriteSvg(unit.classId, team, "ac_" + unit.id, unit.accentColor);
+      renderer.cacheSpriteFromSvg(key, "", svg, true);
+    }
+    unit._spriteKey = key;
+  }
+
   function syncBodyPhaseClass() {
     document.body.classList.toggle("phase-battle", state.phase === "battle");
   }
@@ -2030,7 +2237,8 @@
       const mini = gladiatorSpriteSvg(
         u.classId,
         sprTeam,
-        9e4 + u.id * 32 + i
+        9e4 + u.id * 32 + i,
+        u.accentColor || null
       );
       mini.classList.add("fft-ct-slot__sprite");
       const n = document.createElement("span");
@@ -2249,7 +2457,8 @@
       const def = classById(pick.classId);
       const li = document.createElement("li");
       li.setAttribute("data-uid", pick.uid || ("pick_" + idx));
-      const miniSpr = gladiatorSpriteSvg(def.id, "player", "pick_" + idx);
+      var _pickAc = pick.accent ? (ACCENT_COLORS.find(function(a) { return a.id === pick.accent; }) || {}).hex : null;
+      const miniSpr = gladiatorSpriteSvg(def.id, "player", "pick_" + idx, _pickAc || null);
       miniSpr.classList.add("picked__sprite");
       li.appendChild(miniSpr);
       const nameSpan = document.createElement("span");
@@ -2622,8 +2831,8 @@
         uid: p.uid,
         classId: p.classId,
         name: p.displayName || null,
-        hp: p.hp || classById(p.classId).hp,
-        maxHp: p.maxHp || classById(p.classId).hp,
+        hp: p.hp != null ? p.hp : classById(p.classId).hp,
+        maxHp: p.maxHp != null ? p.maxHp : classById(p.classId).hp,
         isFree: p.isFree || false,
         level: p.level || 1,
         xp: p.xp || 0,
@@ -2657,7 +2866,7 @@
       var nextBout = state.boutNumber + 1;
       var hSeed;
       if (mission) {
-        hSeed = mission.id * 97 + 42;
+        hSeed = _hashMissionId(mission.id) * 97 + 42;
       } else if (skirmishConfig.seed) {
         var h = 0;
         for (var si = 0; si < skirmishConfig.seed.length; si++) h = ((h << 5) - h + skirmishConfig.seed.charCodeAt(si)) | 0;
@@ -2738,16 +2947,22 @@
   }
 
   function placeEnemiesCampaign(mission) {
-    var rng = seedRng(mission.id * 997 + 13);
+    var rng = seedRng(_hashMissionId(mission.id) * 997 + 13);
     var usedPositions = {};
     var enemies = mission.enemies.slice();
 
-    if (mission.id === 13) {
+    if (mission.id === "13") {
       if (!Campaign.getFlag("scaeva_allied")) {
         enemies.push({ classId: "murmillo", gifted: true });
       }
       if (!Campaign.getFlag("valeria_allied")) {
         enemies.push({ classId: "hoplomachus", gifted: true });
+      }
+      if (Campaign.getFlag("valeria_betrayed")) {
+        enemies.push({ classId: "provocator", gifted: true });
+      }
+      if (Campaign.getFlag("nero_deal")) {
+        enemies.push({ classId: "samnite", gifted: true });
       }
     }
 
@@ -2788,6 +3003,11 @@
       var _bAtk = classById(unit.classId).atk, _bSpd = classById(unit.classId).spd;
       unit.bonusAtk = (unit.bonusAtk || 0) + Math.round(_bAtk * (diff.atkMul - 1));
       unit.bonusSpd = (unit.bonusSpd || 0) + Math.round(_bSpd * (diff.spdMul - 1));
+      if (campaignState.newGamePlus > 0) {
+        unit.maxHp = Math.round(unit.maxHp * ngPlusScale("hp")); unit.hp = unit.maxHp;
+        unit.bonusAtk += Math.round(classById(unit.classId).atk * (ngPlusScale("atk") - 1));
+        unit.bonusSpd += Math.round(_bSpd * (ngPlusScale("spd") - 1));
+      }
       state.units.push(unit);
     }
   }
@@ -2819,7 +3039,7 @@
     if (pick.accent) {
       unit.accent = pick.accent;
       var acObj = ACCENT_COLORS.find(function(a) { return a.id === pick.accent; });
-      if (acObj) unit.accentColor = acObj.hex;
+      if (acObj) { unit.accentColor = acObj.hex; ensureAccentSprite(unit); }
     }
     if (pick.promotionId) {
       unit.promotionId = pick.promotionId;
@@ -2865,7 +3085,8 @@
       const li = document.createElement("li");
       li.className = "deploy-card" + (idx === state.deploySelectedIndex && !p.placed ? " is-picked" : "") + (p.placed ? " is-placed" : "");
 
-      var sprSvg = gladiatorSpriteSvg(p.classId, "player", "dpl_" + idx);
+      var _dplAccent = p.accent ? (ACCENT_COLORS.find(function(a) { return a.id === p.accent; }) || {}).hex : null;
+      var sprSvg = gladiatorSpriteSvg(p.classId, "player", "dpl_" + idx, _dplAccent || null);
       sprSvg.classList.add("deploy-card__sprite");
       li.appendChild(sprSvg);
 
@@ -2949,6 +3170,7 @@
   }
 
   function resetMapMods() {
+    state.barricadeHp = {};
     state.mapMods.cursedTiles = new Set();
     state.mapMods.cursedDmg = 0;
     state.mapMods.fullCurse = false;
@@ -2958,7 +3180,7 @@
     state.mapMods.crowdSurgeApplied = false;
     state.mapMods.collapsedTiles = new Set();
     state.mapMods.collapsingActive = false;
-    state.mapMods.collapsingMission = 0;
+    state.mapMods.collapsingMission = "0";
     state.mapMods.glowTiles = new Set();
     state.mapMods.shiftingSand = false;
     state.mapMods.symbolFlashTurn = 0;
@@ -2972,7 +3194,7 @@
     resetMapMods();
     if (!mission || !mission.mapModifiers) return;
 
-    var rng = seedRng(mission.id * 1337 + 7);
+    var rng = seedRng(_hashMissionId(mission.id) * 1337 + 7);
     var sandTiles = [];
     for (var y = 0; y < BOARD_H; y++) {
       for (var x = 0; x < BOARD_W; x++) {
@@ -3008,10 +3230,10 @@
       }
     }
 
-    if (mission.id >= 10) state.mapMods.darkSky = true;
-    if (mission.id === 9) state.mapMods.shiftingSand = true;
-    if (mission.id === 8) state.mapMods.symbolFlashTurn = 3;
-    if (mission.id === 11) {
+    if (mission.missionNum >= 10) state.mapMods.darkSky = true;
+    if (mission.id === "9") state.mapMods.shiftingSand = true;
+    if (mission.id === "8") state.mapMods.symbolFlashTurn = 3;
+    if (mission.id === "11") {
       var glyphPool = sandTiles.slice();
       for (var gi = 0; gi < 5 && glyphPool.length; gi++) {
         var gIdx = Math.floor(rng() * glyphPool.length);
@@ -3055,24 +3277,43 @@
   function triggerTerrainStep(u) {
     if (u.hp <= 0) return;
     var zone = tileZone(u.x, u.y);
+    var uName = u.displayName || classById(u.classId).name;
     if (zone === "trap_spike") {
-      var dmg = 3 + Math.floor((campaignState.missionIndex || 0) / 3);
+      var _cm = Campaign.getMission();
+      var dmg = 3 + Math.floor((_cm ? _cm.missionNum : 0) / 3);
       applyDamage(u, dmg);
-      log((u.displayName || classById(u.classId).name) + " steps on spikes! (-" + dmg + ")", "system");
+      spawnDmgNumber(u, "-" + dmg, "#ff4444");
+      SFX.hit();
+      log(uName + " steps on spikes! (-" + dmg + ")", "system");
       if (state.terrain[u.y]) state.terrain[u.y][u.x] = "sand";
     } else if (zone === "trap_fire") {
       applyDamage(u, 4);
-      u.bleedTurns = Math.max(u.bleedTurns || 0, 1);
-      log((u.displayName || classById(u.classId).name) + " walks through fire! (-4, bleeding)", "system");
+      spawnDmgNumber(u, "-4", "#ff6600");
+      SFX.hit();
+      applyStatus(u, "burn");
+      log(uName + " walks through fire! (-4, burning)", "system");
     } else if (zone === "fountain") {
       var heal = Math.min(5, u.maxHp - u.hp);
       if (heal > 0) {
         u.hp += heal;
         u._statHealing = (u._statHealing || 0) + heal;
         spawnDmgNumber(u, "+" + heal, "#80ff80");
-        log((u.displayName || classById(u.classId).name) + " is healed by the fountain! (+" + heal + ")", "heal");
+        log(uName + " is healed by the fountain! (+" + heal + ")", "heal");
       }
     }
+  }
+
+  function damageBarricade(x, y, dmg) {
+    var key = x + "," + y;
+    if (!state.barricadeHp || !state.barricadeHp[key]) return false;
+    state.barricadeHp[key] = Math.max(0, state.barricadeHp[key] - dmg);
+    if (state.barricadeHp[key] <= 0) {
+      if (state.terrain[y]) state.terrain[y][x] = "sand";
+      delete state.barricadeHp[key];
+      log("Barricade destroyed!", "system");
+      return true;
+    }
+    return false;
   }
 
   function tickRitualPulse() {
@@ -3118,9 +3359,7 @@
     var mid = state.mapMods.collapsingMission;
     var shouldCollapse = false;
 
-    if (mid === 12) {
-      if (state.turnCount === 6 || state.turnCount === 10) shouldCollapse = true;
-    } else if (mid === 13) {
+    if (mid === "13") {
       if (state.turnCount > 0 && state.turnCount % 3 === 0) shouldCollapse = true;
     }
     if (!shouldCollapse) return;
@@ -3134,7 +3373,7 @@
         candidates.push(k);
       }
     }
-    var rng = seedRng(state.turnCount * 31 + mid);
+    var rng = seedRng(state.turnCount * 31 + _hashMissionId(mid || "0"));
     var count = Math.min(2, candidates.length);
     for (var ci = 0; ci < count; ci++) {
       var idx = Math.floor(rng() * candidates.length);
@@ -3148,7 +3387,7 @@
 
   function recalcGlowTiles() {
     state.mapMods.glowTiles = new Set();
-    if (!state.mapMods.fullCurse && state.mapMods.collapsingMission !== 13) return;
+    if (!state.mapMods.fullCurse && state.mapMods.collapsingMission !== "13") return;
     state.mapMods.collapsedTiles.forEach(function (k) {
       var cx = cellKeyX(k), cy = cellKeyY(k);
       for (var di = 0; di < DIRS.length; di++) {
@@ -3255,6 +3494,12 @@
     state.turnCount = 0;
     state.totalDamageDealt = 0;
     state._statMaxSingleHit = 0;
+    state._resultBookkept = false;
+    state._statFirstBlood = null;
+    state._statPacifistTurn = false;
+    state._pacifistStreak = 0;
+    state._playerKilledThisTurn = false;
+    state._ctStallCount = 0;
     state.battleLog = [];
     state.battleRecord = [];
     if (renderer) renderer.floatingTexts = [];
@@ -3340,6 +3585,7 @@
     }
     if (u.fortressRooted > 0) u.fortressRooted--;
     u.interceptActive = false;
+    tickStatuses(u);
   }
 
   async function tickBattleTurn() {
@@ -3351,13 +3597,37 @@
     const actor = nextActor();
     refreshCtStrip();
     if (actor) clearTurnBuffs(actor);
+    if (actor && actor.hp <= 0) {
+      await animateDeath(actor);
+      if (await checkVictoryAsync()) return;
+      await tickBattleTurn();
+      return;
+    }
     if (!actor) {
       log("CT stall — forcing result.", "system");
       renderBoard();
-      await checkVictoryAsync();
+      if (await checkVictoryAsync()) return;
+      state._ctStallCount = (state._ctStallCount || 0) + 1;
+      if (state._ctStallCount >= 3) {
+        log("Repeated CT stall — battle ended.", "system");
+        showResultOverlay("defeat");
+        return;
+      }
+      await delay(100);
+      await tickBattleTurn();
       return;
     }
+    state._ctStallCount = 0;
     state.activeUnit = actor;
+    if (unitStunned(actor)) {
+      var _sname = actor.displayName || classById(actor.classId).name;
+      log(_sname + " is stunned and cannot act!", "system");
+      removeStatus(actor, "stun");
+      renderBoard();
+      await delay(400);
+      await tickBattleTurn();
+      return;
+    }
     if (actor.team === "enemy") {
       try {
         await runEnemyTurn(actor);
@@ -3400,6 +3670,7 @@
     state.hasActed = false;
     state.selectedAbilityIndex = -1;
     state._noDamageTurn = true;
+    state._playerKilledThisTurn = false;
     updateBondBuff(actor);
     showUnitPanel(actor);
     setBattleButtons(actor);
@@ -3410,6 +3681,7 @@
     if (state.tutorialStep < 20) state.tutorialStep = 20;
     tutorialTip(20, "It's your turn! Use Move (M) to reposition, Attack (A) to strike adjacent foes, Ability (B) for special skills, or Wait (W) to end your turn.");
     tutorialTip(21, "Tip: Move first to get next to an enemy, then Attack. You can also use keyboard shortcuts: M, A, B, W.");
+    tutorialTip(22, "The CT strip at the top shows turn order. Faster units (higher SPD) act more often. Height gives +15% damage.");
   }
 
   // -- Tile info & forecast --
@@ -3584,7 +3856,13 @@
   async function clearPlayerTurn() {
     const actor = state.activeUnit;
     if (actor) {
-      if (state._noDamageTurn) state._statPacifistTurn = true;
+      if (state._playerKilledThisTurn) {
+        state._pacifistStreak = 0;
+      } else {
+        state._pacifistStreak = (state._pacifistStreak || 0) + 1;
+        if (state._pacifistStreak >= 5) state._statPacifistTurn = true;
+      }
+      state._playerKilledThisTurn = false;
       var cursedKill = tickCursedTileDamage(actor);
       if (cursedKill) await animateDeath(actor);
       tickMarkDebuffIfNeeded(actor);
@@ -4575,7 +4853,7 @@
         log("Crowd's Favor already used this battle.");
         state.battleMode = "idle";
         renderBoard();
-        return;
+        return false;
       }
       u.crowdsFavorUsed = true;
       u.hp = u.maxHp;
@@ -4754,7 +5032,6 @@
     }
 
     if (ab.effect === "atkdebuff") {
-      SFX.ability();
       tgt.atkDebuffTurns = ab.debuffTurns || 2;
       tgt.atkDebuffAmt = ab.debuffAmt || 3;
       log(ab.name + " — " + classById(tgt.classId).name + " weakened (−" + tgt.atkDebuffAmt + " ATK)!");
@@ -4867,8 +5144,8 @@
 
     if (ab.effect === "hpswap") {
       await animateAttack(u, tgt);
-      var swapUPct = Math.max(0, u.hp / u.maxHp);
-      var swapTPct = Math.max(0, tgt.hp / tgt.maxHp);
+      var swapUPct = u.maxHp > 0 ? Math.max(0, u.hp / u.maxHp) : 0;
+      var swapTPct = tgt.maxHp > 0 ? Math.max(0, tgt.hp / tgt.maxHp) : 0;
       var newUHp = Math.max(1, Math.min(u.maxHp, Math.round(swapTPct * u.maxHp)));
       var newTHp = Math.max(1, Math.min(tgt.maxHp, Math.round(swapUPct * tgt.maxHp)));
       var uDelta = newUHp - u.hp;
@@ -4952,7 +5229,6 @@
       u.duelTurns = 3;
       tgt.duelTarget = u.uid;
       tgt.duelTurns = 3;
-      SFX.ability();
       spawnDmgNumber(u, "DUEL", "#e8c040");
       spawnDmgNumber(tgt, "DUEL", "#e8c040");
       log(ab.name + ": " + (u.displayName || classById(u.classId).name) + " and " + (tgt.displayName || classById(tgt.classId).name) + " deal +20% to each other for 3 turns!");
@@ -5044,6 +5320,7 @@
   }
 
   function showResultOverlay(result) {
+    state._lastBattleResult = result;
     const won = result === "victory";
     if (won) { SFX.victory(); } else { SFX.defeat(); }
     resultOverlay.classList.remove("is-hidden", "result-overlay--victory", "result-overlay--defeat");
@@ -5176,6 +5453,9 @@
           state.survivalMode = false;
           showTitleScreen();
         } else {
+          var alive = state.picks.filter(function(p) { return p.hp > 0; });
+          state.survivalScore += alive.length * 20 + state.survivalWave * 50 + state.totalDamageDealt;
+          state.totalDamageDealt = 0;
           showSurvivalShop();
         }
       } else {
@@ -5209,8 +5489,7 @@
       if (shown[v.id]) continue;
       if (v.condition === "both_survived") {
         if (!classSet[v.classA] || (v.classB && !classSet[v.classB])) continue;
-      } else if (v.condition === "scaeva_allied" && !Campaign.getFlag("scaeva_allied")) continue;
-      else if (v.condition === "livia_allied" && !Campaign.getFlag("livia_allied")) continue;
+      } else if (v.condition && !Campaign.checkCondition(v.condition)) continue;
       shown[v.id] = true;
       var unitA = classSet[v.classA];
       var unitB = v.classB ? classSet[v.classB] : null;
@@ -5265,13 +5544,15 @@
       state.units.forEach(function (u) { if (u.team === "player") _deployedUids[u.uid] = true; });
       Campaign.saveSurvivors(state.units, mission.carryHp, false, _deployedUids);
 
-      if (mission.id === 13) {
+      if (mission.id === "13") {
         Campaign.advance(true);
+        Campaign.saveToDisk();
         runEndingScene();
         return;
       }
 
       Campaign.advance(true);
+      Campaign.saveToDisk();
 
       if (Campaign.isFinished()) {
         runEndingScene();
@@ -5420,7 +5701,7 @@
     if (!state.picks.length) return;
     var mission = campaignState.active ? Campaign.getMission() : null;
     var nextBout = state.boutNumber + 1;
-    var hSeed = mission ? mission.id * 97 + 42 : (nextBout * 71 + 42);
+    var hSeed = mission ? _hashMissionId(mission.id) * 97 + 42 : (nextBout * 71 + 42);
     state._mapSeed = hSeed;
     state.height = buildHeightField(hSeed);
     state.terrain = buildTerrainMap(hSeed, mission ? mission.terrain : null);
@@ -5474,6 +5755,8 @@
 
   function determineEnding() {
     if (Campaign.getFlag("endingA_triggered")) return "a";
+    if (Campaign.getFlag("nero_deal")) return "d";
+    if (Campaign.getFlag("valeria_betrayed") || (campaignState.totalDeaths > 5 && !Campaign.getFlag("livia_allied") && !Campaign.getFlag("scaeva_allied"))) return "e";
     if (Campaign.getFlag("livia_allied") && Campaign.getFlag("temple_visited")) return "b";
     return "c";
   }
@@ -5481,7 +5764,7 @@
   function runEndingScene(onComplete) {
     var key = determineEnding();
     campaignState.endingKey = key;
-    var scenes = Campaign.getEndingScenes(key);
+    var scenes = filterScene(Campaign.getEndingScenes(key));
     if (scenes.length > 0) {
       runScene(scenes.slice(), function () {
         showCampaignComplete();
@@ -5497,12 +5780,26 @@
     Campaign.clearSave();
     resultOverlay.classList.remove("is-hidden", "result-overlay--victory", "result-overlay--defeat");
     resultOverlay.classList.add("result-overlay--victory");
+    var ngBtn = document.getElementById("btnNewGamePlus");
+    if (ngBtn) {
+      ngBtn.classList.remove("is-hidden");
+      var ngLvl = (campaignState.newGamePlus || 0) + 1;
+      ngBtn.textContent = "New Game+ " + (ngLvl > 1 ? "(Cycle " + ngLvl + ")" : "");
+    }
 
-    var endingLabels = { a: "Ending A — Geminus", b: "Ending B — The Sacrifice", c: "Ending C — The Vessel" };
+    var endingLabels = {
+      a: "Ending A — Geminus",
+      b: "Ending B — The Sacrifice",
+      c: "Ending C — The Vessel",
+      d: "Ending D — The Emperor's Dog",
+      e: "Ending E — The Pyre",
+    };
     var endingDescs = {
-      a: "Both brothers survive. The ritual is broken. The twins walk out of the arena together.",
-      b: "Titus is restored, but Cassius gives himself to seal the temple. The cost of love.",
-      c: "Cassius absorbs Dis Pater's power. Titus is free — but Cassius is changed forever.",
+      a: "Both brothers survive. The ritual is broken by an act of stubborn, stupid love. They walk out of the arena together, into sunlight, into whatever comes next.",
+      b: "Titus is restored. Cassius burns the ritual out from within, breaking himself to save everyone else. The cost of love is a broken body and a brother who will never forgive himself.",
+      c: "Cassius becomes a vessel for the power beneath the arena. Titus is free. But something ancient looks out through Cassius's eyes now, and it smiles too slowly.",
+      d: "Nero's champion wins — but the victory is ashes. Titus doesn't recognize the man who served a tyrant to save him. Cassius stands alone in an empty arena, holding a golden eagle badge worth nothing.",
+      e: "The arena burns. The Colosseum screams. Cassius drags his brother from the rubble — alive, human, free. But everyone else is gone. Two brothers, surrounded by the wreckage of every choice that brought them here.",
     };
     var key = campaignState.endingKey || "c";
 
@@ -5795,6 +6092,12 @@
             } else if (opt.flag) {
               Campaign.setFlag(opt.flag);
             }
+            if (opt.flag === "valeria_betrayed") {
+              campaignState.denarii += 50;
+            }
+            if (opt.flag === "nerva_sacrificed") {
+              Campaign.setFlag("nerva_alive", false);
+            }
             if (choicesEl) choicesEl.classList.add("is-hidden");
             if (advanceEl) advanceEl.classList.remove("is-hidden");
             showNextSceneStep();
@@ -5881,6 +6184,12 @@
             } else if (opt.flag) {
               Campaign.setFlag(opt.flag);
             }
+            if (opt.flag === "valeria_betrayed") {
+              campaignState.denarii += 50;
+            }
+            if (opt.flag === "nerva_sacrificed") {
+              Campaign.setFlag("nerva_alive", false);
+            }
             sceneChoices.classList.add("is-hidden");
             btnNext.classList.remove("is-hidden");
             _showNextSceneStepDOM();
@@ -5915,6 +6224,16 @@
       btnContinue.classList.toggle("is-hidden", !anySave);
     }
     document.getElementById("slotPicker").classList.add("is-hidden");
+    var _ngBadge = document.getElementById("ngPlusBadge");
+    if (_ngBadge) _ngBadge.remove();
+    if (campaignState.newGamePlus > 0) {
+      var badge = document.createElement("div");
+      badge.id = "ngPlusBadge";
+      badge.className = "ng-plus-badge";
+      badge.textContent = "NG+" + campaignState.newGamePlus;
+      var sub = document.querySelector(".title-panel__sub");
+      if (sub) sub.parentElement.insertBefore(badge, sub.nextSibling);
+    }
     if (overlay) {
       overlay.classList.remove("is-hidden");
       trapFocus(overlay);
@@ -5944,7 +6263,7 @@
         btn.className = "btn slot-picker__btn";
         if (summary) {
           var d = new Date(summary.savedAt);
-          btn.innerHTML = "<strong>Slot " + (slot + 1) + "</strong><br>" + summary.missionName + "<br><small>" + summary.rosterSize + " fighters · " + d.toLocaleDateString() + "</small>";
+          btn.innerHTML = "<strong>Slot " + (slot + 1) + "</strong><br>" + _esc(summary.missionName) + "<br><small>" + summary.rosterSize + " fighters · " + d.toLocaleDateString() + "</small>";
         } else {
           btn.innerHTML = "<strong>Slot " + (slot + 1) + "</strong><br><em>Empty</em>";
         }
@@ -6147,8 +6466,10 @@
     var rng = seedRng(seed);
     gameRng = seedRng(seed * 1999 + wave);
     BOARD_W = 12; BOARD_H = 10;
-    state.height = buildHeightField(seed);
-    state.terrain = buildTerrainMap(seed, null, null);
+    var _survTemplateKeys = Object.keys(MAP_TEMPLATES);
+    var _survTemplate = (wave % 4 === 0) ? _survTemplateKeys[Math.floor(rng() * _survTemplateKeys.length)] : null;
+    state.height = buildHeightField(seed, _survTemplate);
+    state.terrain = buildTerrainMap(seed, null, _survTemplate);
     if (renderer) renderer.resize(BOARD_W, BOARD_H);
 
     for (var i = 0; i < state.picks.length; i++) {
@@ -6204,7 +6525,6 @@
     var overlay = document.getElementById("survShopOverlay");
     var body = document.getElementById("survShopBody");
     var alive = state.picks.filter(function(p) { return p.hp > 0; });
-    state.survivalScore += alive.length * 20 + state.survivalWave * 50 + state.totalDamageDealt;
 
     var html = '<p>Wave ' + state.survivalWave + ' cleared! Score: ' + state.survivalScore + '</p>';
     html += '<p>Denarii: ' + state.survivalDenarii + '</p>';
@@ -6328,6 +6648,7 @@
       maxNearDeath: 0,
       maxLevel: 1,
       pacifistTurn: !!state._statPacifistTurn,
+      lastBattleWon: state._lastBattleResult === "victory",
     };
 
     var playerUnits = state.units ? state.units.filter(function(u) { return u.team === "player"; }) : [];
@@ -6374,8 +6695,8 @@
       first_blood:    function(s) { return s.totalBattles >= 1; },
       veteran:        function(s) { return s.totalBattles >= 10; },
       centurion:      function(s) { return s.totalBattles >= 25; },
-      flawless:       function(s) { return s.lastBattleFlawless; },
-      massacre:       function(s) { return s.lastBattleDamage >= 100; },
+      flawless:       function(s) { return s.lastBattleWon && s.lastBattleFlawless; },
+      massacre:       function(s) { return s.lastBattleWon && s.lastBattleDamage >= 100; },
       collector:      function(s) { return s.inventoryCount >= 5; },
       hoarder:        function(s) { return s.inventoryCount >= 15; },
       wave_5:         function(s) { return s.survivalBest >= 5; },
@@ -6387,8 +6708,8 @@
       campaign_clear: function(s) { return s.campaignComplete; },
       campaign_hard:  function(s) { return s.campaignCompleteHard; },
       overkill:       function(s) { return s.maxSingleHit >= 20; },
-      pacifist_turn:  function(s) { return s.pacifistTurn; },
-      speedrunner:    function(s) { return s.lastBattleTurns > 0 && s.lastBattleTurns <= 5; },
+      pacifist_turn:  function(s) { return s.lastBattleWon && s.pacifistTurn; },
+      speedrunner:    function(s) { return s.lastBattleWon && s.lastBattleTurns > 0 && s.lastBattleTurns <= 5; },
       deathless:      function(s) { return s.deathlessBattles >= 5; },
       hundred_kills:  function(s) { return s.totalKills >= 100; },
       max_level:      function(s) { return s.maxLevel >= MAX_LEVEL; },
@@ -6446,6 +6767,59 @@
       var descEl = document.createElement("div");
       descEl.textContent = unlocked ? ach.desc : "Locked";
       card.appendChild(descEl);
+      grid.appendChild(card);
+    }
+    hideTitleScreen();
+    overlay.classList.remove("is-hidden");
+    trapFocus(overlay);
+  }
+
+  function showBestiaryPanel() {
+    var overlay = document.getElementById("bestiaryOverlay");
+    var grid = document.getElementById("bestiaryGrid");
+    if (!overlay || !grid) return;
+    grid.innerHTML = "";
+    for (var i = 0; i < GLADIATOR_CLASSES.length; i++) {
+      var cls = GLADIATOR_CLASSES[i];
+      var card = document.createElement("div");
+      card.className = "bestiary-card";
+      var header = document.createElement("div");
+      header.className = "bestiary-card__header";
+      var svgStr = gladiatorSpriteSvg(cls.id, "player");
+      var svgWrap = document.createElement("div");
+      svgWrap.className = "bestiary-card__sprite";
+      svgWrap.innerHTML = svgStr;
+      header.appendChild(svgWrap);
+      var nameEl = document.createElement("div");
+      nameEl.className = "bestiary-card__name";
+      nameEl.textContent = cls.name;
+      header.appendChild(nameEl);
+      card.appendChild(header);
+      var stats = document.createElement("div");
+      stats.className = "bestiary-card__stats";
+      stats.innerHTML = "HP:" + cls.hp + " ATK:" + cls.atk + " DEF:" + cls.def + " SPD:" + cls.spd + " MV:" + cls.move + " JMP:" + cls.jump;
+      card.appendChild(stats);
+      var abs = cls.abilities || [];
+      for (var j = 0; j < abs.length; j++) {
+        var ab = abs[j];
+        var abEl = document.createElement("div");
+        abEl.className = "bestiary-card__ability";
+        abEl.textContent = ab.name + (ab.desc ? " — " + ab.desc : "");
+        card.appendChild(abEl);
+      }
+      var promos = CLASS_PROMOTIONS[cls.id] || [];
+      for (var k = 0; k < promos.length; k++) {
+        var pr = promos[k];
+        var prEl = document.createElement("div");
+        prEl.className = "bestiary-card__promo";
+        prEl.textContent = "⬆ " + pr.name;
+        if (pr.abilities) {
+          for (var pa = 0; pa < pr.abilities.length; pa++) {
+            prEl.textContent += " | " + pr.abilities[pa].name;
+          }
+        }
+        card.appendChild(prEl);
+      }
       grid.appendChild(card);
     }
     hideTitleScreen();
@@ -7333,8 +7707,8 @@
       }
 
       if (ab.effect === "hpswap" && ab.target === "adjacent_enemy" && gameRng() < 0.3) {
-        var ePct = enemy.hp / enemy.maxHp;
-        var tPct = adjTarget.hp / adjTarget.maxHp;
+        var ePct = enemy.maxHp > 0 ? enemy.hp / enemy.maxHp : 0;
+        var tPct = adjTarget.maxHp > 0 ? adjTarget.hp / adjTarget.maxHp : 0;
         if (tPct - ePct >= 0.25) {
           SFX.ability();
           await animateAttack(enemy, adjTarget);
@@ -7522,15 +7896,13 @@
     isoCanvas.addEventListener("gesturestart", function (e) { e.preventDefault(); }, { passive: false });
     isoCanvas.addEventListener("gesturechange", function (e) { e.preventDefault(); }, { passive: false });
     isoCanvas.addEventListener("gestureend", function (e) { e.preventDefault(); }, { passive: false });
-    isoCanvas.addEventListener("touchmove", function (e) {
-      if (e.touches.length > 1) e.preventDefault();
-    }, { passive: false });
 
     isoCanvas.addEventListener("click", function (e) {
       const rect = isoCanvas.getBoundingClientRect();
       const mx = e.clientX - rect.left;
       const my = e.clientY - rect.top;
       const cell = renderer.screenToGrid(mx, my);
+      state.cursor.visible = false;
       if (cell) onTileClick(cell.col, cell.row);
     });
 
@@ -7563,6 +7935,27 @@
               } else {
                 hideForecast();
               }
+            } else {
+              hideForecast();
+            }
+          } else if (state.battleMode === "move" && state.activeUnit) {
+            isoCanvas.style.cursor = "pointer";
+            var _mu = state.activeUnit;
+            var _adjEnemy = state.units.find(function(u) {
+              return u.hp > 0 && u.team !== _mu.team && Math.abs(u.x - cell.col) + Math.abs(u.y - cell.row) === 1;
+            });
+            if (_adjEnemy) {
+              var _origX = _mu.x, _origY = _mu.y;
+              try {
+                _mu.x = cell.col; _mu.y = cell.row;
+                var _preDmg = physicalDamage(_mu, _adjEnemy, 1, 0, true);
+                var _preHit = computeHitChance(_mu, _adjEnemy);
+              } finally {
+                _mu.x = _origX; _mu.y = _origY;
+              }
+              var _eName = classById(_adjEnemy.classId).name;
+              forecastEl.innerHTML = '<div class="fc-name">' + _esc(_eName) + '</div><div class="fc-hit">Hit: ' + _preHit + '%</div><div class="fc-dmg">~' + _preDmg + ' dmg (if moved here)</div>';
+              forecastEl.classList.remove("is-hidden");
             } else {
               hideForecast();
             }
@@ -7618,6 +8011,24 @@
         }
         return;
       }
+      if (e.key === "Escape") {
+        var _esc_overlays = [
+          { id: "bestiaryOverlay", action: function() { document.getElementById("bestiaryOverlay").classList.add("is-hidden"); releaseFocusTrap(); showTitleScreen(); } },
+          { id: "trophyOverlay", action: function() { document.getElementById("trophyOverlay").classList.add("is-hidden"); releaseFocusTrap(); showTitleScreen(); } },
+          { id: "skirmishSettings", action: hideSkirmishSettings },
+          { id: "survivalSettings", action: function() { document.getElementById("survivalSettings").classList.add("is-hidden"); releaseFocusTrap(); showTitleScreen(); } },
+          { id: "slotPicker", action: function() { document.getElementById("slotPicker").classList.add("is-hidden"); var btn = document.getElementById("btnNewCampaign"); if (btn) btn.focus(); } },
+        ];
+        for (var _oi = 0; _oi < _esc_overlays.length; _oi++) {
+          var _el = document.getElementById(_esc_overlays[_oi].id);
+          if (_el && !_el.classList.contains("is-hidden")) {
+            e.preventDefault();
+            _esc_overlays[_oi].action();
+            return;
+          }
+        }
+      }
+
       var key = e.key.toLowerCase();
       if (e.repeat) return;
 
@@ -7627,6 +8038,56 @@
       if (key === "=" || key === "+") { renderer.setZoom(renderer.zoom + 0.15); scheduleRender(); return; }
       if (key === "-" || key === "_") { renderer.setZoom(renderer.zoom - 0.15); scheduleRender(); return; }
       if (key === "r" || key === "home") { renderer.zoom = 1.0; renderer.panX = 0; renderer.panY = 0; renderer.rotStep = 0; renderer._recalcLayout(); scheduleRender(); return; }
+
+      if ((state.phase === "battle" || state.phase === "deploy") && (e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+        e.preventDefault();
+        state.cursor.visible = true;
+        var dx = 0, dy = 0;
+        if (e.key === "ArrowUp") dy = -1;
+        else if (e.key === "ArrowDown") dy = 1;
+        else if (e.key === "ArrowLeft") dx = -1;
+        else if (e.key === "ArrowRight") dx = 1;
+        state.cursor.x = Math.max(0, Math.min(BOARD_W - 1, state.cursor.x + dx));
+        state.cursor.y = Math.max(0, Math.min(BOARD_H - 1, state.cursor.y + dy));
+        var _cx = state.cursor.x, _cy = state.cursor.y;
+        showTileInfo(_cx, _cy);
+        var _cKey = cellKey(_cx, _cy);
+        if (state.highlightCells.has(_cKey)) {
+          if (state.battleMode === "attack" || state.battleMode === "ability") {
+            var _cTgt = occupantAt(_cx, _cy);
+            if (state.activeUnit && _cTgt && _cTgt.team !== state.activeUnit.team) {
+              showForecast(state.activeUnit, _cTgt, state.battleMode === "ability" ? state.selectedAbilityIndex : -1);
+            } else if (state.activeUnit && !_cTgt && state.battleMode === "ability" && state.selectedAbilityIndex >= 0) {
+              var _kab = unitAbilities(state.activeUnit)[state.selectedAbilityIndex];
+              if (_kab && _kab.target === "aoe_range") showAreaForecast(state.activeUnit, _kab);
+              else hideForecast();
+            } else { hideForecast(); }
+          } else if (state.battleMode === "move" && state.activeUnit) {
+            var _kmu = state.activeUnit;
+            var _kadj = state.units.find(function(u) {
+              return u.hp > 0 && u.team !== _kmu.team && Math.abs(u.x - _cx) + Math.abs(u.y - _cy) === 1;
+            });
+            if (_kadj) {
+              var _koX = _kmu.x, _koY = _kmu.y;
+              try {
+                _kmu.x = _cx; _kmu.y = _cy;
+                var _kDmg = physicalDamage(_kmu, _kadj, 1, 0, true);
+                var _kHit = computeHitChance(_kmu, _kadj);
+              } finally { _kmu.x = _koX; _kmu.y = _koY; }
+              var _kName = classById(_kadj.classId).name;
+              forecastEl.innerHTML = '<div class="fc-name">' + _esc(_kName) + '</div><div class="fc-hit">Hit: ' + _kHit + '%</div><div class="fc-dmg">~' + _kDmg + ' dmg (if moved here)</div>';
+              forecastEl.classList.remove("is-hidden");
+            } else { hideForecast(); }
+          } else { hideForecast(); }
+        } else { hideForecast(); }
+        scheduleRender();
+        return;
+      }
+      if (state.phase === "battle" && state.cursor.visible && (e.key === "Enter" || e.key === " ")) {
+        e.preventDefault();
+        onTileClick(state.cursor.x, state.cursor.y);
+        return;
+      }
 
       // Battle shortcuts — (A)ttack, a(B)ility, (W)ait, E(sc)ape to cancel
       if (state.phase === "battle" && !state.animating && state.activeUnit && state.activeUnit.team === "player") {
@@ -7645,6 +8106,7 @@
       }
 
       if (key === "f2") { e.preventDefault(); btnMute.click(); return; }
+      if (key === "f3") { e.preventDefault(); var _sb = document.getElementById("btnSpeed"); if (_sb) _sb.click(); return; }
     });
 
     // Pan via middle-mouse or right-click drag
@@ -7754,6 +8216,22 @@
       btnMute.setAttribute("aria-label", muted ? "Unmute (F2)" : "Mute (F2)");
     });
 
+    var btnSpeed = document.getElementById("btnSpeed");
+    if (btnSpeed) {
+      function _updateSpeedBtn() {
+        var idx = _ANIM_SPEEDS.indexOf(_animSpeed);
+        btnSpeed.innerHTML = _ANIM_LABELS[idx >= 0 ? idx : 0] + "<kbd>F3</kbd>";
+        btnSpeed.setAttribute("aria-label", "Animation speed: " + _ANIM_LABELS[idx >= 0 ? idx : 0] + " (F3)");
+      }
+      _updateSpeedBtn();
+      btnSpeed.addEventListener("click", function () {
+        var idx = _ANIM_SPEEDS.indexOf(_animSpeed);
+        _animSpeed = _ANIM_SPEEDS[(idx + 1) % _ANIM_SPEEDS.length];
+        try { localStorage.setItem("geminus_anim_speed", String(_animSpeed)); } catch (e) {}
+        _updateSpeedBtn();
+      });
+    }
+
     var _resizeTimer = null;
     window.addEventListener("resize", function () {
       clearTimeout(_resizeTimer);
@@ -7805,6 +8283,15 @@
       scheduleRender();
     });
     btnResultContinue.addEventListener("click", closeResultAndReset);
+
+    var btnNGPlus = document.getElementById("btnNewGamePlus");
+    if (btnNGPlus) btnNGPlus.addEventListener("click", function () {
+      Campaign.startNewGamePlus();
+      resultOverlay.classList.add("is-hidden");
+      btnNGPlus.classList.add("is-hidden");
+      releaseFocusTrap();
+      showTitleScreen();
+    });
 
     var btnWatchReplay = document.getElementById("btnWatchReplay");
     if (btnWatchReplay) btnWatchReplay.addEventListener("click", showReplayOverlay);
@@ -7859,6 +8346,12 @@
       showSlotPicker("new");
     });
     if (btnSkirmish) btnSkirmish.addEventListener("click", showSkirmishSettings);
+
+    var btnTutorial = document.getElementById("btnTutorial");
+    if (btnTutorial) btnTutorial.addEventListener("click", function () {
+      Campaign.setSlot(0);
+      startCampaign();
+    });
 
     // Skirmish settings wiring
     var skEnemyCount = document.getElementById("skEnemyCount");
@@ -7949,8 +8442,18 @@
       releaseFocusTrap();
       showTitleScreen();
     });
+    var btnBestiary = document.getElementById("btnBestiary");
+    if (btnBestiary) btnBestiary.addEventListener("click", showBestiaryPanel);
+    var btnBestiaryBack = document.getElementById("btnBestiaryBack");
+    if (btnBestiaryBack) btnBestiaryBack.addEventListener("click", function() {
+      document.getElementById("bestiaryOverlay").classList.add("is-hidden");
+      releaseFocusTrap();
+      showTitleScreen();
+    });
     document.getElementById("btnSlotBack").addEventListener("click", function () {
       document.getElementById("slotPicker").classList.add("is-hidden");
+      var btn = document.getElementById("btnNewCampaign");
+      if (btn) btn.focus();
     });
 
     budgetMax.textContent = String(budgetCurrent);

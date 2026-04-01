@@ -53,7 +53,7 @@ html, body {
   pointer-events: none;
   position: fixed;
   inset: 0;
-  z-index: 9999;
+  z-index: 89;
   opacity: 0.09;
   background: repeating-linear-gradient(
     0deg,
@@ -704,8 +704,11 @@ svg.deploy-card__sprite {
   bottom: 0.5rem;
   right: 0.5rem;
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 3px;
   z-index: 10;
+  max-width: calc(100vw - 1rem);
 }
 @media (min-width: 961px) {
   .camera-controls { position: absolute; }
@@ -987,8 +990,12 @@ svg.deploy-card__sprite {
 .title-panel {
   text-align: center;
   padding: 3rem 2.5rem;
-  max-height: 85vh;
-  max-height: 85dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  min-height: 100dvh;
   overflow-y: auto;
 }
 .title-panel__crest {
@@ -1891,4 +1898,80 @@ svg.deploy-card__sprite {
   color: var(--fft-text-dim);
   min-width: 5em;
   text-align: center;
+}
+
+/* ---- NG+ badge ---- */
+.ng-plus-badge {
+  display: inline-block;
+  background: var(--fft-gold);
+  color: var(--fft-black);
+  font-family: var(--font-fft);
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.15em 0.5em;
+  border-radius: 3px;
+  margin: 0.25rem auto;
+  text-align: center;
+}
+
+/* ---- Bestiary ---- */
+.bestiary-panel {
+  max-width: 52rem;
+}
+.bestiary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  max-height: 65vh;
+  max-height: 65dvh;
+  overflow-y: auto;
+}
+.bestiary-card {
+  background: var(--fft-window-inner);
+  border: 1px solid var(--fft-gold-dim);
+  border-radius: 4px;
+  padding: 0.6rem;
+  font-family: var(--font-fft);
+  font-size: 0.72rem;
+  color: var(--fft-text);
+}
+.bestiary-card__header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+.bestiary-card__sprite {
+  width: 32px;
+  height: 40px;
+  flex-shrink: 0;
+}
+.bestiary-card__sprite svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.bestiary-card__name {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--fft-gold);
+}
+.bestiary-card__stats {
+  color: var(--fft-text-dim);
+  margin-bottom: 0.3rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.02em;
+}
+.bestiary-card__ability {
+  color: var(--fft-text);
+  font-size: 0.68rem;
+  padding: 0.15rem 0;
+  border-top: 1px solid rgba(192, 168, 136, 0.15);
+}
+.bestiary-card__promo {
+  color: var(--fft-gold-dim);
+  font-size: 0.65rem;
+  padding: 0.15rem 0;
+  font-style: italic;
 }

@@ -12,11 +12,15 @@
   <meta property="og:url" content="https://geminus.surge.sh/" />
   <meta property="og:title" content="Geminus Ratio — Ludus Tactics" />
   <meta property="og:description" content="Turn-based gladiator tactics game inspired by Final Fantasy Tactics. Build a ludus, deploy fighters, and battle on an isometric arena." />
+  <meta property="og:image" content="https://geminus.surge.sh/og-image.jpg" />
+  <meta property="og:image:width" content="1376" />
+  <meta property="og:image:height" content="768" />
 
   <!-- Twitter Card -->
-  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Geminus Ratio — Ludus Tactics" />
   <meta name="twitter:description" content="Turn-based gladiator tactics game inspired by Final Fantasy Tactics. Build a ludus, deploy fighters, and battle on an isometric arena." />
+  <meta name="twitter:image" content="https://geminus.surge.sh/og-image.jpg" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚔</text></svg>" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -106,6 +110,7 @@
               <button type="button" id="btnRotR" class="cam-btn" aria-label="Rotate right (E)" title="Rotate right (E)">↻<kbd>E</kbd></button>
               <button type="button" id="btnCamReset" class="cam-btn cam-btn--small" aria-label="Reset camera (R)" title="Reset camera (R)">⌂<kbd>R</kbd></button>
               <button type="button" id="btnMute" class="cam-btn cam-btn--small" aria-label="Toggle mute (F2)" title="Toggle mute (F2)">♪<kbd>F2</kbd></button>
+              <button type="button" id="btnSpeed" class="cam-btn cam-btn--small" aria-label="Animation speed (F3)" title="Animation speed (F3)">1×<kbd>F3</kbd></button>
             </div>
           </div>
         </div>
@@ -125,6 +130,8 @@
         <button type="button" id="btnSkirmish" class="btn btn--ghost">Skirmish</button>
         <button type="button" id="btnSurvival" class="btn btn--ghost">Survival Arena</button>
         <button type="button" id="btnTrophies" class="btn btn--ghost btn--small">Trophies</button>
+        <button type="button" id="btnBestiary" class="btn btn--ghost btn--small">Bestiary</button>
+        <button type="button" id="btnTutorial" class="btn btn--ghost btn--small">Tutorial</button>
       </div>
       <div id="slotPicker" class="slot-picker is-hidden" aria-label="Save slot selection">
         <h3 class="slot-picker__title">Choose a Save Slot</h3>
@@ -212,6 +219,7 @@
       <div id="resultButtons" class="result-buttons">
         <button type="button" id="btnResultContinue" class="btn btn--gold">Continue</button>
         <button type="button" id="btnResultRetry" class="btn btn--ghost is-hidden">Retry Mission</button>
+        <button type="button" id="btnNewGamePlus" class="btn btn--gold is-hidden">New Game+</button>
         <button type="button" id="btnWatchReplay" class="btn btn--ghost btn--small">Watch Replay</button>
       </div>
     </div>
@@ -246,6 +254,17 @@
       <div id="trophyGrid" class="trophy-grid" aria-label="Trophy list"></div>
       <div class="title-panel__buttons">
         <button type="button" id="btnTrophyBack" class="btn btn--ghost">Back</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bestiary overlay -->
+  <div id="bestiaryOverlay" class="title-overlay is-hidden" role="dialog" aria-labelledby="bestiaryHeading" aria-modal="true">
+    <div class="title-panel bestiary-panel">
+      <h2 id="bestiaryHeading" class="title-panel__name">Bestiary</h2>
+      <div id="bestiaryGrid" class="bestiary-grid" aria-label="Class list"></div>
+      <div class="title-panel__buttons">
+        <button type="button" id="btnBestiaryBack" class="btn btn--ghost">Back</button>
       </div>
     </div>
   </div>
@@ -291,11 +310,11 @@
     </div>
   </div>
 
-  <script src="js/rng.js"></script>
-  <script src="js/sfx.js"></script>
-  <script src="js/renderer.js"></script>
-  <script src="js/sprites.js"></script>
-  <script src="js/campaign.js"></script>
-  <script src="js/game.js"></script>
+  <script defer src="js/rng.js"></script>
+  <script defer src="js/sfx.js"></script>
+  <script defer src="js/renderer.js"></script>
+  <script defer src="js/sprites.js"></script>
+  <script defer src="js/campaign.js"></script>
+  <script defer src="js/game.js"></script>
 </body>
 </html>

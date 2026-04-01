@@ -10,6 +10,15 @@ alwaysApply: true
 - Hosting: Surge.sh (account: albmunmu@gmail.com, Student plan)
 - No build step — static HTML/CSS/JS served directly
 
+## Git push
+
+This repo uses the **betexcr** GitHub account. Before pushing, ensure it is the active `gh` account:
+
+```bash
+gh auth switch --user betexcr
+git push origin main
+```
+
 ## Deploy command
 
 ```bash
