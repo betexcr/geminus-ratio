@@ -2308,6 +2308,7 @@
     refreshCtStrip();
     const p = state.phase;
     if (p === "ludus") { SFX.startAmbient("ludus"); SFX.startMusic("ludus"); }
+    else if (p === "deploy") { SFX.startAmbient("ludus"); SFX.startMusic("deploy"); }
     else if (p === "battle") { SFX.startAmbient("battle"); SFX.startMusic("battle"); }
     else { SFX.startAmbient("ludus"); SFX.startMusic("ludus"); }
     var phaseText = p === "ludus" ? "Ludus" : p === "deploy" ? "Gates" : "Arena";
@@ -3276,6 +3277,7 @@
 
   function triggerTerrainStep(u) {
     if (u.hp <= 0) return;
+    if (u.isCinematic) return;
     var zone = tileZone(u.x, u.y);
     var uName = u.displayName || classById(u.classId).name;
     if (zone === "trap_spike") {
@@ -5322,7 +5324,10 @@
   function showResultOverlay(result) {
     state._lastBattleResult = result;
     const won = result === "victory";
+    SFX.stopAmbient();
+    SFX.stopMusic();
     if (won) { SFX.victory(); } else { SFX.defeat(); }
+    SFX.playBattleResultMusic(won);
     resultOverlay.classList.remove("is-hidden", "result-overlay--victory", "result-overlay--defeat");
     resultOverlay.classList.add(won ? "result-overlay--victory" : "result-overlay--defeat");
 
@@ -5778,6 +5783,9 @@
 
   function showCampaignComplete() {
     Campaign.clearSave();
+    SFX.stopAmbient();
+    SFX.stopMusic();
+    SFX.startMusic("credits");
     resultOverlay.classList.remove("is-hidden", "result-overlay--victory", "result-overlay--defeat");
     resultOverlay.classList.add("result-overlay--victory");
     var ngBtn = document.getElementById("btnNewGamePlus");
@@ -5838,7 +5846,7 @@
 
   function stageCutscene(steps) {
     SFX.startAmbient("cutscene");
-    SFX.stopMusic();
+    SFX.startMusic("cutscene");
     var cs = state.cutscene;
     cs.savedPanX = renderer.panX;
     cs.savedPanY = renderer.panY;
@@ -6240,6 +6248,8 @@
       var focusBtn = (btnContinue && !btnContinue.classList.contains("is-hidden")) ? btnContinue : $("#btnNewCampaign");
       setTimeout(function() { (focusBtn || overlay).focus(); }, 100);
     }
+    SFX.stopAmbient();
+    SFX.startMusic("title");
     panelRoster.classList.add("is-hidden");
     panelDeploy.classList.add("is-hidden");
     panelBattle.classList.add("is-hidden");
@@ -6550,6 +6560,8 @@
     });
     overlay.classList.remove("is-hidden");
     trapFocus(overlay);
+    SFX.startAmbient("ludus");
+    SFX.startMusic("ludus");
   }
 
   function survivalDefeat() {
@@ -6838,6 +6850,7 @@
 
   function recordAction(actor, action, details) {
     if (!state.battleRecord) return;
+    if (actor && actor.isCinematic) return;
     var entry = {
       turn: state.turnCount,
       actorId: actor ? actor.id : null,

@@ -1,6 +1,9 @@
 /**
  * SFX — procedural Web Audio sound effects for Geminus Ratio.
- * Zero dependencies, zero asset files.
+ * Optional streaming music: Rome: Total War (PC) soundtrack filenames from
+ * https://www.protoman.com/Music/Music/Rome%20Total%20War%20%28PC%29/
+ * Set SFX.MUSIC_STREAM_BASE to a folder URL (ending with /) with those MP3s
+ * for offline use; defaults to the Protoman mirror above.
  */
 "use strict";
 
@@ -11,6 +14,224 @@ var SFX = (function () {
   var _muted = false;
   var _baseGain = 1;
   var _pendingTimers = [];
+
+  /** @type {string} Base URL with trailing slash */
+  var MUSIC_STREAM_BASE = "https://www.protoman.com/Music/Music/Rome%20Total%20War%20%28PC%29/";
+  var USE_STREAMING_MUSIC = true;
+  var _musicStreamId = 0;
+  var _streamMainAudio = null;
+  var _stingerAudio = null;
+
+  /**
+   * Maps game moments → exact RTW track filenames (index listing).
+   */
+  var RTW_TRACKS = {
+    title: ["01 Rome Total War.mp3"],
+    ludus: [
+      "02 Rome HQ.mp3",
+      "11 Campaign 1  Autumn.mp3",
+      "12 Campaign 2  Melancholy.mp3",
+      "13 Campaign 3  Divinitus.mp3",
+      "14 Campaign 4  Lonely Strategos.mp3",
+      "15 Campaign 5  Arabic Winter.mp3",
+      "16 Campaign 6  Arabic Summer.mp3",
+    ],
+    deploy: [
+      "23 Mobilize 1  Journey to Rome Part 2.mp3",
+      "24 Mobilize 2  Warrior March.mp3",
+      "25 Mobilize 3  Enemy is Near.mp3",
+      "26 Mobilize 4  Army of Drums.mp3",
+      "27 Mobilize 5  Mobilize.mp3",
+      "28 Mobilize 6  Soldiers' Chant.mp3",
+      "17 Campaign Battle 1  Time 2 Kill.mp3",
+    ],
+    battle: [
+      "29 Battle 1  Imperial Conflict.mp3",
+      "30 Battle 2  Mayhem.mp3",
+      "31 Battle 3  Melee Cafe.mp3",
+      "32 Battle 4  Romantic Battle.mp3",
+    ],
+    cutscene: [
+      "19 Tension 1  Journey to Rome Part 1.mp3",
+      "20 Tension 2  Caesar's Nightmare.mp3",
+      "21 Tension 3  Death Approaches.mp3",
+      "22 Tension 4  Drums of Doom.mp3",
+    ],
+    credits: ["38 Credits  Forever (Rome Total War).mp3"],
+    victory: ["35 Roman Victory.mp3", "18 Campaign Win1  Invicta.mp3"],
+    defeat: ["37 Defeat  Lost Souls.mp3"],
+  };
+
+  function _musicUrl(filename) {
+    var base = MUSIC_STREAM_BASE || "";
+    if (!base) return filename;
+    return base + encodeURIComponent(filename);
+  }
+
+  function _pick(arr, seedHint) {
+    if (!arr || !arr.length) return null;
+    var i = seedHint != null ? Math.abs(seedHint) % arr.length : Math.floor(Math.random() * arr.length);
+    return arr[i];
+  }
+
+  function _streamVolumeMain() {
+    return _muted ? 0 : Math.max(0, Math.min(1, _baseGain * 0.35));
+  }
+
+  function _streamVolumeStinger() {
+    return _muted ? 0 : Math.max(0, Math.min(1, _baseGain * 0.5));
+  }
+
+  function _stopStreamMain() {
+    if (_streamMainAudio) {
+      try { _streamMainAudio.pause(); } catch (e) {}
+      try { _streamMainAudio.removeAttribute("src"); _streamMainAudio.load(); } catch (e2) {}
+      _streamMainAudio = null;
+    }
+  }
+
+  function _stopStinger() {
+    if (_stingerAudio) {
+      try { _stingerAudio.pause(); } catch (e) {}
+      try { _stingerAudio.removeAttribute("src"); _stingerAudio.load(); } catch (e2) {}
+      _stingerAudio = null;
+    }
+  }
+
+  function _startProceduralMusic(api, profile) {
+    var proc = profile;
+    if (proc === "title" || proc === "deploy" || proc === "cutscene" || proc === "credits") proc = "ludus";
+    if (proc !== "ludus" && proc !== "battle") proc = "ludus";
+
+    var c = ensure();
+    if (!c) return;
+    var musicVol = _baseGain * 0.4;
+    var self = api;
+
+    try {
+      if (proc === "ludus") {
+        var notes = [220, 261.6, 329.6, 392];
+        var noteIdx = 0;
+        var gain = c.createGain();
+        gain.gain.value = musicVol;
+        gain.connect(dest());
+        var timer = setInterval(function () {
+          if (!c || c.state === "closed" || c.state !== "running" || _muted) return;
+          var freq = notes[noteIdx % notes.length];
+          noteIdx++;
+          var osc = c.createOscillator();
+          var ng = c.createGain();
+          osc.type = "triangle";
+          osc.frequency.value = freq;
+          ng.gain.setValueAtTime(0.12, c.currentTime);
+          ng.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.6);
+          osc.connect(ng);
+          ng.connect(gain);
+          osc.start(c.currentTime);
+          osc.stop(c.currentTime + 0.65);
+          osc.onended = function () { osc.disconnect(); ng.disconnect(); };
+        }, 750);
+        self._musicNodes = { gain: gain, timer: timer };
+        self._musicProfile = profile;
+      } else if (proc === "battle") {
+        var gainB = c.createGain();
+        gainB.gain.value = musicVol;
+        gainB.connect(dest());
+
+        var drone = c.createOscillator();
+        var droneGain = c.createGain();
+        drone.type = "sawtooth";
+        drone.frequency.value = 55;
+        droneGain.gain.value = 0.06;
+        drone.connect(droneGain);
+        droneGain.connect(gainB);
+        drone.start();
+
+        var beatIdx = 0;
+        var beatLen = Math.round(c.sampleRate * 0.06);
+        var beatBuf = c.createBuffer(1, beatLen, c.sampleRate);
+        var beatData = beatBuf.getChannelData(0);
+        for (var bi = 0; bi < beatLen; bi++) beatData[bi] = (Math.random() * 2 - 1);
+        var timerB = setInterval(function () {
+          if (!c || c.state === "closed" || c.state !== "running" || _muted) return;
+          beatIdx++;
+          var accent = (beatIdx % 4 === 1) ? 0.14 : 0.07;
+          var src = c.createBufferSource();
+          src.buffer = beatBuf;
+          var ng = c.createGain();
+          ng.gain.setValueAtTime(accent, c.currentTime);
+          ng.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.05);
+          src.connect(ng);
+          ng.connect(gainB);
+          src.start(c.currentTime);
+          src.onended = function () { src.disconnect(); ng.disconnect(); };
+
+          if (beatIdx % 8 === 0) {
+            var osc2 = c.createOscillator();
+            var og = c.createGain();
+            osc2.type = "square";
+            osc2.frequency.value = 110;
+            og.gain.setValueAtTime(0.06, c.currentTime);
+            og.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.25);
+            osc2.connect(og);
+            og.connect(gainB);
+            osc2.start(c.currentTime);
+            osc2.stop(c.currentTime + 0.3);
+            osc2.onended = function () { osc2.disconnect(); og.disconnect(); };
+          }
+        }, 500);
+        self._musicNodes = { gain: gainB, timer: timerB, drone: drone, droneGain: droneGain };
+        self._musicProfile = profile;
+      }
+    } catch (e) {
+      api.stopMusic();
+      api._musicProfile = null;
+    }
+  }
+
+  function _beginStreamTrack(api, profile, loop) {
+    if (!USE_STREAMING_MUSIC) return false;
+    var list = RTW_TRACKS[profile];
+    if (!list || !list.length) return false;
+    var file = _pick(list, profile === "battle" ? Math.floor(Math.random() * 0x7fffffff) : null);
+    if (!file) return false;
+    var url = _musicUrl(file);
+    if (!url) return false;
+
+    var myId = ++_musicStreamId;
+    var a = new Audio(url);
+    a.loop = !!loop;
+    a.volume = _streamVolumeMain();
+    a.addEventListener("ended", function () {
+      if (myId !== _musicStreamId || a !== _streamMainAudio) return;
+      if (!a.loop) {
+        api._musicNodes = null;
+        api._musicProfile = null;
+        _streamMainAudio = null;
+      }
+    });
+
+    var p = a.play();
+    if (p && typeof p.then === "function") {
+      p.then(function () {
+        if (myId !== _musicStreamId) {
+          try { a.pause(); } catch (e) {}
+          return;
+        }
+        _streamMainAudio = a;
+        api._musicNodes = { kind: "stream", audio: a };
+        api._musicProfile = profile;
+      }).catch(function () {
+        if (myId !== _musicStreamId) return;
+        _startProceduralMusic(api, profile);
+      });
+    } else {
+      _streamMainAudio = a;
+      api._musicNodes = { kind: "stream", audio: a };
+      api._musicProfile = profile;
+    }
+    return true;
+  }
 
   function ensure() {
     if (ctx && ctx.state === "closed") {
@@ -26,6 +247,9 @@ var SFX = (function () {
       }
       SFX._musicNodes = null;
       SFX._musicProfile = null;
+      _musicStreamId++;
+      _stopStreamMain();
+      _stopStinger();
       if (SFX._ambientStopTimer) { clearTimeout(SFX._ambientStopTimer); SFX._ambientStopTimer = 0; }
       if (SFX._musicStopTimer) { clearTimeout(SFX._musicStopTimer); SFX._musicStopTimer = 0; }
     }
@@ -156,6 +380,8 @@ var SFX = (function () {
         this._musicNodes.gain.gain.setValueAtTime(this._musicNodes.gain.gain.value, mt);
         this._musicNodes.gain.gain.linearRampToValueAtTime(eff, mt + 0.02);
       }
+      if (_streamMainAudio) _streamMainAudio.volume = _streamVolumeMain();
+      if (_stingerAudio) _stingerAudio.volume = _streamVolumeStinger();
     },
 
     mute: function () {
@@ -173,6 +399,8 @@ var SFX = (function () {
         this._musicNodes.gain.gain.setValueAtTime(this._musicNodes.gain.gain.value, mt);
         this._musicNodes.gain.gain.linearRampToValueAtTime(eff, mt + 0.02);
       }
+      if (_streamMainAudio) _streamMainAudio.volume = _streamVolumeMain();
+      if (_stingerAudio) _stingerAudio.volume = _streamVolumeStinger();
       return _muted;
     },
 
@@ -279,113 +507,65 @@ var SFX = (function () {
     startMusic: function (profile) {
       if (this._musicProfile === profile && this._musicNodes) return;
       this.stopMusic();
-      var c = ensure();
-      if (!c) return;
-      var musicVol = _baseGain * 0.4;
-      var self = this;
+      if (_beginStreamTrack(this, profile, true)) return;
+      _startProceduralMusic(this, profile);
+    },
 
-      try {
-        if (profile === "ludus") {
-          var notes = [220, 261.6, 329.6, 392];
-          var noteIdx = 0;
-          var gain = c.createGain();
-          gain.gain.value = musicVol;
-          gain.connect(dest());
-          var timer = setInterval(function () {
-            if (!c || c.state === "closed" || c.state !== "running" || _muted) return;
-            var freq = notes[noteIdx % notes.length];
-            noteIdx++;
-            var osc = c.createOscillator();
-            var ng = c.createGain();
-            osc.type = "triangle";
-            osc.frequency.value = freq;
-            ng.gain.setValueAtTime(0.12, c.currentTime);
-            ng.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.6);
-            osc.connect(ng);
-            ng.connect(gain);
-            osc.start(c.currentTime);
-            osc.stop(c.currentTime + 0.65);
-            osc.onended = function () { osc.disconnect(); ng.disconnect(); };
-          }, 750);
-          self._musicNodes = { gain: gain, timer: timer };
-          self._musicProfile = profile;
-        } else if (profile === "battle") {
-          var gain = c.createGain();
-          gain.gain.value = musicVol;
-          gain.connect(dest());
-
-          var drone = c.createOscillator();
-          var droneGain = c.createGain();
-          drone.type = "sawtooth";
-          drone.frequency.value = 55;
-          droneGain.gain.value = 0.06;
-          drone.connect(droneGain);
-          droneGain.connect(gain);
-          drone.start();
-
-          var beatIdx = 0;
-          var beatLen = Math.round(c.sampleRate * 0.06);
-          var beatBuf = c.createBuffer(1, beatLen, c.sampleRate);
-          var beatData = beatBuf.getChannelData(0);
-          for (var bi = 0; bi < beatLen; bi++) beatData[bi] = (Math.random() * 2 - 1);
-          var timer = setInterval(function () {
-            if (!c || c.state === "closed" || c.state !== "running" || _muted) return;
-            beatIdx++;
-            var accent = (beatIdx % 4 === 1) ? 0.14 : 0.07;
-            var src = c.createBufferSource();
-            src.buffer = beatBuf;
-            var ng = c.createGain();
-            ng.gain.setValueAtTime(accent, c.currentTime);
-            ng.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.05);
-            src.connect(ng);
-            ng.connect(gain);
-            src.start(c.currentTime);
-            src.onended = function () { src.disconnect(); ng.disconnect(); };
-
-            if (beatIdx % 8 === 0) {
-              var osc = c.createOscillator();
-              var og = c.createGain();
-              osc.type = "square";
-              osc.frequency.value = 110;
-              og.gain.setValueAtTime(0.06, c.currentTime);
-              og.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.25);
-              osc.connect(og);
-              og.connect(gain);
-              osc.start(c.currentTime);
-              osc.stop(c.currentTime + 0.3);
-              osc.onended = function () { osc.disconnect(); og.disconnect(); };
-            }
-          }, 500);
-          self._musicNodes = { gain: gain, timer: timer, drone: drone, droneGain: droneGain };
-          self._musicProfile = profile;
-        }
-      } catch (e) {
-        self.stopMusic();
-        self._musicProfile = null;
+    playBattleResultMusic: function (won) {
+      _stopStinger();
+      if (!USE_STREAMING_MUSIC) return;
+      var list = won ? RTW_TRACKS.victory : RTW_TRACKS.defeat;
+      var file = _pick(list, null);
+      if (!file) return;
+      var url = _musicUrl(file);
+      if (!url) return;
+      var a = new Audio(url);
+      a.loop = false;
+      a.volume = _streamVolumeStinger();
+      _stingerAudio = a;
+      var playProm = a.play();
+      if (playProm && typeof playProm.catch === "function") {
+        playProm.catch(function () { if (_stingerAudio === a) _stingerAudio = null; });
       }
+    },
+
+    setStreamingMusic: function (enabled) {
+      USE_STREAMING_MUSIC = !!enabled;
+    },
+
+    setMusicStreamBase: function (baseUrl) {
+      if (!baseUrl || typeof baseUrl !== "string") MUSIC_STREAM_BASE = "";
+      else MUSIC_STREAM_BASE = baseUrl.replace(/\/?$/, "/");
+    },
+
+    getMusicStreamBase: function () {
+      return MUSIC_STREAM_BASE;
     },
 
     _musicStopTimer: 0,
 
     stopMusic: function () {
+      _musicStreamId++;
+      _stopStreamMain();
+      _stopStinger();
       if (this._musicStopTimer) { clearTimeout(this._musicStopTimer); this._musicStopTimer = 0; }
-      if (!this._musicNodes) return;
       var nodes = this._musicNodes;
-      if (nodes.timer) clearInterval(nodes.timer);
       this._musicNodes = null;
       this._musicProfile = null;
+      if (!nodes || nodes.kind === "stream") return;
+      if (nodes.timer) clearInterval(nodes.timer);
       var self = this;
       if (ctx && ctx.state === "running" && nodes.gain) {
         try {
           nodes.gain.gain.setValueAtTime(nodes.gain.gain.value, ctx.currentTime);
           nodes.gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.03);
         } catch (e) {}
-        if (nodes.drone) try { nodes.drone.stop(ctx.currentTime + 0.04); } catch (e) {}
+        if (nodes.drone) try { nodes.drone.stop(ctx.currentTime + 0.04); } catch (e2) {}
         self._musicStopTimer = setTimeout(function () {
           self._musicStopTimer = 0;
-          if (nodes.drone) try { nodes.drone.disconnect(); } catch (e) {}
-          if (nodes.droneGain) try { nodes.droneGain.disconnect(); } catch (e) {}
-          if (nodes.gain) try { nodes.gain.disconnect(); } catch (e) {}
+          if (nodes.drone) try { nodes.drone.disconnect(); } catch (e3) {}
+          if (nodes.droneGain) try { nodes.droneGain.disconnect(); } catch (e4) {}
+          if (nodes.gain) try { nodes.gain.disconnect(); } catch (e5) {}
         }, 60);
       } else {
         if (nodes.drone) {
