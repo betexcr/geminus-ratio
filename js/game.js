@@ -8364,6 +8364,9 @@
       return Math.sqrt(dx * dx + dy * dy);
     }
     isoCanvas.addEventListener("touchstart", function (e) {
+      // Ludus: canvas is non-interactive (onTileClick returns immediately). Let touches
+      // propagate so the page/panel can scroll on phones — otherwise preventDefault traps drags.
+      if (state.phase === "ludus") return;
       e.preventDefault();
       if (e.touches.length === 1) {
         _touch.startX = e.touches[0].clientX;
@@ -8377,6 +8380,7 @@
       }
     }, { passive: false });
     isoCanvas.addEventListener("touchmove", function (e) {
+      if (state.phase === "ludus") return;
       e.preventDefault();
       if (state.cutscene.active) return;
       if (e.touches.length === 1) {
@@ -8398,6 +8402,7 @@
       }
     }, { passive: false });
     isoCanvas.addEventListener("touchend", function (e) {
+      if (state.phase === "ludus") return;
       if (e.changedTouches.length === 1 && !_touch.moved && e.touches.length === 0) {
         var rect = isoCanvas.getBoundingClientRect();
         var mx = _touch.startX - rect.left;

@@ -124,6 +124,11 @@ html, body {
   min-height: calc(100dvh - 4.5rem);
 }
 
+/* Let the panel shrink inside the grid so max-height + overflow-y: auto reliably scrolls */
+.layout > .panel {
+  min-height: 0;
+}
+
 @media (max-width: 960px) {
   .layout { grid-template-columns: 1fr; }
   /* Avoid forcing ~100dvh stage below a tall panel (arena felt “stuck at bottom”). */
@@ -206,7 +211,9 @@ html, body {
   max-height: min(46vh, 22rem);
   overflow-x: hidden;
   overflow-y: auto;
-  overscroll-behavior: contain;
+  /* Allow vertical scroll to chain to .panel when the class list itself has nothing to scroll */
+  overscroll-behavior-x: contain;
+  overscroll-behavior-y: auto;
   margin: 0 -0.15rem 0.4rem 0;
   padding: 0.15rem 0.35rem 0.5rem 0;
   background: var(--fft-window-inner);
