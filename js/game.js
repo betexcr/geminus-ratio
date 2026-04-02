@@ -2585,6 +2585,7 @@
   }
 
   function renderEquipShop() {
+    hideEquipAssignPanel();
     var existing = document.getElementById("equipShopSection");
     if (existing) existing.remove();
     if (!campaignState.active && !state.survivalMode) return;
@@ -2631,20 +2632,18 @@
     }
   }
 
-  function showEquipPicker(item) {
-    if (item.cost > state.budget) {
-      log("Not enough denarii for " + item.name + ".", "system");
-      return;
-    }
-    var msg = "Buy " + item.name + " (" + item.cost + "d)?\\nAssign to which fighter?\\n";
-    for (var i = 0; i < state.picks.length; i++) {
-      msg += (i + 1) + ": " + (state.picks[i].displayName || classById(state.picks[i].classId).name) + "\\n";
-    }
-    var choice = prompt(msg, "1");
-    if (!choice) return;
-    var idx = parseInt(choice, 10) - 1;
-    if (idx < 0 || idx >= state.picks.length) return;
-    var pick = state.picks[idx];
+  function hideEquipAssignPanel() {
+    var el = document.getElementById("equipAssignPanel");
+    if (el) el.remove();
+    document.removeEventListener("keydown", equipAssignOnEscape);
+  }
+
+  function equipAssignOnEscape(e) {
+    if (e.key !== "Escape") return;
+    hideEquipAssignPanel();
+  }
+
+  function assignEquipmentToPick(item, pick) {
     if (!pick.equipment) pick.equipment = { weapon: null, armor: null, trinket: null };
     var oldId = pick.equipment[item.slot];
     if (oldId) {
@@ -2657,6 +2656,65 @@
     log("Equipped " + item.name + " on " + (pick.displayName || classById(pick.classId).name) + ".");
     refreshRosterUI();
     safeSave();
+  }
+
+  function showEquipPicker(item) {
+    if (item.cost > state.budget) {
+      log("Not enough denarii for " + item.name + ".", "system");
+      return;
+    }
+    var section = document.getElementById("equipShopSection");
+    if (!section || !state.picks.length) return;
+
+    hideEquipAssignPanel();
+
+    var panel = document.createElement("div");
+    panel.id = "equipAssignPanel";
+    panel.className = "equip-assign";
+    panel.setAttribute("role", "group");
+    panel.setAttribute("aria-label", "Assign equipment to a fighter");
+
+    var promptEl = document.createElement("div");
+    promptEl.className = "equip-assign__prompt";
+    promptEl.textContent = "Assign " + item.name + " (" + item.cost + " d) — choose a fighter:";
+    panel.appendChild(promptEl);
+
+    var namesRow = document.createElement("div");
+    namesRow.className = "equip-assign__names";
+    for (var i = 0; i < state.picks.length; i++) {
+      (function (pick) {
+        var dispC = displayClassById(pick.classId);
+        var className = dispC.name;
+        if (pick.promotionId) {
+          var _pr = getPromotion(pick.promotionId);
+          if (_pr) className = _pr.name;
+        }
+        var label = pick.displayName ? pick.displayName + " (" + className + ")" : className;
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "equip-assign__fighter";
+        btn.textContent = label;
+        btn.setAttribute("aria-label", "Assign to " + label);
+        btn.addEventListener("click", function () {
+          assignEquipmentToPick(item, pick);
+          hideEquipAssignPanel();
+        });
+        namesRow.appendChild(btn);
+      })(state.picks[i]);
+    }
+    panel.appendChild(namesRow);
+
+    var cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.className = "btn btn--ghost equip-assign__cancel";
+    cancel.textContent = "Cancel";
+    cancel.addEventListener("click", hideEquipAssignPanel);
+    panel.appendChild(cancel);
+
+    section.appendChild(panel);
+    document.addEventListener("keydown", equipAssignOnEscape);
+    var _firstAssignBtn = namesRow.querySelector("button.equip-assign__fighter");
+    if (_firstAssignBtn) _firstAssignBtn.focus();
   }
 
   function toggleRosterStats() {

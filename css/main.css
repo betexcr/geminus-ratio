@@ -1706,6 +1706,56 @@ svg.deploy-card__sprite {
 .equip-card__cost { color: var(--fft-hp-yellow); }
 .equip-card--rare .equip-card__name { color: var(--fft-cyan); }
 .equip-card--legendary .equip-card__name { color: #dda0ff; }
+
+.equip-assign {
+  margin-top: 0.45rem;
+  padding: 0.4rem 0.35rem;
+  background: #0e0c0a;
+  border: 2px solid var(--fft-gold-dim);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+.equip-assign__prompt {
+  font-family: var(--font-fft);
+  font-size: 0.75rem;
+  color: var(--fft-text-dim);
+  margin-bottom: 0.35rem;
+  line-height: 1.25;
+}
+.equip-assign__names {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+  margin-bottom: 0.35rem;
+}
+.equip-assign__fighter {
+  font-family: var(--font-fft);
+  font-size: 0.78rem;
+  padding: 0.25rem 0.5rem;
+  min-height: 2rem;
+  background: #1a1612;
+  border: 2px solid #4a4030;
+  color: var(--fft-cyan);
+  cursor: pointer;
+  text-align: left;
+  max-width: 100%;
+}
+@media (hover: hover) {
+  .equip-assign__fighter:hover {
+    border-color: var(--fft-gold);
+    color: var(--fft-gold);
+  }
+}
+.equip-assign__fighter:focus-visible {
+  outline: 2px solid var(--fft-gold);
+  outline-offset: 2px;
+}
+.equip-assign__cancel {
+  margin-top: 0.15rem;
+  font-size: 0.75rem;
+  min-height: 2rem;
+}
+
 .equip-slot {
   display: inline-block;
   font-family: var(--font-fft);
