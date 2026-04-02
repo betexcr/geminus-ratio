@@ -35,6 +35,10 @@ Then open `http://localhost:8765`.
 
 Plain HTML/CSS/JS, no build step. Deploy to GitHub Pages, Netlify, or Cloudflare Pages by uploading this folder.
 
+## Dev tools
+
+- [`tools/gen-log-ability-keys.mjs`](tools/gen-log-ability-keys.mjs) — optional Node helper that scans `js/game.js` for ability-related `log(...)` suffix strings (useful when auditing i18n keys). Run from the `geminus-ratio` folder: `node tools/gen-log-ability-keys.mjs`
+
 ## Deploy / PWA cache
 
 The optional [service worker](sw.js) precaches same-origin HTML, CSS, and JS only (not Google Fonts or other CDNs). **Increment `CACHE_NAME` in `sw.js` whenever you ship changes to those static files** so returning visitors pick up the new precache; the `activate` handler deletes older caches.

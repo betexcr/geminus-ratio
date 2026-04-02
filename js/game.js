@@ -1373,14 +1373,16 @@
   }
 
   /** @param primaryBtnPath e.g. dialog.overwrite or dialog.ok */
-  function showAppConfirm(message, onConfirm, onCancel, primaryBtnPath) {
+  /** @param opts.destructive — danger-styled primary; focus lands on Cancel first */
+  function showAppConfirm(message, onConfirm, onCancel, primaryBtnPath, opts) {
+    opts = opts || {};
     var prevFocus = document.activeElement;
     var overlay = document.createElement("div");
     overlay.className = "app-dialog-overlay";
     overlay.setAttribute("role", "dialog");
     overlay.setAttribute("aria-modal", "true");
     var panel = document.createElement("div");
-    panel.className = "app-dialog-panel";
+    panel.className = "app-dialog-panel" + (opts.destructive ? " app-dialog-panel--destructive" : "");
     var p = document.createElement("p");
     p.textContent = message;
     panel.appendChild(p);
@@ -1392,7 +1394,7 @@
     cancel.textContent = _dlgT("dialog.cancel");
     var ok = document.createElement("button");
     ok.type = "button";
-    ok.className = "btn btn--gold";
+    ok.className = opts.destructive ? "btn btn--danger" : "btn btn--gold";
     ok.textContent = _dlgT(primaryBtnPath || "dialog.ok");
     function closeCf() {
       releaseFocusTrap();
@@ -1424,7 +1426,8 @@
     trapFocus(panel);
     panel.tabIndex = -1;
     panel.focus();
-    ok.focus();
+    if (opts.destructive) cancel.focus();
+    else ok.focus();
   }
 
   function showSaveFailureDialog() {
@@ -1774,7 +1777,7 @@
     resetUxBtn.textContent = _dlgT("settingsExtra.resetUxCounters");
     resetUxBtn.addEventListener("click", function () {
       resetUxCounters();
-      showUxToast(_dlgT("settingsExtra.resetUxCounters"), "info");
+      showUxToast(_dlgT("settingsExtra.resetUxCountersDone"), "info");
     });
     body.appendChild(resetUxBtn);
 
@@ -4700,10 +4703,18 @@
     tileInfoEl.classList.add("is-hidden");
   }
 
+  function _forecastFxLabel(effectId) {
+    if (!effectId) return "";
+    var key = "battle.forecastFx." + effectId;
+    var s = _dlgT(key);
+    if (s === key) return _dlgT("battle.forecastFx.generic", { id: String(effectId).replace(/_/g, " ") });
+    return s;
+  }
+
   function showForecast(attacker, target, abilityIdx) {
     var def = classById(target.classId);
     var hitPct = computeHitChance(attacker, target);
-    var label = "Attack";
+    var label = _dlgT("battle.forecastBasicAttack");
     var dmg, mult = 1, ignDef = 0;
     var ab = null;
     if (abilityIdx >= 0) {
@@ -4712,10 +4723,10 @@
     }
     if (ab && ab.effect === "hpswap") {
       var html = '<div class="fc-name">' + _esc(def.name) + '</div>';
-      html += '<div class="fc-dmg">' + _esc(label) + ': Swap HP%</div>';
+      html += '<div class="fc-dmg">' + _esc(label) + ': ' + _esc(_dlgT("battle.forecastSwapHp")) + "</div>";
       forecastEl.innerHTML = html;
       forecastEl.classList.remove("is-hidden");
-      announce(def.name + " — " + label + ": Swap HP%");
+      announce(def.name + " — " + label + ": " + _dlgT("battle.forecastSwapHp"));
       return;
     }
     if (ab && ab.effect === "suppress") {
@@ -4725,33 +4736,34 @@
     } else {
       dmg = physicalDamage(attacker, target, mult, ignDef, true);
     }
-    var dmgLabel = (ab && (ab.effect === "suppress" || ab.effect === "grave_pulse")) ? " true dmg" : " dmg";
+    var dmgLabel = (ab && (ab.effect === "suppress" || ab.effect === "grave_pulse")) ? _dlgT("battle.forecastDmgTrue") : _dlgT("battle.forecastDmg");
     var dmgPrefix = "~";
     if (ab && ab.effect === "double_strike") {
       dmgPrefix = "2x ~";
     }
     var dmgSuffix = "";
     if (ab && (ab.target === "aoe_adjacent" || ab.target === "aoe_range")) {
-      dmgSuffix = " (per foe)";
+      dmgSuffix = _dlgT("battle.forecastPerFoe");
     }
     var effects = [];
-    if (ab && ab.effect) effects.push(ab.effect.replace(/_/g, " "));
-    if (ab && ab.ignoreDefPct) effects.push("ignore DEF " + Math.round((ab.ignoreDefPct || 0) * 100) + "%");
+    if (ab && ab.effect) effects.push(_forecastFxLabel(ab.effect));
+    if (ab && ab.ignoreDefPct) effects.push(_dlgT("battle.forecastIgnoreDef", { pct: Math.round((ab.ignoreDefPct || 0) * 100) }));
+    var tempoStr = (ab && ab.ctCost) ? ("CT+" + ab.ctCost) : _dlgT("battle.forecastTempoStandard");
     var html = '<div class="fc-name">' + _esc(def.name) + '</div>';
-    html += '<div class="fc-hit">Hit: ' + hitPct + '%</div>';
-    html += '<div class="fc-dmg">' + _esc(label) + ': ' + dmgPrefix + dmg + dmgLabel + dmgSuffix + '</div>';
-    if (effects.length) html += '<div class="fc-dmg">' + _esc(_dlgT("battle.forecastEffects", { effects: effects.join(", ") })) + '</div>';
-    html += '<div class="fc-dmg">' + _esc(_dlgT("battle.forecastTempo", { tempo: (ab && ab.ctCost) ? ("CT+" + ab.ctCost) : "standard" })) + '</div>';
+    html += '<div class="fc-hit">' + _esc(_dlgT("battle.forecastHit", { pct: hitPct })) + "</div>";
+    html += '<div class="fc-dmg">' + _esc(label) + ": " + dmgPrefix + dmg + dmgLabel + dmgSuffix + "</div>";
+    if (effects.length) html += '<div class="fc-dmg">' + _esc(_dlgT("battle.forecastEffects", { effects: effects.join(", ") })) + "</div>";
+    html += '<div class="fc-dmg">' + _esc(_dlgT("battle.forecastTempo", { tempo: tempoStr })) + "</div>";
     forecastEl.innerHTML = html;
     forecastEl.classList.remove("is-hidden");
-    announce(def.name + " — Hit: " + hitPct + "% — " + label + ": " + dmgPrefix + dmg + dmgLabel + dmgSuffix);
+    announce(def.name + " — " + _dlgT("battle.forecastHit", { pct: hitPct }) + " — " + label + ": " + dmgPrefix + dmg + dmgLabel + dmgSuffix);
   }
 
   function showAreaForecast(attacker, ab) {
     var label = abilityName(ab);
     var dmg = physicalDamage(attacker, attacker, ab.mult || 1, ab.ignoreDefPct || 0, true);
     var html = '<div class="fc-name">' + _esc(label) + '</div>';
-    html += '<div class="fc-dmg">~' + dmg + ' dmg per foe in area</div>';
+    html += '<div class="fc-dmg">' + _esc(_dlgT("battle.forecastAreaPerFoe", { n: dmg })) + "</div>";
     forecastEl.innerHTML = html;
     forecastEl.classList.remove("is-hidden");
   }
@@ -5130,7 +5142,11 @@
 
     if (state.battleMode === "move") {
       const k = cellKey(x, y);
-      if (!state.highlightCells.has(k)) { state.animating = false; return; }
+      if (!state.highlightCells.has(k)) {
+        state.animating = false;
+        showUserHint(_dlgT("ux.battleSelectHighlighted"), { forceBattleHint: true, announce: true });
+        return;
+      }
       state.preMovePos = { x: u.x, y: u.y };
       try {
         var path = computePath(u, x, y);
@@ -5156,9 +5172,17 @@
     }
     if (state.battleMode === "attack") {
       const k = cellKey(x, y);
-      if (!state.highlightCells.has(k)) { state.animating = false; return; }
+      if (!state.highlightCells.has(k)) {
+        state.animating = false;
+        showUserHint(_dlgT("ux.battleSelectHighlighted"), { forceBattleHint: true, announce: true });
+        return;
+      }
       const tgt = occupantAt(x, y);
-      if (!tgt || tgt.team === u.team) { state.animating = false; return; }
+      if (!tgt || tgt.team === u.team) {
+        state.animating = false;
+        showUserHint(_dlgT("ux.battleSelectEnemy"), { forceBattleHint: true, announce: true });
+        return;
+      }
       recordAction(u, "attack", { targetName: tgt.displayName || classById(tgt.classId).name, targetId: tgt.id });
       try {
         const hitPct = computeHitChance(u, tgt);
@@ -5197,7 +5221,11 @@
     }
     if (state.battleMode === "shadow_step") {
       const k = cellKey(x, y);
-      if (!state.highlightCells.has(k)) { state.animating = false; return; }
+      if (!state.highlightCells.has(k)) {
+        state.animating = false;
+        showUserHint(_dlgT("ux.battleSelectHighlighted"), { forceBattleHint: true, announce: true });
+        return;
+      }
       try {
         u.x = x;
         u.y = y;
@@ -5212,7 +5240,11 @@
     }
     if (state.battleMode === "abyssal_gate") {
       const agk = cellKey(x, y);
-      if (!state.highlightCells.has(agk)) { state.animating = false; return; }
+      if (!state.highlightCells.has(agk)) {
+        state.animating = false;
+        showUserHint(_dlgT("ux.battleSelectHighlighted"), { forceBattleHint: true, announce: true });
+        return;
+      }
       var agAlly = occupantAt(x, y);
       if (!agAlly || agAlly.team !== u.team) { state.animating = false; return; }
       state.highlightCells.clear();
@@ -5242,7 +5274,11 @@
     }
     if (state.battleMode === "abyssal_gate_dest") {
       const agdk = cellKey(x, y);
-      if (!state.highlightCells.has(agdk)) { state.animating = false; return; }
+      if (!state.highlightCells.has(agdk)) {
+        state.animating = false;
+        showUserHint(_dlgT("ux.battleSelectHighlighted"), { forceBattleHint: true, announce: true });
+        return;
+      }
       try {
         var agTarget = state._abyssalAlly;
         if (agTarget && agTarget.hp > 0) {
@@ -6401,9 +6437,14 @@
       : "<p><strong>" + state.totalDamageDealt + "</strong> damage dealt to enemies</p>";
     var deaths = Math.max(0, pTotal - pAlive);
     var insightRows = [];
-    insightRows.push(_dlgT((state.totalDamageDealt >= 30) ? "resultInsights.highDamage" : "resultInsights.lowDamage", { n: state.totalDamageDealt }));
-    insightRows.push(_dlgT((deaths > 0) ? "resultInsights.allyLosses" : "resultInsights.cleanFight", { n: deaths }));
-    insightRows.push(_dlgT((state.turnCount >= 12) ? "resultInsights.longBattle" : "resultInsights.shortBattle", { n: state.turnCount }));
+    var rk = won ? "resultInsights.win." : "resultInsights.loss.";
+    insightRows.push(_dlgT(rk + ((state.totalDamageDealt >= 30) ? "highDamage" : "lowDamage"), { n: state.totalDamageDealt }));
+    if (won) {
+      insightRows.push(_dlgT((deaths > 0) ? "resultInsights.win.allyLosses" : "resultInsights.win.cleanFight", { n: deaths }));
+    } else {
+      insightRows.push(_dlgT("resultInsights.loss.casualties", { n: deaths }));
+    }
+    insightRows.push(_dlgT(rk + ((state.turnCount >= 12) ? "longBattle" : "shortBattle"), { n: state.turnCount }));
     html += '<div style="margin-top:0.55rem;"><strong>' + _esc(_dlgT("resultInsights.title")) + '</strong><ul style="margin:0.35rem 0 0 1rem;">';
     for (var ir = 0; ir < insightRows.length; ir++) html += "<li>" + _esc(insightRows[ir]) + "</li>";
     html += "</ul></div>";
@@ -6661,7 +6702,7 @@
         var streak = parseInt(localStorage.getItem(k) || "0", 10) || 0;
         streak++;
         localStorage.setItem(k, String(streak));
-        if (streak >= 2 && streak <= 4) showUxToast(_dlgT("ux.adaptiveHelp"), "info");
+        if (streak === 2) showUxToast(_dlgT("ux.adaptiveHelp"), "info");
       } catch (e) {}
       retryCampaignMission();
     }
@@ -7476,7 +7517,7 @@
               startCampaign();
             }
             if (summary) {
-              showAppConfirm(omsg, proceedNewSlot, null, "dialog.overwrite");
+              showAppConfirm(omsg, proceedNewSlot, null, "dialog.overwrite", { destructive: true });
               return;
             }
             proceedNewSlot();
@@ -8265,12 +8306,23 @@
       if (!entry) return;
       stepEl.textContent = (_replayIdx + 1) + " / " + state.battleRecord.length;
 
-      var desc = "Turn " + entry.turn + ": " + entry.actorName + " ";
-      if (entry.action === "move") desc += "moved to (" + entry.details.toCol + "," + entry.details.toRow + ")";
-      else if (entry.action === "attack") desc += "attacked" + (entry.details.targetName ? " " + entry.details.targetName : "") + (entry.details.damage ? " for " + entry.details.damage + " dmg" : "");
-      else if (entry.action === "ability") desc += "used " + (entry.details.abilityName || "ability") + (entry.details.targetName ? " on " + entry.details.targetName : "");
-      else if (entry.action === "wait") desc += "waited.";
-      else desc += entry.action;
+      var desc;
+      var d = entry.details || {};
+      if (entry.action === "move") {
+        desc = _dlgT("replay.stepMove", { turn: entry.turn, actor: entry.actorName, col: d.toCol, row: d.toRow });
+      } else if (entry.action === "attack") {
+        var who = d.targetName ? " " + d.targetName : "";
+        var dmg = d.damage ? _dlgT("replay.forDmg", { n: d.damage }) : "";
+        desc = _dlgT("replay.stepAttack", { turn: entry.turn, actor: entry.actorName, who: who, dmg: dmg });
+      } else if (entry.action === "ability") {
+        var abn = d.abilityName || _dlgT("replay.abilityFallback");
+        var on = d.targetName ? _dlgT("replay.onTarget", { name: d.targetName }) : "";
+        desc = _dlgT("replay.stepAbility", { turn: entry.turn, actor: entry.actorName, ability: abn, on: on });
+      } else if (entry.action === "wait") {
+        desc = _dlgT("replay.stepWait", { turn: entry.turn, actor: entry.actorName });
+      } else {
+        desc = _dlgT("replay.stepOther", { turn: entry.turn, actor: entry.actorName, action: entry.action });
+      }
       descEl.textContent = desc;
 
       var rCtx = canvas.getContext("2d");
@@ -9452,7 +9504,7 @@
                 _mu.x = _origX; _mu.y = _origY;
               }
               var _eName = classById(_adjEnemy.classId).name;
-              forecastEl.innerHTML = '<div class="fc-name">' + _esc(_eName) + '</div><div class="fc-hit">Hit: ' + _preHit + '%</div><div class="fc-dmg">~' + _preDmg + ' dmg (if moved here)</div>';
+              forecastEl.innerHTML = '<div class="fc-name">' + _esc(_eName) + "</div><div class=\"fc-hit\">" + _esc(_dlgT("battle.forecastHit", { pct: _preHit })) + "</div><div class=\"fc-dmg\">" + _esc(_dlgT("battle.forecastIfMovedHere", { dmg: _preDmg })) + "</div>";
               forecastEl.classList.remove("is-hidden");
             } else {
               hideForecast();
@@ -9577,7 +9629,7 @@
                 var _kHit = computeHitChance(_kmu, _kadj);
               } finally { _kmu.x = _koX; _kmu.y = _koY; }
               var _kName = classById(_kadj.classId).name;
-              forecastEl.innerHTML = '<div class="fc-name">' + _esc(_kName) + '</div><div class="fc-hit">Hit: ' + _kHit + '%</div><div class="fc-dmg">~' + _kDmg + ' dmg (if moved here)</div>';
+              forecastEl.innerHTML = '<div class="fc-name">' + _esc(_kName) + "</div><div class=\"fc-hit\">" + _esc(_dlgT("battle.forecastHit", { pct: _kHit })) + "</div><div class=\"fc-dmg\">" + _esc(_dlgT("battle.forecastIfMovedHere", { dmg: _kDmg })) + "</div>";
               forecastEl.classList.remove("is-hidden");
             } else { hideForecast(); }
           } else { hideForecast(); }
@@ -9605,6 +9657,15 @@
                 : (focusedIdx - 1 + menuBtns.length) % menuBtns.length;
               menuBtns[focusedIdx].focus();
             }
+            return;
+          }
+          if (key === "tab" && menuBtns.length) {
+            e.preventDefault();
+            if (focusedIdx < 0) focusedIdx = 0;
+            focusedIdx = e.shiftKey
+              ? (focusedIdx - 1 + menuBtns.length) % menuBtns.length
+              : (focusedIdx + 1) % menuBtns.length;
+            menuBtns[focusedIdx].focus();
             return;
           }
           if (key === "enter" && focusedIdx >= 0) {
@@ -9834,7 +9895,7 @@
         refreshRosterUI();
       }
       var msg = campaignState.active ? _dlgT("panel.clearRosterConfirmCampaign") : _dlgT("panel.clearRosterConfirmSkirmish");
-      showAppConfirm(msg, doClearRoster, null, "dialog.ok");
+      showAppConfirm(msg, doClearRoster, null, "dialog.clearRoster", { destructive: true });
     });
     btnToDeploy.addEventListener("click", startDeploy);
     btnTrainingBout.addEventListener("click", startTrainingBout);

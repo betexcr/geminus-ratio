@@ -163,6 +163,19 @@ html, body {
 
 @media (max-width: 960px) {
   .layout { grid-template-columns: 1fr; }
+  /* Nested sticky + inner overflow breaks touch scrolling (e.g. can’t reach top of class list after picks grow). */
+  .class-list-scroll {
+    position: static;
+    top: auto;
+    z-index: auto;
+    max-height: none;
+    overflow-y: visible;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: auto;
+  }
+  .panel {
+    touch-action: pan-y;
+  }
   /* Avoid forcing ~100dvh stage below a tall panel (arena felt “stuck at bottom”). */
   .stage-wrap {
     min-height: clamp(260px, 52dvh, 560px);
@@ -245,6 +258,7 @@ html, body {
   max-height: min(46vh, 22rem);
   overflow-x: hidden;
   overflow-y: auto;
+  touch-action: pan-y;
   /* Allow vertical scroll to chain to .panel when the class list itself has nothing to scroll */
   overscroll-behavior-x: contain;
   overscroll-behavior-y: auto;
@@ -1421,6 +1435,39 @@ svg.deploy-card__sprite {
   outline: 2px solid var(--fft-gold);
   outline-offset: 2px;
   box-shadow: 0 0 8px rgba(232,192,64,0.4);
+}
+
+.btn--danger {
+  background: linear-gradient(180deg, #8b2a2a 0%, #5c1818 100%);
+  border-color: #a04040;
+  color: #fff;
+}
+.btn--danger:hover {
+  filter: brightness(1.08);
+}
+.btn--danger:focus-visible {
+  outline: 2px solid var(--fft-red);
+  outline-offset: 2px;
+  box-shadow: 0 0 8px rgba(200, 64, 64, 0.45);
+}
+
+.app-dialog-panel--destructive {
+  border-color: var(--fft-red-dark);
+}
+
+.deploy-card:focus-visible {
+  outline: 2px solid var(--fft-cyan);
+  outline-offset: 2px;
+}
+
+.slot-picker__btn:focus-visible {
+  outline: 2px solid var(--fft-gold);
+  outline-offset: 2px;
+}
+
+.banner__controls-btn:focus-visible {
+  outline: 2px solid var(--fft-gold);
+  outline-offset: 2px;
 }
 
 /* -- Save slot picker -- */
