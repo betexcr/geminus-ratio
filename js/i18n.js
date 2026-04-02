@@ -59,7 +59,7 @@ var I18n = (function () {
         toGatesNeedBudget: "You are over budget — remove or adjust hires.",
         enterArenaNeedPlace: "Place every fighter on a gate tile before entering.",
         objectiveDefeatAll: "Objective: Defeat all enemies.",
-        rosterScrollHint: "Touch tip: drag this side panel with two fingers to scroll up and down — you’ll reach every class and your picks so you can finish your roster.",
+        rosterScrollHint: "Touch tip: with two fingers on the top block (or one finger anywhere), drag up/down — the whole screen moves so you can reach every class, your picks, and the arena below.",
       },
       dialog: { ok: "OK", cancel: "Cancel", overwrite: "Overwrite", clearRoster: "Clear roster" },
       ux: {
@@ -669,7 +669,7 @@ var I18n = (function () {
         toGatesNeedBudget: "Presupuesto excedido — quita o ajusta contrataciones.",
         enterArenaNeedPlace: "Coloca a todos en una casilla de puerta antes de entrar.",
         objectiveDefeatAll: "Objetivo: derrota a todos los enemigos.",
-        rosterScrollHint: "Consejo táctil: arrastra este panel lateral con dos dedos para subir y bajar — así verás todas las clases y tu plantilla y podrás terminar la selección.",
+        rosterScrollHint: "Consejo táctil: con dos dedos en el bloque superior (o un dedo en cualquier sitio), arrastra arriba/abajo — se mueve toda la pantalla para ver cada clase, tu plantilla y la arena de abajo.",
       },
       dialog: { ok: "Aceptar", cancel: "Cancelar", overwrite: "Sobrescribir", clearRoster: "Vaciar plantilla" },
       ux: {

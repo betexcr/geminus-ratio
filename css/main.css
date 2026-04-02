@@ -162,7 +162,14 @@ html, body {
 }
 
 @media (max-width: 960px) {
-  .layout { grid-template-columns: 1fr; }
+  /* Stack panel + arena by content height; body/window scrolls both as one surface.
+     (Default align-content: stretch + min-height: 100dvh was stretching rows to fill the viewport,
+     so the page never grew — two-finger drags had nowhere to scroll.) */
+  .layout {
+    grid-template-columns: 1fr;
+    min-height: 0;
+    align-content: start;
+  }
   /* Nested sticky + inner overflow breaks touch scrolling (e.g. can’t reach top of class list after picks grow). */
   .class-list-scroll {
     position: static;
@@ -172,13 +179,24 @@ html, body {
     overflow-y: visible;
     overflow-x: hidden;
     -webkit-overflow-scrolling: auto;
+    touch-action: auto;
   }
-  .panel {
-    touch-action: pan-y;
+  /* Don’t trap the roster in a viewport-tall box — one document scroll reaches class list, picks, and arena. */
+  .layout > .panel {
+    max-height: none;
+    min-height: 0;
+    align-self: start;
+    overflow-x: hidden;
+    overflow-y: visible;
+    overscroll-behavior-y: auto;
+    touch-action: auto;
   }
   /* Avoid forcing ~100dvh stage below a tall panel (arena felt “stuck at bottom”). */
   .stage-wrap {
+    align-self: start;
+    width: 100%;
     min-height: clamp(260px, 52dvh, 560px);
+    touch-action: auto;
   }
   .camera-controls {
     position: fixed;
@@ -842,6 +860,11 @@ svg.deploy-card__sprite {
   width: 100% !important;
   height: 100% !important;
   image-rendering: crisp-edges;
+  /* Ludus/deploy/title: let vertical drags scroll the page; battle uses custom pan/pinch (see body.phase-battle). */
+  touch-action: pan-y;
+}
+
+body.phase-battle .iso-canvas {
   touch-action: none;
 }
 
