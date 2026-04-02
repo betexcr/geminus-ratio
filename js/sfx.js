@@ -201,6 +201,8 @@ var SFX = (function () {
     var myId = ++_musicStreamId;
     var a = new Audio(url);
     a.loop = !!loop;
+    // Assign immediately so mute() can set volume while decode/play is pending (was only set after .play() resolved).
+    _streamMainAudio = a;
     a.volume = _streamVolumeMain();
     a.addEventListener("ended", function () {
       if (myId !== _musicStreamId || a !== _streamMainAudio) return;
@@ -218,15 +220,15 @@ var SFX = (function () {
           try { a.pause(); } catch (e) {}
           return;
         }
-        _streamMainAudio = a;
+        a.volume = _streamVolumeMain();
         api._musicNodes = { kind: "stream", audio: a };
         api._musicProfile = profile;
       }).catch(function () {
         if (myId !== _musicStreamId) return;
+        if (_streamMainAudio === a) _stopStreamMain();
         _startProceduralMusic(api, profile);
       });
     } else {
-      _streamMainAudio = a;
       api._musicNodes = { kind: "stream", audio: a };
       api._musicProfile = profile;
     }
@@ -381,6 +383,9 @@ var SFX = (function () {
         this._musicNodes.gain.gain.linearRampToValueAtTime(eff, mt + 0.02);
       }
       if (_streamMainAudio) _streamMainAudio.volume = _streamVolumeMain();
+      if (this._musicNodes && this._musicNodes.kind === "stream" && this._musicNodes.audio) {
+        this._musicNodes.audio.volume = _streamVolumeMain();
+      }
       if (_stingerAudio) _stingerAudio.volume = _streamVolumeStinger();
     },
 
@@ -400,6 +405,9 @@ var SFX = (function () {
         this._musicNodes.gain.gain.linearRampToValueAtTime(eff, mt + 0.02);
       }
       if (_streamMainAudio) _streamMainAudio.volume = _streamVolumeMain();
+      if (this._musicNodes && this._musicNodes.kind === "stream" && this._musicNodes.audio) {
+        this._musicNodes.audio.volume = _streamVolumeMain();
+      }
       if (_stingerAudio) _stingerAudio.volume = _streamVolumeStinger();
       return _muted;
     },
