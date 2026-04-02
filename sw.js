@@ -1,6 +1,6 @@
 /* Offline shell: caches core static assets only; game saves stay in the browser as before.
    Bump CACHE_NAME on each static deploy so clients drop stale precaches. */
-var CACHE_NAME = "geminus-static-v5";
+var CACHE_NAME = "geminus-static-v6";
 var PRECACHE_URLS = [
   "./",
   "./index.html",

@@ -278,6 +278,24 @@ html, body {
   gap: 0.35rem;
 }
 
+/* Two-finger panel scroll hint (touch / tablets); hidden on fine-pointer desktops */
+.roster-scroll-hint {
+  display: none;
+  margin: 0 0 0.5rem;
+  padding: 0.35rem 0.4rem;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--fft-cyan-dim);
+  background: rgba(20, 28, 36, 0.65);
+  border: 1px solid var(--fft-cyan-dim);
+  border-radius: 2px;
+}
+@media (pointer: coarse) {
+  .roster-scroll-hint {
+    display: block;
+  }
+}
+
 .class-row {
   display: grid;
   grid-template-columns: auto 1fr auto;

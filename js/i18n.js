@@ -59,6 +59,7 @@ var I18n = (function () {
         toGatesNeedBudget: "You are over budget — remove or adjust hires.",
         enterArenaNeedPlace: "Place every fighter on a gate tile before entering.",
         objectiveDefeatAll: "Objective: Defeat all enemies.",
+        rosterScrollHint: "Touch tip: drag this side panel with two fingers to scroll up and down — you’ll reach every class and your picks so you can finish your roster.",
       },
       dialog: { ok: "OK", cancel: "Cancel", overwrite: "Overwrite", clearRoster: "Clear roster" },
       ux: {
@@ -668,6 +669,7 @@ var I18n = (function () {
         toGatesNeedBudget: "Presupuesto excedido — quita o ajusta contrataciones.",
         enterArenaNeedPlace: "Coloca a todos en una casilla de puerta antes de entrar.",
         objectiveDefeatAll: "Objetivo: derrota a todos los enemigos.",
+        rosterScrollHint: "Consejo táctil: arrastra este panel lateral con dos dedos para subir y bajar — así verás todas las clases y tu plantilla y podrás terminar la selección.",
       },
       dialog: { ok: "Aceptar", cancel: "Cancelar", overwrite: "Sobrescribir", clearRoster: "Vaciar plantilla" },
       ux: {
@@ -1535,6 +1537,8 @@ var I18n = (function () {
       if (bl) bl.textContent = t("panel.denarii");
       var hints = pr.querySelectorAll(".hint");
       if (hints[0]) hints[0].textContent = t("panel.rosterHint");
+      var rsh = $("rosterScrollHint");
+      if (rsh) rsh.textContent = t("panel.rosterScrollHint");
       var h3 = pr.querySelector("h3");
       if (h3) h3.textContent = t("panel.picksTitle");
     }
