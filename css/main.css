@@ -162,6 +162,12 @@ html, body {
 }
 
 @media (max-width: 960px) {
+  /* Clip wide content at the viewport; do NOT put overflow-x:hidden on .panel (pairs with overflow-y:visible
+     and browsers compute overflow-y as auto — panel becomes an inner scroller once roster content grows). */
+  html,
+  body {
+    overflow-x: hidden;
+  }
   /* Stack panel + arena by content height; body/window scrolls both as one surface.
      (Default align-content: stretch + min-height: 100dvh was stretching rows to fill the viewport,
      so the page never grew — two-finger drags had nowhere to scroll.) */
@@ -176,18 +182,16 @@ html, body {
     top: auto;
     z-index: auto;
     max-height: none;
-    overflow-y: visible;
-    overflow-x: hidden;
+    overflow: visible;
     -webkit-overflow-scrolling: auto;
     touch-action: auto;
   }
   /* Don’t trap the roster in a viewport-tall box — one document scroll reaches class list, picks, and arena. */
   .layout > .panel {
     max-height: none;
-    min-height: 0;
+    min-height: min-content;
     align-self: start;
-    overflow-x: hidden;
-    overflow-y: visible;
+    overflow: visible;
     overscroll-behavior-y: auto;
     touch-action: auto;
   }
@@ -205,6 +209,11 @@ html, body {
     left: auto;
     max-width: min(100vw - 1rem - env(safe-area-inset-left) - env(safe-area-inset-right), 28rem);
     z-index: 50;
+  }
+  /* Avoid overflow-x:auto + overflow-y:visible → y becomes auto (nested vertical scroll on shop strip). */
+  .equip-shop__row {
+    overflow-x: auto;
+    overflow-y: hidden;
   }
 }
 
