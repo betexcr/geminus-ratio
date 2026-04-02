@@ -1591,6 +1591,11 @@
     if (btnMuteSet && typeof SFX !== "undefined" && SFX.isMuted) {
       btnMuteSet.textContent = SFX.isMuted() ? _dlgT("settings.unmute") : _dlgT("settings.mute");
     }
+    var hcLbl = ov.querySelector("[data-i18n=\"settingsExtra.highContrast\"]");
+    if (hcLbl) hcLbl.textContent = _dlgT("settingsExtra.highContrast");
+    applyHighContrast();
+    var rc = document.getElementById("settingsResetUxBtn");
+    if (rc) rc.textContent = _dlgT("settingsExtra.resetUxCounters");
     var speedVal = document.getElementById("settingsSpeedValue");
     if (speedVal) {
       var idx = _ANIM_SPEEDS.indexOf(_animSpeed);
@@ -1750,6 +1755,29 @@
     });
     addRow("settings.saveToast", toastSel);
 
+    var hcBtn = document.createElement("button");
+    hcBtn.type = "button";
+    hcBtn.id = "settingsHighContrastBtn";
+    hcBtn.className = "btn btn--ghost btn--tiny";
+    hcBtn.addEventListener("click", function () {
+      var now = false;
+      try { now = localStorage.getItem("geminus_high_contrast") === "1"; } catch (e) {}
+      try { localStorage.setItem("geminus_high_contrast", now ? "0" : "1"); } catch (e2) {}
+      applyHighContrast();
+    });
+    addRow("settingsExtra.highContrast", hcBtn);
+
+    var resetUxBtn = document.createElement("button");
+    resetUxBtn.type = "button";
+    resetUxBtn.id = "settingsResetUxBtn";
+    resetUxBtn.className = "btn btn--ghost btn--tiny";
+    resetUxBtn.textContent = _dlgT("settingsExtra.resetUxCounters");
+    resetUxBtn.addEventListener("click", function () {
+      resetUxCounters();
+      showUxToast(_dlgT("settingsExtra.resetUxCounters"), "info");
+    });
+    body.appendChild(resetUxBtn);
+
     panel.appendChild(body);
     overlay.appendChild(panel);
     function shut() {
@@ -1907,6 +1935,34 @@
   var _lastSaveOkToast = 0;
   var _SAVE_OK_TOAST_MS = 3500;
   var _SAVE_OK_TOAST_MINIMAL_MS = 12000;
+  var _saveBadgeState = "saved";
+  var _touchGhostTapUntil = 0;
+
+  function getUxCounters() {
+    try { return JSON.parse(localStorage.getItem("geminus_ux_counters_v1") || "{}") || {}; } catch (e) { return {}; }
+  }
+  function setUxCounters(obj) { try { localStorage.setItem("geminus_ux_counters_v1", JSON.stringify(obj || {})); } catch (e) {} }
+  function bumpUxCounter(key) {
+    if (!key) return;
+    var c = getUxCounters();
+    c[key] = (c[key] || 0) + 1;
+    setUxCounters(c);
+  }
+  function resetUxCounters() { setUxCounters({}); }
+  function setSaveBadge(stateKey) {
+    _saveBadgeState = stateKey || "saved";
+    var el = document.getElementById("saveBadge");
+    if (!el) return;
+    el.textContent = _dlgT("saveBadge." + _saveBadgeState);
+    el.classList.toggle("save-badge--issue", _saveBadgeState === "issue");
+  }
+  function applyHighContrast() {
+    var on = false;
+    try { on = localStorage.getItem("geminus_high_contrast") === "1"; } catch (e) {}
+    document.body.classList.toggle("high-contrast", !!on);
+    var btn = document.getElementById("settingsHighContrastBtn");
+    if (btn) btn.textContent = on ? _dlgT("settingsExtra.highContrastOn") : _dlgT("settingsExtra.highContrastOff");
+  }
 
   function _saveOkToastPreference() {
     try {
@@ -1918,8 +1974,10 @@
 
   function safeSave() {
     if (!campaignState.active) return;
+    setSaveBadge("unsaved");
     var ok = Campaign.saveToDisk();
     if (!ok) {
+      setSaveBadge("issue");
       if (!_saveWarned) {
         _saveWarned = true;
         var msg = _dlgT("ux.saveFailed");
@@ -1928,6 +1986,8 @@
         showSaveFailureDialog();
       }
     } else {
+      _saveWarned = false;
+      setSaveBadge("saved");
       var pref = _saveOkToastPreference();
       if (pref === "off") return;
       var debounceMs = pref === "minimal" ? _SAVE_OK_TOAST_MINIMAL_MS : _SAVE_OK_TOAST_MS;
@@ -4674,9 +4734,14 @@
     if (ab && (ab.target === "aoe_adjacent" || ab.target === "aoe_range")) {
       dmgSuffix = " (per foe)";
     }
+    var effects = [];
+    if (ab && ab.effect) effects.push(ab.effect.replace(/_/g, " "));
+    if (ab && ab.ignoreDefPct) effects.push("ignore DEF " + Math.round((ab.ignoreDefPct || 0) * 100) + "%");
     var html = '<div class="fc-name">' + _esc(def.name) + '</div>';
     html += '<div class="fc-hit">Hit: ' + hitPct + '%</div>';
     html += '<div class="fc-dmg">' + _esc(label) + ': ' + dmgPrefix + dmg + dmgLabel + dmgSuffix + '</div>';
+    if (effects.length) html += '<div class="fc-dmg">' + _esc(_dlgT("battle.forecastEffects", { effects: effects.join(", ") })) + '</div>';
+    html += '<div class="fc-dmg">' + _esc(_dlgT("battle.forecastTempo", { tempo: (ab && ab.ctCost) ? ("CT+" + ab.ctCost) : "standard" })) + '</div>';
     forecastEl.innerHTML = html;
     forecastEl.classList.remove("is-hidden");
     announce(def.name + " — Hit: " + hitPct + "% — " + label + ": " + dmgPrefix + dmg + dmgLabel + dmgSuffix);
@@ -6334,6 +6399,14 @@
     html += _i18
       ? "<p>" + I18n.t("result.damageDealt", { n: state.totalDamageDealt }) + "</p>"
       : "<p><strong>" + state.totalDamageDealt + "</strong> damage dealt to enemies</p>";
+    var deaths = Math.max(0, pTotal - pAlive);
+    var insightRows = [];
+    insightRows.push(_dlgT((state.totalDamageDealt >= 30) ? "resultInsights.highDamage" : "resultInsights.lowDamage", { n: state.totalDamageDealt }));
+    insightRows.push(_dlgT((deaths > 0) ? "resultInsights.allyLosses" : "resultInsights.cleanFight", { n: deaths }));
+    insightRows.push(_dlgT((state.turnCount >= 12) ? "resultInsights.longBattle" : "resultInsights.shortBattle", { n: state.turnCount }));
+    html += '<div style="margin-top:0.55rem;"><strong>' + _esc(_dlgT("resultInsights.title")) + '</strong><ul style="margin:0.35rem 0 0 1rem;">';
+    for (var ir = 0; ir < insightRows.length; ir++) html += "<li>" + _esc(insightRows[ir]) + "</li>";
+    html += "</ul></div>";
 
     var playerUnits = state.units.filter(function (u) { return u.team === "player"; });
     var mvp = playerUnits.reduce(function(best, u) {
@@ -6538,6 +6611,7 @@
     }
 
     if (won) {
+      try { localStorage.setItem("geminus_loss_streak_mission_" + String(mission.id), "0"); } catch (e0) {}
       var lootCount = 1 + (gameRng() < 0.4 ? 1 : 0);
       var lootPool = EQUIPMENT_DB.filter(function(e) {
         return e.rarity === "common" || (e.rarity === "rare" && gameRng() < 0.4) || (e.rarity === "legendary" && gameRng() < 0.1);
@@ -6581,6 +6655,14 @@
         loadNextMission();
       }
     } else {
+      var missionId = mission && mission.id ? String(mission.id) : "unknown";
+      try {
+        var k = "geminus_loss_streak_mission_" + missionId;
+        var streak = parseInt(localStorage.getItem(k) || "0", 10) || 0;
+        streak++;
+        localStorage.setItem(k, String(streak));
+        if (streak >= 2 && streak <= 4) showUxToast(_dlgT("ux.adaptiveHelp"), "info");
+      } catch (e) {}
       retryCampaignMission();
     }
   }
@@ -8166,6 +8248,12 @@
 
   function showReplayOverlay() {
     if (!state.battleRecord || state.battleRecord.length === 0) return;
+    try {
+      if (localStorage.getItem("geminus_replay_help_v1") !== "1") {
+        localStorage.setItem("geminus_replay_help_v1", "1");
+        showAppMessage(_dlgT("ux.replayHelp"));
+      }
+    } catch (e0) {}
     var overlay = document.getElementById("replayOverlay");
     var canvas = document.getElementById("replayCanvas");
     var descEl = document.getElementById("replayDesc");
@@ -9239,6 +9327,10 @@
         if (survSet && !survSet.classList.contains("is-hidden")) showSurvivalLeaderboard();
         refreshTrophyPanelIfOpen();
         refreshPostMissionTipIfOpen();
+        var kb = document.getElementById("btnKeybindHint");
+        if (kb) kb.textContent = _dlgT("battle.keybindToggle");
+        setSaveBadge(_saveBadgeState);
+        showUxToast(_dlgT("ux.localeChanged"), "info");
       });
     }
     var btnLangEn = document.getElementById("btnLangEn");
@@ -9257,6 +9349,17 @@
     if (btnControlsHelpTitle) btnControlsHelpTitle.addEventListener("click", function () { dismissTutorialNudge(); onControlsHelpClick(); });
     var btnSettings = document.getElementById("btnSettings");
     if (btnSettings) btnSettings.addEventListener("click", function () { openSettings(); });
+    var btnKeybindHint = document.getElementById("btnKeybindHint");
+    if (btnKeybindHint) {
+      btnKeybindHint.textContent = _dlgT("battle.keybindToggle");
+      btnKeybindHint.addEventListener("click", function () {
+        var el = document.getElementById("battleHint");
+        if (!el) return;
+        var hidden = el.classList.contains("is-hidden");
+        el.textContent = _dlgT("battle.keybindSummary");
+        el.classList.toggle("is-hidden", !hidden);
+      });
+    }
 
     isoCanvas.addEventListener("gesturestart", function (e) { e.preventDefault(); }, { passive: false });
     isoCanvas.addEventListener("gesturechange", function (e) { e.preventDefault(); }, { passive: false });
@@ -9529,6 +9632,7 @@
         }
       }
       if (key === "m" || key === "a" || key === "b" || key === "w" || key === "u") {
+        bumpUxCounter("noOpBattleShortcut");
         showUserHint(_dlgT("ux.noOpBattleOnly"), { announce: true });
         return;
       }
@@ -9636,6 +9740,7 @@
           scheduleRender();
         }
       } else if (e.touches.length === 2) {
+        _touchGhostTapUntil = Date.now() + 350;
         var dist = _touchDist(e.touches);
         if (_touch.pinchDist > 0) {
           renderer.setZoom(_touch.pinchZoom * (dist / _touch.pinchDist));
@@ -9645,6 +9750,7 @@
     }, { passive: false });
     isoCanvas.addEventListener("touchend", function (e) {
       if (state.phase === "ludus") return;
+      if (Date.now() < _touchGhostTapUntil) return;
       if (e.changedTouches.length === 1 && !_touch.moved && e.touches.length === 0) {
         var rect = isoCanvas.getBoundingClientRect();
         var mx = _touch.startX - rect.left;
@@ -9927,6 +10033,8 @@
 
     budgetMax.textContent = String(budgetCurrent);
     updateDifficultyHelpLines();
+    applyHighContrast();
+    setSaveBadge("saved");
     showTitleScreen();
     setTimeout(scheduleRender, 120);
 

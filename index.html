@@ -40,6 +40,7 @@
       <div class="banner__actions">
         <button type="button" id="btnSettings" class="btn btn--ghost btn--tiny banner__controls-btn">Settings</button>
         <button type="button" id="btnControlsHelp" class="btn btn--ghost btn--tiny banner__controls-btn">Controls</button>
+        <div id="saveBadge" class="save-badge" aria-live="polite">Saved</div>
         <div class="banner__phase" id="phaseLabel" aria-live="polite">Ludus</div>
       </div>
     </header>
@@ -101,6 +102,7 @@
             <button type="button" id="btnUndo" class="btn btn--ghost" disabled aria-label="Undo Move (U)"><kbd>U</kbd> Undo</button>
             <div id="abilityMenu" class="ability-menu is-hidden" role="menu" aria-label="Abilities"></div>
           </div>
+          <button type="button" id="btnKeybindHint" class="btn btn--ghost btn--tiny">Keys</button>
           <p id="battleHint" class="battle-hint is-hidden" aria-live="polite"></p>
           <div id="logFeed" class="log-feed" role="log" aria-label="Combat log" aria-relevant="additions"></div>
           <button type="button" id="btnLogExpand" class="btn btn--ghost btn--small" aria-label="Expand full log" aria-expanded="false">Full Log</button>
