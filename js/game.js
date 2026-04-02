@@ -751,8 +751,16 @@
     return palColor(team, ref);
   }
 
+  /** Stable XML id prefix for inline SVG defs (must be unique in the document so url(#…) resolves correctly). */
+  function spriteDomIdSegment(s) {
+    if (s == null || s === "") return "spr";
+    var t = String(s).replace(/[^a-zA-Z0-9_]/g, "_");
+    if (/^[0-9]/.test(t)) t = "u" + t;
+    return t;
+  }
+
   function gladiatorSpriteSvg(classId, team, uniqueId, accentHex) {
-    const uid = "spr" + uniqueId;
+    const uid = "spr" + spriteDomIdSegment(uniqueId);
     const data = SPRITE_RECTS[classId] || SPRITE_RECTS.murmillo;
     const svg = document.createElementNS(SVG_NS, "svg");
     svg.setAttribute("viewBox", "0 0 64 80");
@@ -2208,9 +2216,10 @@
   function ensureAccentSprite(unit) {
     if (!unit.accentColor || !renderer) return;
     var team = unit.gifted ? "gifted" : unit.team;
-    var key = unit.classId + "_" + team + "_" + unit.accentColor;
+    var hex = String(unit.accentColor).replace(/^#/, "").toLowerCase();
+    var key = unit.classId + "_" + team + "_" + hex;
     if (!renderer.spriteCache[key]) {
-      var svg = gladiatorSpriteSvg(unit.classId, team, "ac_" + unit.id, unit.accentColor);
+      var svg = gladiatorSpriteSvg(unit.classId, team, "ac_" + unit.id + "_" + hex, unit.accentColor);
       renderer.cacheSpriteFromSvg(key, "", svg, true);
     }
     unit._spriteKey = key;
@@ -2501,7 +2510,7 @@
       const li = document.createElement("li");
       li.setAttribute("data-uid", pick.uid || ("pick_" + idx));
       var _pickAc = pick.accent ? (ACCENT_COLORS.find(function(a) { return a.id === pick.accent; }) || {}).hex : null;
-      const miniSpr = gladiatorSpriteSvg(def.id, "player", "pick_" + idx, _pickAc || null);
+      const miniSpr = gladiatorSpriteSvg(def.id, "player", (pick.uid || "pick_" + idx) + "_pk", _pickAc || null);
       miniSpr.classList.add("picked__sprite");
       li.appendChild(miniSpr);
       const nameSpan = document.createElement("span");
@@ -3188,7 +3197,7 @@
       li.className = "deploy-card" + (idx === state.deploySelectedIndex && !p.placed ? " is-picked" : "") + (p.placed ? " is-placed" : "");
 
       var _dplAccent = p.accent ? (ACCENT_COLORS.find(function(a) { return a.id === p.accent; }) || {}).hex : null;
-      var sprSvg = gladiatorSpriteSvg(p.classId, "player", "dpl_" + idx, _dplAccent || null);
+      var sprSvg = gladiatorSpriteSvg(p.classId, "player", (p.uid || "dpl_" + idx) + "_dpl", _dplAccent || null);
       sprSvg.classList.add("deploy-card__sprite");
       li.appendChild(sprSvg);
 
@@ -6973,7 +6982,7 @@
       card.className = "bestiary-card";
       var header = document.createElement("div");
       header.className = "bestiary-card__header";
-      var svgStr = gladiatorSpriteSvg(cls.id, "player");
+      var svgStr = gladiatorSpriteSvg(cls.id, "player", "bestiary_" + cls.id);
       var svgWrap = document.createElement("div");
       svgWrap.className = "bestiary-card__sprite";
       svgWrap.innerHTML = svgStr;
@@ -8079,6 +8088,7 @@
 
   function init() {
     renderer = new IsoRenderer(isoCanvas);
+    renderer.onSpriteCached = scheduleRender;
     renderer.resize(BOARD_W, BOARD_H);
     initSpriteCache();
 

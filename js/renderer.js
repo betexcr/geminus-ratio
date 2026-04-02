@@ -1479,6 +1479,9 @@ var IsoRenderer = (function () {
         if (cacheKeys[ci].indexOf(cachePrefix) === 0) delete self._outlineCache[cacheKeys[ci]];
       }
       URL.revokeObjectURL(url);
+      if (typeof self.onSpriteCached === "function") {
+        try { self.onSpriteCached(); } catch (e) {}
+      }
     };
     img.onerror = function() { URL.revokeObjectURL(url); };
     img.src = url;
