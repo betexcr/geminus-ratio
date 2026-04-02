@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Geminus Ratio">
+  <rect width="512" height="512" rx="64" fill="#0c0a08"/>
+  <path fill="#e8c040" d="M256 96 L320 416 L256 360 L192 416 Z" opacity="0.95"/>
+  <path fill="#c9a030" d="M256 120 L300 380 L256 340 L212 380 Z"/>
+  <path fill="none" stroke="#2a2418" stroke-width="8" d="M128 256h256M256 128v256"/>
+</svg>

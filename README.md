@@ -34,3 +34,11 @@ Then open `http://localhost:8765`.
 ## Tech
 
 Plain HTML/CSS/JS, no build step. Deploy to GitHub Pages, Netlify, or Cloudflare Pages by uploading this folder.
+
+## Deploy / PWA cache
+
+The optional [service worker](sw.js) precaches same-origin HTML, CSS, and JS only (not Google Fonts or other CDNs). **Increment `CACHE_NAME` in `sw.js` whenever you ship changes to those static files** so returning visitors pick up the new precache; the `activate` handler deletes older caches.
+
+Service workers require **HTTPS** or **localhost**. After a deploy, verify with a hard refresh or an incognito window.
+
+On **iOS Safari**, test modals and the camera bar with a real device or Simulator: fixed overlays should respect safe areas (see `env(safe-area-inset-*)` in CSS).

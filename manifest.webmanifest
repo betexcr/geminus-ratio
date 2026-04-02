@@ -1,0 +1,24 @@
+{
+  "name": "Geminus Ratio — Ludus Tactics",
+  "short_name": "Geminus Ratio",
+  "description": "Turn-based gladiator tactics — build a ludus, deploy fighters, battle on an isometric arena.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0c0a08",
+  "theme_color": "#0c0a08",
+  "icons": [
+    {
+      "src": "icons/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://geminus.surge.sh/og-image.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any"
+    }
+  ]
+}
