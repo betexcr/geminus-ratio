@@ -12,6 +12,15 @@
     return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
 
+  function abilityName(ab) {
+    if (typeof I18n !== "undefined" && I18n.abilityName) return I18n.abilityName(ab);
+    return ab && ab.name ? ab.name : "";
+  }
+  function abilityDesc(ab) {
+    if (typeof I18n !== "undefined" && I18n.abilityDesc) return I18n.abilityDesc(ab);
+    return ab && ab.desc ? ab.desc : "";
+  }
+
   var BOARD_W = 12;
   var BOARD_H = 10;
   const MAX_ROSTER = 6;
@@ -283,12 +292,12 @@
       cost: 28, hp: 38, atk: 11, def: 6, spd: 6, move: 3, jump: 1,
       growth: { hp: 450, atk: 30, def: 70, spd: 15 },
       abilities: [
-        { name: "Cetus Wall", desc: "Brace: next hit deals half damage.", type: "buff", target: "self", levelReq: 1 },
-        { name: "Testudo", desc: "+3 DEF until next turn.", type: "buff", target: "self", levelReq: 2 },
-        { name: "Aegis Slam", desc: "0.6× hit + stun foe 1 turn.", type: "attack", target: "adjacent_enemy", mult: 0.6, effect: "stun", levelReq: 3 },
-        { name: "Iron Will", desc: "Heal 15% HP + cleanse root.", type: "heal", target: "self", levelReq: 4 },
-        { name: "Fortress Stance", desc: "+4 DEF 2 turns; rooted 1 turn.", type: "buff", target: "self", levelReq: 5 },
-        { name: "Guardian Aura", desc: "All adjacent allies heal 5 HP.", type: "heal", target: "self", levelReq: 6 },
+        { aid: "murmillo_cetus_wall", name: "Cetus Wall", desc: "Brace: next hit deals half damage.", type: "buff", target: "self", levelReq: 1 },
+        { aid: "murmillo_testudo", name: "Testudo", desc: "+3 DEF until next turn.", type: "buff", target: "self", levelReq: 2 },
+        { aid: "murmillo_aegis_slam", name: "Aegis Slam", desc: "0.6× hit + stun foe 1 turn.", type: "attack", target: "adjacent_enemy", mult: 0.6, effect: "stun", levelReq: 3 },
+        { aid: "murmillo_iron_will", name: "Iron Will", desc: "Heal 15% HP + cleanse root.", type: "heal", target: "self", levelReq: 4 },
+        { aid: "murmillo_fortress_stance", name: "Fortress Stance", desc: "+4 DEF 2 turns; rooted 1 turn.", type: "buff", target: "self", levelReq: 5 },
+        { aid: "murmillo_guardian_aura", name: "Guardian Aura", desc: "All adjacent allies heal 5 HP.", type: "heal", target: "self", levelReq: 6 },
       ],
     },
     {
@@ -296,12 +305,12 @@
       cost: 24, hp: 28, atk: 10, def: 3, spd: 9, move: 4, jump: 2,
       growth: { hp: 250, atk: 40, def: 20, spd: 60 },
       abilities: [
-        { name: "Iaculum", desc: "Net an adjacent foe (skip their next turn).", type: "debuff", target: "adjacent_enemy", levelReq: 1 },
-        { name: "Trident Lunge", desc: "Range-2 line attack for 0.8× damage.", type: "attack", target: "line", range: 2, mult: 0.8, levelReq: 2 },
-        { name: "Tide Pull", desc: "Pull adjacent foe 1 tile toward you.", type: "utility", target: "adjacent_enemy", effect: "pull", levelReq: 3 },
-        { name: "Entangle", desc: "Root + −2 ATK (2 turns) to foe.", type: "debuff", target: "adjacent_enemy", effect: "entangle", levelReq: 4 },
-        { name: "Neptune's Favor", desc: "Heal 20% HP + Move +1.", type: "heal", target: "self", levelReq: 5 },
-        { name: "Drag Under", desc: "Pull foe + deal 1.0× damage.", type: "attack", target: "adjacent_enemy", mult: 1.0, effect: "drag", levelReq: 6 },
+        { aid: "retiarius_iaculum", name: "Iaculum", desc: "Net an adjacent foe (skip their next turn).", type: "debuff", target: "adjacent_enemy", levelReq: 1 },
+        { aid: "retiarius_trident_lunge", name: "Trident Lunge", desc: "Range-2 line attack for 0.8× damage.", type: "attack", target: "line", range: 2, mult: 0.8, levelReq: 2 },
+        { aid: "retiarius_tide_pull", name: "Tide Pull", desc: "Pull adjacent foe 1 tile toward you.", type: "utility", target: "adjacent_enemy", effect: "pull", levelReq: 3 },
+        { aid: "retiarius_entangle", name: "Entangle", desc: "Root + −2 ATK (2 turns) to foe.", type: "debuff", target: "adjacent_enemy", effect: "entangle", levelReq: 4 },
+        { aid: "retiarius_neptunes_favor", name: "Neptune's Favor", desc: "Heal 20% HP + Move +1.", type: "heal", target: "self", levelReq: 5 },
+        { aid: "retiarius_drag_under", name: "Drag Under", desc: "Pull foe + deal 1.0× damage.", type: "attack", target: "adjacent_enemy", mult: 1.0, effect: "drag", levelReq: 6 },
       ],
     },
     {
@@ -309,12 +318,12 @@
       cost: 26, hp: 32, atk: 12, def: 4, spd: 8, move: 4, jump: 1,
       growth: { hp: 300, atk: 45, def: 30, spd: 50 },
       abilities: [
-        { name: "Umbra", desc: "Move +1 this turn.", type: "buff", target: "self", levelReq: 1 },
-        { name: "Pursuit", desc: "Adjacent strike for 1.25× if foe present.", type: "attack", target: "adjacent_enemy", mult: 1.25, levelReq: 2 },
-        { name: "Blind Rush", desc: "+2 ATK this action, −2 DEF until next turn.", type: "buff", target: "self", levelReq: 3 },
-        { name: "Battle Focus", desc: "Next attack +25% hit chance.", type: "buff", target: "self", levelReq: 4 },
-        { name: "Relentless", desc: "Range-2 line dash + 0.8× strike.", type: "attack", target: "line", range: 2, mult: 0.8, levelReq: 5 },
-        { name: "Hunter's Mark", desc: "Foe takes +3 dmg from all for 2 turns.", type: "debuff", target: "adjacent_enemy", effect: "huntermark", levelReq: 6 },
+        { aid: "secutor_umbra", name: "Umbra", desc: "Move +1 this turn.", type: "buff", target: "self", levelReq: 1 },
+        { aid: "secutor_pursuit", name: "Pursuit", desc: "Adjacent strike for 1.25× if foe present.", type: "attack", target: "adjacent_enemy", mult: 1.25, levelReq: 2 },
+        { aid: "secutor_blind_rush", name: "Blind Rush", desc: "+2 ATK this action, −2 DEF until next turn.", type: "buff", target: "self", levelReq: 3 },
+        { aid: "secutor_battle_focus", name: "Battle Focus", desc: "Next attack +25% hit chance.", type: "buff", target: "self", levelReq: 4 },
+        { aid: "secutor_relentless", name: "Relentless", desc: "Range-2 line dash + 0.8× strike.", type: "attack", target: "line", range: 2, mult: 0.8, levelReq: 5 },
+        { aid: "secutor_hunters_mark", name: "Hunter's Mark", desc: "Foe takes +3 dmg from all for 2 turns.", type: "debuff", target: "adjacent_enemy", effect: "huntermark", levelReq: 6 },
       ],
     },
     {
@@ -322,12 +331,12 @@
       cost: 22, hp: 30, atk: 13, def: 3, spd: 7, move: 3, jump: 2,
       growth: { hp: 250, atk: 60, def: 20, spd: 50 },
       abilities: [
-        { name: "Sica Riposte", desc: "Counter next melee hit for 5 true damage.", type: "buff", target: "self", levelReq: 1 },
-        { name: "Curved Strike", desc: "Attack ignoring 50% of DEF.", type: "attack", target: "adjacent_enemy", mult: 1, ignoreDefPct: 0.5, levelReq: 2 },
-        { name: "Bleeding Arc", desc: "1.1× hit + 3 bleed (1/turn for 3 turns).", type: "attack", target: "adjacent_enemy", mult: 1.1, effect: "bleed", levelReq: 3 },
-        { name: "Parry", desc: "Next hit halved, counter 3 dmg.", type: "buff", target: "self", levelReq: 4 },
-        { name: "Crimson Dance", desc: "1.3× hit, heal 25% of damage.", type: "attack", target: "adjacent_enemy", mult: 1.3, effect: "lifesteal", steal: 0.25, levelReq: 5 },
-        { name: "Blade Storm", desc: "Hit all adjacent foes for 1.0×.", type: "attack", target: "aoe_adjacent", mult: 1.0, levelReq: 6 },
+        { aid: "thraex_sica_riposte", name: "Sica Riposte", desc: "Counter next melee hit for 5 true damage.", type: "buff", target: "self", levelReq: 1 },
+        { aid: "thraex_curved_strike", name: "Curved Strike", desc: "Attack ignoring 50% of DEF.", type: "attack", target: "adjacent_enemy", mult: 1, ignoreDefPct: 0.5, levelReq: 2 },
+        { aid: "thraex_bleeding_arc", name: "Bleeding Arc", desc: "1.1× hit + 3 bleed (1/turn for 3 turns).", type: "attack", target: "adjacent_enemy", mult: 1.1, effect: "bleed", levelReq: 3 },
+        { aid: "thraex_parry", name: "Parry", desc: "Next hit halved, counter 3 dmg.", type: "buff", target: "self", levelReq: 4 },
+        { aid: "thraex_crimson_dance", name: "Crimson Dance", desc: "1.3× hit, heal 25% of damage.", type: "attack", target: "adjacent_enemy", mult: 1.3, effect: "lifesteal", steal: 0.25, levelReq: 5 },
+        { aid: "thraex_blade_storm", name: "Blade Storm", desc: "Hit all adjacent foes for 1.0×.", type: "attack", target: "aoe_adjacent", mult: 1.0, levelReq: 6 },
       ],
     },
     {
@@ -335,12 +344,12 @@
       cost: 25, hp: 30, atk: 12, def: 4, spd: 7, move: 3, jump: 1,
       growth: { hp: 300, atk: 50, def: 35, spd: 30 },
       abilities: [
-        { name: "Hasta Impetus", desc: "Line thrust (range 3) for 1.25× damage.", type: "attack", target: "line", range: 3, mult: 1.25, levelReq: 1 },
-        { name: "Shield Bash", desc: "0.5× damage + push foe 1 tile.", type: "attack", target: "adjacent_enemy", mult: 0.5, effect: "push", levelReq: 2 },
-        { name: "Phalanx Guard", desc: "Adjacent allies gain +2 DEF this round.", type: "buff", target: "self", levelReq: 3 },
-        { name: "Spear Brace", desc: "Next melee attacker takes 4 counter dmg.", type: "buff", target: "self", levelReq: 4 },
-        { name: "Piercing Thrust", desc: "Range-2 line, 1.0× ignoring all DEF.", type: "attack", target: "line", range: 2, mult: 1.0, ignoreDefPct: 1.0, levelReq: 5 },
-        { name: "Phalanx Advance", desc: "Allies: +2 ATK, +1 Move this turn.", type: "buff", target: "self", levelReq: 6 },
+        { aid: "hoplomachus_hasta_impetus", name: "Hasta Impetus", desc: "Line thrust (range 3) for 1.25× damage.", type: "attack", target: "line", range: 3, mult: 1.25, levelReq: 1 },
+        { aid: "hoplomachus_shield_bash", name: "Shield Bash", desc: "0.5× damage + push foe 1 tile.", type: "attack", target: "adjacent_enemy", mult: 0.5, effect: "push", levelReq: 2 },
+        { aid: "hoplomachus_phalanx_guard", name: "Phalanx Guard", desc: "Adjacent allies gain +2 DEF this round.", type: "buff", target: "self", levelReq: 3 },
+        { aid: "hoplomachus_spear_brace", name: "Spear Brace", desc: "Next melee attacker takes 4 counter dmg.", type: "buff", target: "self", levelReq: 4 },
+        { aid: "hoplomachus_piercing_thrust", name: "Piercing Thrust", desc: "Range-2 line, 1.0× ignoring all DEF.", type: "attack", target: "line", range: 2, mult: 1.0, ignoreDefPct: 1.0, levelReq: 5 },
+        { aid: "hoplomachus_phalanx_advance", name: "Phalanx Advance", desc: "Allies: +2 ATK, +1 Move this turn.", type: "buff", target: "self", levelReq: 6 },
       ],
     },
     {
@@ -348,12 +357,12 @@
       cost: 30, hp: 29, atk: 14, def: 2, spd: 8, move: 4, jump: 2,
       growth: { hp: 200, atk: 70, def: 10, spd: 60 },
       abilities: [
-        { name: "Ferrum Cyclone", desc: "Hit all adjacent foes for 0.7×.", type: "attack", target: "aoe_adjacent", mult: 0.7, levelReq: 1 },
-        { name: "Twin Slash", desc: "1.4× single target, costs 3 HP.", type: "attack", target: "adjacent_enemy", mult: 1.4, selfDamage: 3, levelReq: 2 },
-        { name: "Shadow Step", desc: "Teleport to a tile within range 2.", type: "buff", target: "self", levelReq: 3 },
-        { name: "Evasion", desc: "+3 DEF until next turn.", type: "buff", target: "self", levelReq: 4 },
-        { name: "Blood Dance", desc: "1.5× hit, heal 30% of damage.", type: "attack", target: "adjacent_enemy", mult: 1.5, effect: "lifesteal", steal: 0.3, levelReq: 5 },
-        { name: "Whirlwind Fury", desc: "1.2× all adjacent + teleport 1.", type: "attack", target: "aoe_adjacent", mult: 1.2, effect: "whirlwind", levelReq: 6 },
+        { aid: "dimachaerus_ferrum_cyclone", name: "Ferrum Cyclone", desc: "Hit all adjacent foes for 0.7×.", type: "attack", target: "aoe_adjacent", mult: 0.7, levelReq: 1 },
+        { aid: "dimachaerus_twin_slash", name: "Twin Slash", desc: "1.4× single target, costs 3 HP.", type: "attack", target: "adjacent_enemy", mult: 1.4, selfDamage: 3, levelReq: 2 },
+        { aid: "dimachaerus_shadow_step", name: "Shadow Step", desc: "Teleport to a tile within range 2.", type: "buff", target: "self", levelReq: 3 },
+        { aid: "dimachaerus_evasion", name: "Evasion", desc: "+3 DEF until next turn.", type: "buff", target: "self", levelReq: 4 },
+        { aid: "dimachaerus_blood_dance", name: "Blood Dance", desc: "1.5× hit, heal 30% of damage.", type: "attack", target: "adjacent_enemy", mult: 1.5, effect: "lifesteal", steal: 0.3, levelReq: 5 },
+        { aid: "dimachaerus_whirlwind_fury", name: "Whirlwind Fury", desc: "1.2× all adjacent + teleport 1.", type: "attack", target: "aoe_adjacent", mult: 1.2, effect: "whirlwind", levelReq: 6 },
       ],
     },
     {
@@ -361,12 +370,12 @@
       cost: 27, hp: 34, atk: 10, def: 5, spd: 6, move: 3, jump: 1,
       growth: { hp: 350, atk: 30, def: 50, spd: 25 },
       abilities: [
-        { name: "Provocatio", desc: "Mark foe: −4 ATK vs others for 2 turns.", type: "debuff", target: "adjacent_enemy", levelReq: 1 },
-        { name: "Rally", desc: "Self-heal 20% of max HP.", type: "heal", target: "self", levelReq: 2 },
-        { name: "Arena Salute", desc: "Cleanse all debuffs from self.", type: "buff", target: "self", levelReq: 3 },
-        { name: "Inspiring Presence", desc: "Adjacent allies +2 ATK this turn.", type: "buff", target: "self", levelReq: 4 },
-        { name: "Guardian's Oath", desc: "Intercept next hit on adjacent ally.", type: "buff", target: "self", levelReq: 5 },
-        { name: "Champion's Resolve", desc: "Full heal (once per battle).", type: "heal", target: "self", levelReq: 6 },
+        { aid: "provocator_provocatio", name: "Provocatio", desc: "Mark foe: −4 ATK vs others for 2 turns.", type: "debuff", target: "adjacent_enemy", levelReq: 1 },
+        { aid: "provocator_rally", name: "Rally", desc: "Self-heal 20% of max HP.", type: "heal", target: "self", levelReq: 2 },
+        { aid: "provocator_arena_salute", name: "Arena Salute", desc: "Cleanse all debuffs from self.", type: "buff", target: "self", levelReq: 3 },
+        { aid: "provocator_inspiring_presence", name: "Inspiring Presence", desc: "Adjacent allies +2 ATK this turn.", type: "buff", target: "self", levelReq: 4 },
+        { aid: "provocator_guardians_oath", name: "Guardian's Oath", desc: "Intercept next hit on adjacent ally.", type: "buff", target: "self", levelReq: 5 },
+        { aid: "provocator_champions_resolve", name: "Champion's Resolve", desc: "Full heal (once per battle).", type: "heal", target: "self", levelReq: 6 },
       ],
     },
     {
@@ -374,12 +383,12 @@
       cost: 23, hp: 33, atk: 11, def: 4, spd: 6, move: 3, jump: 1,
       growth: { hp: 350, atk: 35, def: 50, spd: 25 },
       abilities: [
-        { name: "Samnis Press", desc: "Shove adjacent foe 1 tile.", type: "utility", target: "adjacent_enemy", effect: "push", levelReq: 1 },
-        { name: "Veteran's Blow", desc: "1.3× damage, costs 5 HP.", type: "attack", target: "adjacent_enemy", mult: 1.3, selfDamage: 5, levelReq: 2 },
-        { name: "War Cry", desc: "Adjacent foes get −2 ATK for 2 turns.", type: "debuff", target: "self", levelReq: 3 },
-        { name: "Battle Hardened", desc: "+2 DEF, +1 ATK for 2 turns.", type: "buff", target: "self", levelReq: 4 },
-        { name: "Intimidating Roar", desc: "All adjacent enemies rooted 1 turn.", type: "debuff", target: "self", levelReq: 5 },
-        { name: "Veteran's Fury", desc: "1.5× hit + push 2 tiles.", type: "attack", target: "adjacent_enemy", mult: 1.5, effect: "push2", levelReq: 6 },
+        { aid: "samnite_samnis_press", name: "Samnis Press", desc: "Shove adjacent foe 1 tile.", type: "utility", target: "adjacent_enemy", effect: "push", levelReq: 1 },
+        { aid: "samnite_veterans_blow", name: "Veteran's Blow", desc: "1.3× damage, costs 5 HP.", type: "attack", target: "adjacent_enemy", mult: 1.3, selfDamage: 5, levelReq: 2 },
+        { aid: "samnite_war_cry", name: "War Cry", desc: "Adjacent foes get −2 ATK for 2 turns.", type: "debuff", target: "self", levelReq: 3 },
+        { aid: "samnite_battle_hardened", name: "Battle Hardened", desc: "+2 DEF, +1 ATK for 2 turns.", type: "buff", target: "self", levelReq: 4 },
+        { aid: "samnite_intimidating_roar", name: "Intimidating Roar", desc: "All adjacent enemies rooted 1 turn.", type: "debuff", target: "self", levelReq: 5 },
+        { aid: "samnite_veterans_fury", name: "Veteran's Fury", desc: "1.5× hit + push 2 tiles.", type: "attack", target: "adjacent_enemy", mult: 1.5, effect: "push2", levelReq: 6 },
       ],
     },
     {
@@ -387,12 +396,12 @@
       cost: 22, hp: 25, atk: 11, def: 2, spd: 9, move: 3, jump: 2,
       growth: { hp: 200, atk: 50, def: 15, spd: 60 },
       abilities: [
-        { name: "Volley", desc: "Range-4 line shot for 0.7×.", type: "attack", target: "line", range: 4, mult: 0.7, levelReq: 1 },
-        { name: "Pin Shot", desc: "0.6× hit + root foe 1 turn.", type: "attack", target: "adjacent_enemy", mult: 0.6, effect: "stun", levelReq: 2 },
-        { name: "High Ground", desc: "+15% hit on next attack.", type: "buff", target: "self", levelReq: 3 },
-        { name: "Poison Arrow", desc: "0.5× + 3 bleed (1/turn, 3 turns).", type: "attack", target: "adjacent_enemy", mult: 0.5, effect: "bleed", levelReq: 4 },
-        { name: "Suppressing Fire", desc: "Range-2 line, 3 true dmg (pierces).", type: "attack", target: "line", range: 2, mult: 0, effect: "suppress", levelReq: 5 },
-        { name: "Eagle Eye", desc: "Next 2 attacks cannot miss.", type: "buff", target: "self", levelReq: 6 },
+        { aid: "sagittarius_volley", name: "Volley", desc: "Range-4 line shot for 0.7×.", type: "attack", target: "line", range: 4, mult: 0.7, levelReq: 1 },
+        { aid: "sagittarius_pin_shot", name: "Pin Shot", desc: "0.6× hit + root foe 1 turn.", type: "attack", target: "adjacent_enemy", mult: 0.6, effect: "stun", levelReq: 2 },
+        { aid: "sagittarius_high_ground", name: "High Ground", desc: "+15% hit on next attack.", type: "buff", target: "self", levelReq: 3 },
+        { aid: "sagittarius_poison_arrow", name: "Poison Arrow", desc: "0.5× + 3 bleed (1/turn, 3 turns).", type: "attack", target: "adjacent_enemy", mult: 0.5, effect: "bleed", levelReq: 4 },
+        { aid: "sagittarius_suppressing_fire", name: "Suppressing Fire", desc: "Range-2 line, 3 true dmg (pierces).", type: "attack", target: "line", range: 2, mult: 0, effect: "suppress", levelReq: 5 },
+        { aid: "sagittarius_eagle_eye", name: "Eagle Eye", desc: "Next 2 attacks cannot miss.", type: "buff", target: "self", levelReq: 6 },
       ],
     },
     {
@@ -400,12 +409,12 @@
       cost: 26, hp: 30, atk: 12, def: 3, spd: 7, move: 5, jump: 1,
       growth: { hp: 300, atk: 40, def: 20, spd: 55 },
       abilities: [
-        { name: "Charge", desc: "Range-2 line dash + 1.3× hit.", type: "attack", target: "line", range: 2, mult: 1.3, effect: "charge", levelReq: 1 },
-        { name: "Wheel Strike", desc: "Hit all adjacent foes for 0.6×.", type: "attack", target: "aoe_adjacent", mult: 0.6, levelReq: 2 },
-        { name: "Rally Charge", desc: "Move +2 this turn.", type: "buff", target: "self", levelReq: 3 },
-        { name: "Momentum", desc: "Passive: +3 ATK after moving 3+ tiles.", type: "passive", target: "self", levelReq: 4 },
-        { name: "Trample", desc: "Range-3 line, 0.6× each foe in line.", type: "attack", target: "line", range: 3, mult: 0.6, effect: "trample", levelReq: 5 },
-        { name: "War Chariot", desc: "Range-3 charge + 1.5× on target.", type: "attack", target: "line", range: 3, mult: 1.5, effect: "charge", levelReq: 6 },
+        { aid: "essedarius_charge", name: "Charge", desc: "Range-2 line dash + 1.3× hit.", type: "attack", target: "line", range: 2, mult: 1.3, effect: "charge", levelReq: 1 },
+        { aid: "essedarius_wheel_strike", name: "Wheel Strike", desc: "Hit all adjacent foes for 0.6×.", type: "attack", target: "aoe_adjacent", mult: 0.6, levelReq: 2 },
+        { aid: "essedarius_rally_charge", name: "Rally Charge", desc: "Move +2 this turn.", type: "buff", target: "self", levelReq: 3 },
+        { aid: "essedarius_momentum", name: "Momentum", desc: "Passive: +3 ATK after moving 3+ tiles.", type: "passive", target: "self", levelReq: 4 },
+        { aid: "essedarius_trample", name: "Trample", desc: "Range-3 line, 0.6× each foe in line.", type: "attack", target: "line", range: 3, mult: 0.6, effect: "trample", levelReq: 5 },
+        { aid: "essedarius_war_chariot", name: "War Chariot", desc: "Range-3 charge + 1.5× on target.", type: "attack", target: "line", range: 3, mult: 1.5, effect: "charge", levelReq: 6 },
       ],
     },
     {
@@ -413,12 +422,12 @@
       cost: 28, hp: 27, atk: 12, def: 3, spd: 8, move: 4, jump: 2,
       growth: { hp: 220, atk: 50, def: 15, spd: 65 },
       abilities: [
-        { name: "Dark Grasp", desc: "0.9× hit, steal 3 HP.", type: "attack", target: "adjacent_enemy", mult: 0.9, effect: "lifesteal", steal: 3, levelReq: 1 },
-        { name: "Phase Walk", desc: "Teleport within range 3.", type: "buff", target: "self", levelReq: 2 },
-        { name: "Dread Whisper", desc: "Debuff: foe −3 ATK for 2 turns.", type: "debuff", target: "adjacent_enemy", effect: "atkdebuff", debuffTurns: 2, debuffAmt: 3, levelReq: 3 },
-        { name: "Shadow Mend", desc: "Heal 25% HP; −2 ATK 1 turn.", type: "heal", target: "self", levelReq: 4 },
-        { name: "Void Burst", desc: "0.8× adj foes + steal 2 HP each.", type: "attack", target: "aoe_adjacent", mult: 0.8, effect: "voidburst", levelReq: 5 },
-        { name: "Abyssal Gate", desc: "Teleport adjacent ally within range 3.", type: "buff", target: "adjacent_ally", levelReq: 6 },
+        { aid: "umbra_dark_grasp", name: "Dark Grasp", desc: "0.9× hit, steal 3 HP.", type: "attack", target: "adjacent_enemy", mult: 0.9, effect: "lifesteal", steal: 3, levelReq: 1 },
+        { aid: "umbra_phase_walk", name: "Phase Walk", desc: "Teleport within range 3.", type: "buff", target: "self", levelReq: 2 },
+        { aid: "umbra_dread_whisper", name: "Dread Whisper", desc: "Debuff: foe −3 ATK for 2 turns.", type: "debuff", target: "adjacent_enemy", effect: "atkdebuff", debuffTurns: 2, debuffAmt: 3, levelReq: 3 },
+        { aid: "umbra_shadow_mend", name: "Shadow Mend", desc: "Heal 25% HP; −2 ATK 1 turn.", type: "heal", target: "self", levelReq: 4 },
+        { aid: "umbra_void_burst", name: "Void Burst", desc: "0.8× adj foes + steal 2 HP each.", type: "attack", target: "aoe_adjacent", mult: 0.8, effect: "voidburst", levelReq: 5 },
+        { aid: "umbra_abyssal_gate", name: "Abyssal Gate", desc: "Teleport adjacent ally within range 3.", type: "buff", target: "adjacent_ally", levelReq: 6 },
       ],
     },
     {
@@ -426,12 +435,12 @@
       cost: 30, hp: 32, atk: 13, def: 3, spd: 6, move: 3, jump: 1,
       growth: { hp: 400, atk: 50, def: 25, spd: 15 },
       abilities: [
-        { name: "Revenant Strike", desc: "1.2× hit, heal 25% of damage.", type: "attack", target: "adjacent_enemy", mult: 1.2, effect: "lifesteal", levelReq: 1 },
-        { name: "Grave Pulse", desc: "4 true dmg to all adjacent foes, costs 5 HP.", type: "attack", target: "aoe_adjacent", mult: 0, effect: "grave_pulse", selfDamage: 5, levelReq: 2 },
-        { name: "Second Wind", desc: "Passive: revive once at 25% HP.", type: "passive", target: "self", levelReq: 3 },
-        { name: "Unholy Resilience", desc: "+3 DEF for 2 turns.", type: "buff", target: "self", levelReq: 4 },
-        { name: "Soul Drain", desc: "1.0× hit, heal 50% of damage.", type: "attack", target: "adjacent_enemy", mult: 1.0, effect: "lifesteal", steal: 0.5, levelReq: 5 },
-        { name: "Death's Embrace", desc: "6 true dmg adj foes, heal total.", type: "attack", target: "aoe_adjacent", mult: 0, effect: "deathembrace", levelReq: 6 },
+        { aid: "vestige_revenant_strike", name: "Revenant Strike", desc: "1.2× hit, heal 25% of damage.", type: "attack", target: "adjacent_enemy", mult: 1.2, effect: "lifesteal", levelReq: 1 },
+        { aid: "vestige_grave_pulse", name: "Grave Pulse", desc: "4 true dmg to all adjacent foes, costs 5 HP.", type: "attack", target: "aoe_adjacent", mult: 0, effect: "grave_pulse", selfDamage: 5, levelReq: 2 },
+        { aid: "vestige_second_wind", name: "Second Wind", desc: "Passive: revive once at 25% HP.", type: "passive", target: "self", levelReq: 3 },
+        { aid: "vestige_unholy_resilience", name: "Unholy Resilience", desc: "+3 DEF for 2 turns.", type: "buff", target: "self", levelReq: 4 },
+        { aid: "vestige_soul_drain", name: "Soul Drain", desc: "1.0× hit, heal 50% of damage.", type: "attack", target: "adjacent_enemy", mult: 1.0, effect: "lifesteal", steal: 0.5, levelReq: 5 },
+        { aid: "vestige_deaths_embrace", name: "Death's Embrace", desc: "6 true dmg adj foes, heal total.", type: "attack", target: "aoe_adjacent", mult: 0, effect: "deathembrace", levelReq: 6 },
       ],
     },
   ];
@@ -440,145 +449,145 @@
     murmillo: [
       { id: "centurion", name: "Centurion", statBonus: { hp: 8, def: 3 },
         abilities: [
-          { name: "Legion Wall", desc: "Adjacent allies gain +2 DEF for 2 turns.", type: "buff", target: "self", levelReq: 5 },
-          { name: "Imperium", desc: "AoE 1.0\u00d7 hit to all adjacent enemies.", type: "attack", target: "aoe_adjacent", mult: 1.0, levelReq: 6 },
+          { aid: "centurion_legion_wall", name: "Legion Wall", desc: "Adjacent allies gain +2 DEF for 2 turns.", type: "buff", target: "self", levelReq: 5 },
+          { aid: "centurion_imperium", name: "Imperium", desc: "AoE 1.0\u00d7 hit to all adjacent enemies.", type: "attack", target: "aoe_adjacent", mult: 1.0, levelReq: 6 },
         ] },
       { id: "praetorian", name: "Praetorian", statBonus: { hp: 4, atk: 2, def: 1 },
         abilities: [
-          { name: "Defiant Counter", desc: "Riposte: counter next 2 melee hits.", type: "buff", target: "self", levelReq: 5 },
-          { name: "Unyielding", desc: "Heal 20% HP; immune to debuffs 1 turn.", type: "heal", target: "self", levelReq: 6 },
+          { aid: "praetorian_defiant_counter", name: "Defiant Counter", desc: "Riposte: counter next 2 melee hits.", type: "buff", target: "self", levelReq: 5 },
+          { aid: "praetorian_unyielding", name: "Unyielding", desc: "Heal 20% HP; immune to debuffs 1 turn.", type: "heal", target: "self", levelReq: 6 },
         ] },
     ],
     retiarius: [
       { id: "laquearius", name: "Laquearius", statBonus: { spd: 3, atk: 1 },
         abilities: [
-          { name: "Lasso Snare", desc: "Range-3 root + pull 1 tile.", type: "debuff", target: "line", range: 3, effect: "pull", levelReq: 5 },
-          { name: "Triple Tide", desc: "Hit 3 tiles in a line for 0.7\u00d7 each.", type: "attack", target: "line", range: 3, mult: 0.7, levelReq: 6 },
+          { aid: "laquearius_lasso_snare", name: "Lasso Snare", desc: "Range-3 root + pull 1 tile.", type: "debuff", target: "line", range: 3, effect: "pull", levelReq: 5 },
+          { aid: "laquearius_triple_tide", name: "Triple Tide", desc: "Hit 3 tiles in a line for 0.7\u00d7 each.", type: "attack", target: "line", range: 3, mult: 0.7, levelReq: 6 },
         ] },
       { id: "pontarius", name: "Pontarius", statBonus: { hp: 5, def: 2 },
         abilities: [
-          { name: "Bridgekeeper", desc: "+3 DEF and heal 5 HP.", type: "buff", target: "self", levelReq: 5 },
-          { name: "Cascade", desc: "Push all adjacent foes 2 tiles.", type: "utility", target: "self", effect: "push2", levelReq: 6 },
+          { aid: "pontarius_bridgekeeper", name: "Bridgekeeper", desc: "+3 DEF and heal 5 HP.", type: "buff", target: "self", levelReq: 5 },
+          { aid: "pontarius_cascade", name: "Cascade", desc: "Push all adjacent foes 2 tiles.", type: "utility", target: "self", effect: "push2", levelReq: 6 },
         ] },
     ],
     secutor: [
       { id: "contraretiarius", name: "Contraretiarius", statBonus: { atk: 3, spd: 1 },
         abilities: [
-          { name: "Net Cutter", desc: "Cleanse root/stun + 1.2\u00d7 strike.", type: "attack", target: "adjacent_enemy", mult: 1.2, effect: "cleanse_self", levelReq: 5 },
-          { name: "Pursue & Finish", desc: "Dash 2 tiles + 1.4\u00d7 hit if foe below 40% HP.", type: "attack", target: "line", range: 2, mult: 1.4, levelReq: 6 },
+          { aid: "contraretiarius_net_cutter", name: "Net Cutter", desc: "Cleanse root/stun + 1.2\u00d7 strike.", type: "attack", target: "adjacent_enemy", mult: 1.2, effect: "cleanse_self", levelReq: 5 },
+          { aid: "contraretiarius_pursue_finish", name: "Pursue & Finish", desc: "Dash 2 tiles + 1.4\u00d7 hit if foe below 40% HP.", type: "attack", target: "line", range: 2, mult: 1.4, levelReq: 6 },
         ] },
       { id: "scissor", name: "Scissor", statBonus: { def: 2, hp: 4 },
         abilities: [
-          { name: "Crescent Guard", desc: "+4 DEF until next turn, counter 3 dmg.", type: "buff", target: "self", levelReq: 5 },
-          { name: "Scissor Rend", desc: "1.3\u00d7 hit ignoring 30% DEF.", type: "attack", target: "adjacent_enemy", mult: 1.3, ignoreDefPct: 0.3, levelReq: 6 },
+          { aid: "scissor_crescent_guard", name: "Crescent Guard", desc: "+4 DEF until next turn, counter 3 dmg.", type: "buff", target: "self", levelReq: 5 },
+          { aid: "scissor_scissor_rend", name: "Scissor Rend", desc: "1.3\u00d7 hit ignoring 30% DEF.", type: "attack", target: "adjacent_enemy", mult: 1.3, ignoreDefPct: 0.3, levelReq: 6 },
         ] },
     ],
     thraex: [
       { id: "hoplomachus_thraex", name: "Myrmex", statBonus: { atk: 4, spd: 1 },
         abilities: [
-          { name: "Scorpion Sting", desc: "1.4\u00d7 hit + bleed 4 (2 turns).", type: "attack", target: "adjacent_enemy", mult: 1.4, effect: "bleed", levelReq: 5 },
-          { name: "Frenzy", desc: "Attack twice at 0.7\u00d7 each.", type: "attack", target: "adjacent_enemy", mult: 0.7, effect: "double_strike", levelReq: 6 },
+          { aid: "myrmex_scorpion_sting", name: "Scorpion Sting", desc: "1.4\u00d7 hit + bleed 4 (2 turns).", type: "attack", target: "adjacent_enemy", mult: 1.4, effect: "bleed", levelReq: 5 },
+          { aid: "myrmex_frenzy", name: "Frenzy", desc: "Attack twice at 0.7\u00d7 each.", type: "attack", target: "adjacent_enemy", mult: 0.7, effect: "double_strike", levelReq: 6 },
         ] },
       { id: "veles_thraex", name: "Veles", statBonus: { spd: 3, move: 1 },
         abilities: [
-          { name: "Javelin Toss", desc: "Range-3 line shot for 0.9\u00d7.", type: "attack", target: "line", range: 3, mult: 0.9, levelReq: 5 },
-          { name: "Skirmish Dance", desc: "Attack + teleport 2 tiles away.", type: "attack", target: "adjacent_enemy", mult: 1.0, effect: "teleport_back", levelReq: 6 },
+          { aid: "veles_javelin_toss", name: "Javelin Toss", desc: "Range-3 line shot for 0.9\u00d7.", type: "attack", target: "line", range: 3, mult: 0.9, levelReq: 5 },
+          { aid: "veles_skirmish_dance", name: "Skirmish Dance", desc: "Attack + teleport 2 tiles away.", type: "attack", target: "adjacent_enemy", mult: 1.0, effect: "teleport_back", levelReq: 6 },
         ] },
     ],
     hoplomachus: [
       { id: "hoplite", name: "Hoplite", statBonus: { def: 3, hp: 5 },
         abilities: [
-          { name: "Shield Wall", desc: "Adjacent allies +3 DEF for 2 turns.", type: "buff", target: "self", levelReq: 5 },
-          { name: "Spartan Thrust", desc: "Range-3 line 1.3\u00d7 + push 1.", type: "attack", target: "line", range: 3, mult: 1.3, effect: "push", levelReq: 6 },
+          { aid: "hoplite_shield_wall", name: "Shield Wall", desc: "Adjacent allies +3 DEF for 2 turns.", type: "buff", target: "self", levelReq: 5 },
+          { aid: "hoplite_spartan_thrust", name: "Spartan Thrust", desc: "Range-3 line 1.3\u00d7 + push 1.", type: "attack", target: "line", range: 3, mult: 1.3, effect: "push", levelReq: 6 },
         ] },
       { id: "peltast", name: "Peltast", statBonus: { atk: 2, spd: 2, move: 1 },
         abilities: [
-          { name: "Javelin Barrage", desc: "Range-4 line 0.8\u00d7 + bleed 2.", type: "attack", target: "line", range: 4, mult: 0.8, effect: "bleed", levelReq: 5 },
-          { name: "Hit and Run", desc: "1.1\u00d7 hit + move 2 tiles back.", type: "attack", target: "adjacent_enemy", mult: 1.1, effect: "teleport_back", levelReq: 6 },
+          { aid: "peltast_javelin_barrage", name: "Javelin Barrage", desc: "Range-4 line 0.8\u00d7 + bleed 2.", type: "attack", target: "line", range: 4, mult: 0.8, effect: "bleed", levelReq: 5 },
+          { aid: "peltast_hit_and_run", name: "Hit and Run", desc: "1.1\u00d7 hit + move 2 tiles back.", type: "attack", target: "adjacent_enemy", mult: 1.1, effect: "teleport_back", levelReq: 6 },
         ] },
     ],
     dimachaerus: [
       { id: "gladiatrix", name: "Gladiatrix", statBonus: { atk: 3, spd: 2 },
         abilities: [
-          { name: "Whirling Blades", desc: "1.2\u00d7 all adjacent + heal 3 per hit.", type: "attack", target: "aoe_adjacent", mult: 1.2, effect: "lifesteal", steal: 3, levelReq: 5 },
-          { name: "Perfect Strike", desc: "1.8\u00d7 single hit, cannot miss.", type: "attack", target: "adjacent_enemy", mult: 1.8, alwaysHit: true, levelReq: 6 },
+          { aid: "gladiatrix_whirling_blades", name: "Whirling Blades", desc: "1.2\u00d7 all adjacent + heal 3 per hit.", type: "attack", target: "aoe_adjacent", mult: 1.2, effect: "lifesteal", steal: 3, levelReq: 5 },
+          { aid: "gladiatrix_perfect_strike", name: "Perfect Strike", desc: "1.8\u00d7 single hit, cannot miss.", type: "attack", target: "adjacent_enemy", mult: 1.8, alwaysHit: true, levelReq: 6 },
         ] },
       { id: "rudiarius", name: "Rudiarius", statBonus: { hp: 6, def: 2 },
         abilities: [
-          { name: "Veteran's Wisdom", desc: "Heal 30% HP + cleanse all debuffs.", type: "heal", target: "self", levelReq: 5 },
-          { name: "Freedom's Edge", desc: "1.5\u00d7 hit; if kill, +1 Move next turn.", type: "attack", target: "adjacent_enemy", mult: 1.5, levelReq: 6 },
+          { aid: "rudiarius_veterans_wisdom", name: "Veteran's Wisdom", desc: "Heal 30% HP + cleanse all debuffs.", type: "heal", target: "self", levelReq: 5 },
+          { aid: "rudiarius_freedoms_edge", name: "Freedom's Edge", desc: "1.5\u00d7 hit; if kill, +1 Move next turn.", type: "attack", target: "adjacent_enemy", mult: 1.5, levelReq: 6 },
         ] },
     ],
     provocator: [
       { id: "primus_palus", name: "Primus Palus", statBonus: { hp: 6, atk: 2 },
         abilities: [
-          { name: "Champion Duel", desc: "Mark foe: both deal +20% vs each other.", type: "debuff", target: "adjacent_enemy", effect: "duel", levelReq: 5 },
-          { name: "Crowd's Favor", desc: "Full heal + +3 ATK for 2 turns (once/battle).", type: "heal", target: "self", levelReq: 6 },
+          { aid: "primus_palus_champion_duel", name: "Champion Duel", desc: "Mark foe: both deal +20% vs each other.", type: "debuff", target: "adjacent_enemy", effect: "duel", levelReq: 5 },
+          { aid: "primus_palus_crowds_favor", name: "Crowd's Favor", desc: "Full heal + +3 ATK for 2 turns (once/battle).", type: "heal", target: "self", levelReq: 6 },
         ] },
       { id: "tertiarius", name: "Tertiarius", statBonus: { def: 3, hp: 4 },
         abilities: [
-          { name: "Hold the Line", desc: "Intercept all hits on adjacent allies 1 turn.", type: "buff", target: "self", levelReq: 5 },
-          { name: "Last Stand", desc: "+5 ATK, +5 DEF when below 30% HP.", type: "buff", target: "self", levelReq: 6 },
+          { aid: "tertiarius_hold_the_line", name: "Hold the Line", desc: "Intercept all hits on adjacent allies 1 turn.", type: "buff", target: "self", levelReq: 5 },
+          { aid: "tertiarius_last_stand", name: "Last Stand", desc: "+5 ATK, +5 DEF when below 30% HP.", type: "buff", target: "self", levelReq: 6 },
         ] },
     ],
     samnite: [
       { id: "secutor_sam", name: "Legionary", statBonus: { hp: 5, atk: 2, def: 1 },
         abilities: [
-          { name: "Pilum Throw", desc: "Range-3 line 1.0\u00d7 + \u22122 DEF on foe 2 turns.", type: "attack", target: "line", range: 3, mult: 1.0, effect: "defdebuff", levelReq: 5 },
-          { name: "Testudo March", desc: "+4 DEF, +2 Move for 1 turn.", type: "buff", target: "self", levelReq: 6 },
+          { aid: "legionary_pilum_throw", name: "Pilum Throw", desc: "Range-3 line 1.0\u00d7 + \u22122 DEF on foe 2 turns.", type: "attack", target: "line", range: 3, mult: 1.0, effect: "defdebuff", levelReq: 5 },
+          { aid: "legionary_testudo_march", name: "Testudo March", desc: "+4 DEF, +2 Move for 1 turn.", type: "buff", target: "self", levelReq: 6 },
         ] },
       { id: "velite", name: "Velite", statBonus: { spd: 3, move: 1 },
         abilities: [
-          { name: "Skirmish Throw", desc: "Range-2 line 0.9\u00d7 + root 1 turn.", type: "attack", target: "line", range: 2, mult: 0.9, effect: "stun", levelReq: 5 },
-          { name: "Guerrilla", desc: "Teleport 3 tiles + stealth 1 turn.", type: "buff", target: "self", levelReq: 6 },
+          { aid: "velite_skirmish_throw", name: "Skirmish Throw", desc: "Range-2 line 0.9\u00d7 + root 1 turn.", type: "attack", target: "line", range: 2, mult: 0.9, effect: "stun", levelReq: 5 },
+          { aid: "velite_guerrilla", name: "Guerrilla", desc: "Teleport 3 tiles + stealth 1 turn.", type: "buff", target: "self", levelReq: 6 },
         ] },
     ],
     sagittarius: [
       { id: "arcuballista", name: "Arcuballista", statBonus: { atk: 4 },
         abilities: [
-          { name: "Siege Shot", desc: "Range-5 line 1.2\u00d7, ignores 50% DEF.", type: "attack", target: "line", range: 5, mult: 1.2, ignoreDefPct: 0.5, levelReq: 5 },
-          { name: "Rain of Arrows", desc: "3\u00d73 AoE at range 3, 0.5\u00d7 each.", type: "attack", target: "aoe_range", range: 3, mult: 0.5, levelReq: 6 },
+          { aid: "arcuballista_siege_shot", name: "Siege Shot", desc: "Range-5 line 1.2\u00d7, ignores 50% DEF.", type: "attack", target: "line", range: 5, mult: 1.2, ignoreDefPct: 0.5, levelReq: 5 },
+          { aid: "arcuballista_rain_of_arrows", name: "Rain of Arrows", desc: "3\u00d73 AoE at range 3, 0.5\u00d7 each.", type: "attack", target: "aoe_range", range: 3, mult: 0.5, levelReq: 6 },
         ] },
       { id: "venator", name: "Venator", statBonus: { spd: 2, move: 1, hp: 3 },
         abilities: [
-          { name: "Beast Trap", desc: "Place trap on tile; next foe stepping takes 6 dmg + root.", type: "utility", target: "self", levelReq: 5 },
-          { name: "Marked Prey", desc: "Target takes +3 dmg from all attacks for 2 turns.", type: "debuff", target: "adjacent_enemy", effect: "huntermark", levelReq: 6 },
+          { aid: "venator_beast_trap", name: "Beast Trap", desc: "Place trap on tile; next foe stepping takes 6 dmg + root.", type: "utility", target: "self", levelReq: 5 },
+          { aid: "venator_marked_prey", name: "Marked Prey", desc: "Target takes +3 dmg from all attacks for 2 turns.", type: "debuff", target: "adjacent_enemy", effect: "huntermark", levelReq: 6 },
         ] },
     ],
     essedarius: [
       { id: "cataphract", name: "Cataphract", statBonus: { hp: 6, def: 2 },
         abilities: [
-          { name: "Armored Charge", desc: "Range-3 line 1.4\u00d7 + push 2 tiles.", type: "attack", target: "line", range: 3, mult: 1.4, effect: "push2", levelReq: 5 },
-          { name: "Iron Rampart", desc: "+5 DEF for 2 turns; rooted.", type: "buff", target: "self", levelReq: 6 },
+          { aid: "cataphract_armored_charge", name: "Armored Charge", desc: "Range-3 line 1.4\u00d7 + push 2 tiles.", type: "attack", target: "line", range: 3, mult: 1.4, effect: "push2", levelReq: 5 },
+          { aid: "cataphract_iron_rampart", name: "Iron Rampart", desc: "+5 DEF for 2 turns; rooted.", type: "buff", target: "self", levelReq: 6 },
         ] },
       { id: "auriga", name: "Auriga", statBonus: { spd: 3, atk: 1, move: 1 },
         abilities: [
-          { name: "Chariot Rush", desc: "Dash 4 tiles + 1.0\u00d7 each foe in path.", type: "attack", target: "line", range: 4, mult: 1.0, effect: "trample", levelReq: 5 },
-          { name: "Reins of War", desc: "+3 ATK, +2 Move for 1 turn.", type: "buff", target: "self", levelReq: 6 },
+          { aid: "auriga_chariot_rush", name: "Chariot Rush", desc: "Dash 4 tiles + 1.0\u00d7 each foe in path.", type: "attack", target: "line", range: 4, mult: 1.0, effect: "trample", levelReq: 5 },
+          { aid: "auriga_reins_of_war", name: "Reins of War", desc: "+3 ATK, +2 Move for 1 turn.", type: "buff", target: "self", levelReq: 6 },
         ] },
     ],
     umbra: [
       { id: "noctis", name: "Noctis", statBonus: { atk: 3, spd: 2 },
         abilities: [
-          { name: "Shadow Reap", desc: "1.5\u00d7 hit + steal 5 HP.", type: "attack", target: "adjacent_enemy", mult: 1.5, effect: "lifesteal", steal: 5, levelReq: 5 },
-          { name: "Nightmare", desc: "All adjacent foes \u22123 ATK, \u22122 SPD for 2 turns.", type: "debuff", target: "self", levelReq: 6 },
+          { aid: "noctis_shadow_reap", name: "Shadow Reap", desc: "1.5\u00d7 hit + steal 5 HP.", type: "attack", target: "adjacent_enemy", mult: 1.5, effect: "lifesteal", steal: 5, levelReq: 5 },
+          { aid: "noctis_nightmare", name: "Nightmare", desc: "All adjacent foes \u22123 ATK, \u22122 SPD for 2 turns.", type: "debuff", target: "self", levelReq: 6 },
         ] },
       { id: "augur", name: "Augur", statBonus: { hp: 5, def: 1, spd: 1 },
         abilities: [
-          { name: "Prophecy", desc: "Heal adjacent ally 30% + cleanse.", type: "heal", target: "adjacent_ally", levelReq: 5 },
-          { name: "Fate's Thread", desc: "Swap HP% with target foe.", type: "utility", target: "adjacent_enemy", effect: "hpswap", levelReq: 6 },
+          { aid: "augur_prophecy", name: "Prophecy", desc: "Heal adjacent ally 30% + cleanse.", type: "heal", target: "adjacent_ally", levelReq: 5 },
+          { aid: "augur_fates_thread", name: "Fate's Thread", desc: "Swap HP% with target foe.", type: "utility", target: "adjacent_enemy", effect: "hpswap", levelReq: 6 },
         ] },
     ],
     vestige: [
       { id: "lich", name: "Lich", statBonus: { atk: 4, hp: 3 },
         abilities: [
-          { name: "Soul Siphon", desc: "1.3\u00d7 hit + heal 50% of damage.", type: "attack", target: "adjacent_enemy", mult: 1.3, effect: "lifesteal", steal: 0.5, levelReq: 5 },
-          { name: "Army of the Dead", desc: "Summon 2 skeletal allies (1 HP, 5 ATK) for 3 turns.", type: "summon", target: "self", levelReq: 6 },
+          { aid: "lich_soul_siphon", name: "Soul Siphon", desc: "1.3\u00d7 hit + heal 50% of damage.", type: "attack", target: "adjacent_enemy", mult: 1.3, effect: "lifesteal", steal: 0.5, levelReq: 5 },
+          { aid: "lich_army_of_dead", name: "Army of the Dead", desc: "Summon 2 skeletal allies (1 HP, 5 ATK) for 3 turns.", type: "summon", target: "self", levelReq: 6 },
         ] },
       { id: "revenant", name: "Revenant", statBonus: { hp: 8, def: 2 },
         abilities: [
-          { name: "Undying Will", desc: "Survive lethal hit at 1 HP (once/battle).", type: "passive", target: "self", levelReq: 5 },
-          { name: "Death Knell", desc: "1.6\u00d7 hit; +0.4\u00d7 if below 25% HP.", type: "attack", target: "adjacent_enemy", mult: 1.6, levelReq: 6 },
+          { aid: "revenant_undying_will", name: "Undying Will", desc: "Survive lethal hit at 1 HP (once/battle).", type: "passive", target: "self", levelReq: 5 },
+          { aid: "revenant_death_knell", name: "Death Knell", desc: "1.6\u00d7 hit; +0.4\u00d7 if below 25% HP.", type: "attack", target: "adjacent_enemy", mult: 1.6, levelReq: 6 },
         ] },
     ],
   };
@@ -649,7 +658,7 @@
         var html = '<div class="promo-card__name">' + _esc(promo.name) + '</div>';
         html += '<div class="promo-card__stats">' + statParts.join(", ") + '</div>';
         for (var j = 0; j < promo.abilities.length; j++) {
-          html += '<div class="promo-card__ability">' + _esc(promo.abilities[j].name) + ': ' + _esc(promo.abilities[j].desc) + '</div>';
+          html += '<div class="promo-card__ability">' + _esc(abilityName(promo.abilities[j])) + ': ' + _esc(abilityDesc(promo.abilities[j])) + '</div>';
         }
         card.innerHTML = html;
 
@@ -2433,15 +2442,19 @@
         tag.className = "ability-tag";
         tag.setAttribute("tabindex", "0");
         tag.setAttribute("role", "button");
-        tag.textContent = a.name;
-        var tipParts = [];
-        if (a.type) tipParts.push(a.type.charAt(0).toUpperCase() + a.type.slice(1));
-        if (a.range) tipParts.push("Range " + a.range);
-        if (a.mult) tipParts.push("×" + a.mult + " dmg");
-        if (a.fixedDmg) tipParts.push(a.fixedDmg + " true dmg");
-        if (a.healAmt) tipParts.push("Heal " + a.healAmt);
-        if (a.levelReq && a.levelReq > 1) tipParts.push("Lv" + a.levelReq);
-        tag._tipText = (a.desc || a.name) + (tipParts.length ? "\n" + tipParts.join(" · ") : "");
+        tag.textContent = abilityName(a);
+        var tipExtra = (typeof I18n !== "undefined" && I18n.abilityTipExtras) ? I18n.abilityTipExtras(a) : "";
+        if (!tipExtra) {
+          var tipParts = [];
+          if (a.type) tipParts.push(a.type.charAt(0).toUpperCase() + a.type.slice(1));
+          if (a.range) tipParts.push("Range " + a.range);
+          if (a.mult) tipParts.push("×" + a.mult + " dmg");
+          if (a.fixedDmg) tipParts.push(a.fixedDmg + " true dmg");
+          if (a.healAmt) tipParts.push("Heal " + a.healAmt);
+          if (a.levelReq && a.levelReq > 1) tipParts.push("Lv" + a.levelReq);
+          tipExtra = tipParts.length ? "\n" + tipParts.join(" · ") : "";
+        }
+        tag._tipText = abilityDesc(a) + tipExtra;
         tag.addEventListener("mouseenter", _showAbilityTip);
         tag.addEventListener("mouseleave", _hideAbilityTip);
         tag.addEventListener("focus", _showAbilityTip);
@@ -3766,7 +3779,7 @@
     var ab = null;
     if (abilityIdx >= 0) {
       ab = unitAbilities(attacker)[abilityIdx];
-      if (ab) { label = ab.name; mult = ab.mult || 1; ignDef = ab.ignoreDefPct || 0; }
+      if (ab) { label = abilityName(ab); mult = ab.mult || 1; ignDef = ab.ignoreDefPct || 0; }
     }
     if (ab && ab.effect === "hpswap") {
       var html = '<div class="fc-name">' + _esc(def.name) + '</div>';
@@ -3801,7 +3814,7 @@
   }
 
   function showAreaForecast(attacker, ab) {
-    var label = ab.name;
+    var label = abilityName(ab);
     var dmg = physicalDamage(attacker, attacker, ab.mult || 1, ab.ignoreDefPct || 0, true);
     var html = '<div class="fc-name">' + _esc(label) + '</div>';
     html += '<div class="fc-dmg">~' + dmg + ' dmg per foe in area</div>';
@@ -3830,7 +3843,7 @@
     ucSpd.textContent = String(unitSpd(u));
     ucMove.textContent = String(effectiveMove(u));
     ucJump.textContent = String(unitJump(u));
-    ucAbility.textContent = unitAbilities(u).map(function (a) { return a.name + " — " + a.desc; }).join(" | ");
+    ucAbility.textContent = unitAbilities(u).map(function (a) { return abilityName(a) + " — " + abilityDesc(a); }).join(" | ");
     var existingStatus = unitCard.querySelector(".uc-status");
     if (existingStatus) existingStatus.remove();
     var icons = getUnitStatusIcons(u);
@@ -3870,7 +3883,7 @@
       btn.type = "button";
       btn.className = "ability-menu__btn";
       btn.setAttribute("role", "menuitem");
-      btn.innerHTML = "<kbd>" + menuIdx + "</kbd> " + _esc(ab.name) + "<small>" + _esc(ab.desc) + "</small>";
+      btn.innerHTML = "<kbd>" + menuIdx + "</kbd> " + _esc(abilityName(ab)) + "<small>" + _esc(abilityDesc(ab)) + "</small>";
       btn.addEventListener("click", function () {
         hideAbilityMenu();
         state.selectedAbilityIndex = idx;
@@ -3878,7 +3891,10 @@
       });
       abilityMenu.appendChild(btn);
     });
-    if (menuIdx === 0) { log("No usable abilities."); return; }
+    if (menuIdx === 0) {
+      log((typeof I18n !== "undefined" && I18n.t) ? I18n.t("battle.noUsableAbilities") : "No usable abilities.");
+      return;
+    }
     abilityMenu.classList.remove("is-hidden");
     btnAbility.setAttribute("aria-expanded", "true");
   }
@@ -4046,7 +4062,7 @@
 
     if (ab.target === "self" || ab.target === "aoe_adjacent") {
       state.highlightCells.add(cellKey(u.x, u.y));
-      log(ab.name + " — click your tile to activate.");
+      log(abilityName(ab) + " — click your tile to activate.");
     } else if (ab.target === "adjacent_enemy") {
       for (const [dx, dy] of DIRS) {
         const tx = u.x + dx;
@@ -4057,10 +4073,10 @@
       }
       if (state.highlightCells.size === 0) {
         state.battleMode = "idle";
-        log(ab.name + " — no adjacent enemies.");
+        log(abilityName(ab) + " — no adjacent enemies.");
         return;
       }
-      log(ab.name + " — choose adjacent enemy.");
+      log(abilityName(ab) + " — choose adjacent enemy.");
     } else if (ab.target === "line") {
       const range = ab.range || 3;
       for (const [dx, dy] of DIRS) {
@@ -4076,10 +4092,10 @@
       }
       if (state.highlightCells.size === 0) {
         state.battleMode = "idle";
-        log(ab.name + " — no valid line targets.");
+        log(abilityName(ab) + " — no valid line targets.");
         return;
       }
-      log(ab.name + " — pick a direction tile.");
+      log(abilityName(ab) + " — pick a direction tile.");
     } else if (ab.target === "adjacent_ally") {
       for (var aai = 0; aai < DIRS.length; aai++) {
         var aax = u.x + DIRS[aai][0], aay = u.y + DIRS[aai][1];
@@ -4091,10 +4107,10 @@
       }
       if (state.highlightCells.size === 0) {
         state.battleMode = "idle";
-        log(ab.name + " — no adjacent allies.");
+        log(abilityName(ab) + " — no adjacent allies.");
         return;
       }
-      log(ab.name + " — choose adjacent ally.");
+      log(abilityName(ab) + " — choose adjacent ally.");
     } else if (ab.target === "aoe_range") {
       var aoerRange = ab.range || 3;
       for (var aoerX = 0; aoerX < BOARD_W; aoerX++) {
@@ -4106,10 +4122,10 @@
       }
       if (state.highlightCells.size === 0) {
         state.battleMode = "idle";
-        log(ab.name + " — no tiles in range.");
+        log(abilityName(ab) + " — no tiles in range.");
         return;
       }
-      log(ab.name + " — choose center tile for area attack.");
+      log(abilityName(ab) + " — choose center tile for area attack.");
     } else {
       state.battleMode = "idle";
       log("No valid target.");
@@ -4137,7 +4153,7 @@
           log("Pursuit Sense — bonus damage primed!");
         }
         if (u.classId === "essedarius" && path.length >= 3) {
-          var hasMomentum = unitAbilities(u).some(function(a) { return a.name === "Momentum"; });
+          var hasMomentum = unitAbilities(u).some(function(a) { return a.aid === "essedarius_momentum"; });
           if (hasMomentum) {
             u.momentumBonus = 3;
             log("Momentum — +3 ATK from charge!");
@@ -4405,7 +4421,7 @@
         }
         applyDamage(f, dmg, u);
         await Promise.all([animateHitFlash(f), screenShake(80, 2)]);
-        log(ab.name + " cuts " + classById(f.classId).name + " (" + dmg + ").");
+        log(abilityName(ab) + " cuts " + classById(f.classId).name + " (" + dmg + ").");
         if (ab.effect === "lifesteal" && ab.steal && u.hp > 0) {
           var _lsAmt = (typeof ab.steal === "number" && ab.steal >= 1) ? ab.steal : Math.round(dmg * (ab.steal || 0.25));
           u.hp = Math.min(u.maxHp, u.hp + _lsAmt);
@@ -4414,7 +4430,7 @@
         }
         if (f.hp <= 0) await animateDeath(f);
       }
-      if (_lsTotal > 0) log(ab.name + " heals " + (u.displayName || classById(u.classId).name) + " for " + _lsTotal + " HP.");
+      if (_lsTotal > 0) log(abilityName(ab) + " heals " + (u.displayName || classById(u.classId).name) + " for " + _lsTotal + " HP.");
       if (!foes.length) log("Whirl in empty air.");
       if (ab.selfDamage) applyDamage(u, ab.selfDamage);
       endAction();
@@ -4435,7 +4451,7 @@
         if (!rollHit(u, arTargets[arI])) {
           SFX.miss();
           spawnDmgNumber(arTargets[arI], "MISS", "#aaaaaa");
-          log(ab.name + " misses " + (arTargets[arI].displayName || classById(arTargets[arI].classId).name) + "!");
+          log(abilityName(ab) + " misses " + (arTargets[arI].displayName || classById(arTargets[arI].classId).name) + "!");
           continue;
         }
         SFX.hit();
@@ -4443,7 +4459,7 @@
         if (arTargets[arI].riposteCharges > 0 && manhattan(u, arTargets[arI]) <= 1) { applyDamage(u, 5, arTargets[arI]); arTargets[arI].riposteCharges--; log("Riposte!"); }
         applyDamage(arTargets[arI], arDmg, u);
         await Promise.all([animateHitFlash(arTargets[arI]), screenShake(80, 2)]);
-        log(ab.name + " rains on " + (arTargets[arI].displayName || classById(arTargets[arI].classId).name) + " (" + arDmg + " dmg).");
+        log(abilityName(ab) + " rains on " + (arTargets[arI].displayName || classById(arTargets[arI].classId).name) + " (" + arDmg + " dmg).");
         if (arTargets[arI].hp <= 0) await animateDeath(arTargets[arI]);
       }
       if (!arTargets.length) log("Arrows rain on empty ground.");
@@ -4516,7 +4532,7 @@
         cy += dy;
       }
       if (!hit) {
-        log(ab.name + " strikes only sand.");
+        log(abilityName(ab) + " strikes only sand.");
         endAction();
         return;
       }
@@ -4525,7 +4541,7 @@
       if (!rollHit(u, hit)) {
         SFX.miss();
         spawnDmgNumber(hit, "MISS", "#aaaaaa");
-        log(ab.name + " misses! (" + hitPct + "% hit)");
+        log(abilityName(ab) + " misses! (" + hitPct + "% hit)");
         endAction();
         return;
       }
@@ -4539,7 +4555,7 @@
       if (u.hp <= 0) { await animateDeath(u); endAction(); return; }
       applyDamage(hit, dmg, u);
       await Promise.all([animateHitFlash(hit), screenShake(80, 2)]);
-      log(ab.name + " pierces for " + dmg + ". (" + hitPct + "% hit)");
+      log(abilityName(ab) + " pierces for " + dmg + ". (" + hitPct + "% hit)");
       if (u.gifted && u.classId === "hoplomachus" && hit.hp > 0) {
         var pdx = Math.sign(hit.x - u.x);
         var pdy = Math.sign(hit.y - u.y);
@@ -4608,7 +4624,7 @@
     if (ab.target === "adjacent_ally") {
       var allyTgt = occupantAt(x, y);
       if (!allyTgt || allyTgt.team !== u.team || allyTgt.id === u.id) return false;
-      if (ab.name === "Abyssal Gate") {
+      if (ab.aid === "umbra_abyssal_gate") {
         return executeAbilitySelf(u, ab);
       }
       if (ab.type === "heal") {
@@ -4620,7 +4636,7 @@
         allyTgt.bleedTurns = 0;
         allyTgt.markDebuffTurns = 0; allyTgt.dreadMarkDmg = 0;
         allyTgt.rootedSkip = 0;
-        log(ab.name + " heals " + (allyTgt.displayName || classById(allyTgt.classId).name) + " for " + healAmt + " HP and cleanses debuffs!");
+        log(abilityName(ab) + " heals " + (allyTgt.displayName || classById(allyTgt.classId).name) + " for " + healAmt + " HP and cleanses debuffs!");
         endAction();
         return true;
       }
@@ -4629,32 +4645,32 @@
   }
 
   function executeAbilitySelf(u, ab) {
-    recordAction(u, "ability", { abilityName: ab.name });
+    recordAction(u, "ability", { abilityName: abilityName(ab) });
     u._statAbilitiesUsed = (u._statAbilitiesUsed || 0) + 1;
     const cid = u.classId;
-    const name = ab.name;
+    const aid = ab.aid;
 
-    if (cid === "murmillo" && name === "Cetus Wall") {
+    if (cid === "murmillo" && aid === "murmillo_cetus_wall") {
       u.braceCharges = 1;
-      log("Cetus Wall — you brace for impact.");
-    } else if (cid === "murmillo" && name === "Testudo") {
+      log(abilityName(ab) + " — you brace for impact.");
+    } else if (cid === "murmillo" && aid === "murmillo_testudo") {
       u.testudoBonus = 3;
-      log("Testudo — shield raised, +3 DEF this round.");
-    } else if (name === "Defiant Counter") {
+      log(abilityName(ab) + " — shield raised, +3 DEF this round.");
+    } else if (aid === "praetorian_defiant_counter") {
       u.riposteCharges = 2;
-      log("Defiant Counter — ready to counter next 2 melee hits.");
-    } else if (cid === "thraex" && name === "Sica Riposte") {
+      log(abilityName(ab) + " — ready to counter next 2 melee hits.");
+    } else if (cid === "thraex" && aid === "thraex_sica_riposte") {
       u.riposteCharges = 1;
-      log("Sica Riposte — blade ready.");
-    } else if (cid === "secutor" && name === "Umbra") {
+      log(abilityName(ab) + " — blade ready.");
+    } else if (cid === "secutor" && aid === "secutor_umbra") {
       u.tempExtraMove = true;
-      log("Umbra — paths lengthen (Move +1).");
+      log(abilityName(ab) + " — paths lengthen (Move +1).");
       ucMove.textContent = String(effectiveMove(u));
-    } else if (cid === "secutor" && name === "Blind Rush") {
+    } else if (cid === "secutor" && aid === "secutor_blind_rush") {
       u.blindRushAtk = 2;
       u.blindRushDef = 2;
-      log("Blind Rush — +2 ATK, −2 DEF.");
-    } else if (cid === "hoplomachus" && name === "Phalanx Guard") {
+      log(abilityName(ab) + " — +2 ATK, −2 DEF.");
+    } else if (cid === "hoplomachus" && aid === "hoplomachus_phalanx_guard") {
       var allies = [];
       for (var pi = 0; pi < DIRS.length; pi++) {
         var px = u.x + DIRS[pi][0], py = u.y + DIRS[pi][1];
@@ -4664,11 +4680,11 @@
           allies.push(classById(palc.classId).name);
         }
       }
-      log("Phalanx Guard — " + (allies.length ? allies.join(", ") + " gain +2 DEF." : "no allies in range."));
-    } else if ((cid === "dimachaerus" && name === "Shadow Step") || name === "Phase Walk") {
+      log(abilityName(ab) + " — " + (allies.length ? allies.join(", ") + " gain +2 DEF." : "no allies in range."));
+    } else if (aid === "dimachaerus_shadow_step" || aid === "umbra_phase_walk") {
       state.battleMode = "shadow_step";
       state.highlightCells.clear();
-      var stepRange = name === "Phase Walk" ? 3 : 2;
+      var stepRange = aid === "umbra_phase_walk" ? 3 : 2;
       for (var sy = 0; sy < BOARD_H; sy++) {
         for (var sx = 0; sx < BOARD_W; sx++) {
           if (manhattan(u, {x: sx, y: sy}) <= stepRange && manhattan(u, {x: sx, y: sy}) > 0
@@ -4680,14 +4696,14 @@
       }
       if (state.highlightCells.size === 0) {
         state.battleMode = "idle";
-        log(name + " — no valid tiles in range.");
+        log(abilityName(ab) + " — no valid tiles in range.");
         endAction();
         return;
       }
       renderBoard();
-      log(name + " — select a tile to teleport to.");
+      log(abilityName(ab) + " — select a tile to teleport to.");
       return false;
-    } else if (cid === "provocator" && name === "Arena Salute") {
+    } else if (cid === "provocator" && aid === "provocator_arena_salute") {
       u.rootedSkip = 0;
       u.crowdSpdDebuff = 0;
       u.markDebuffTurns = 0;
@@ -4698,8 +4714,8 @@
       u.atkDebuffAmt = 0;
       u.defDebuffTurns = 0;
       u.defDebuffAmt = 0;
-      log("Arena Salute — all debuffs cleansed!");
-    } else if (cid === "samnite" && name === "War Cry") {
+      log(abilityName(ab) + " — all debuffs cleansed!");
+    } else if (cid === "samnite" && aid === "samnite_war_cry") {
       var cried = 0;
       for (var wi = 0; wi < DIRS.length; wi++) {
         var wx = u.x + DIRS[wi][0], wy = u.y + DIRS[wi][1];
@@ -4710,34 +4726,34 @@
           cried++;
         }
       }
-      log("War Cry — " + (cried ? cried + " foes shaken (−2 ATK)!" : "no foes in range."));
-    } else if (name === "High Ground") {
+      log(abilityName(ab) + " — " + (cried ? cried + " foes shaken (−2 ATK)!" : "no foes in range."));
+    } else if (aid === "sagittarius_high_ground") {
       u.highGroundNext = true;
-      log("High Ground — next attack has +15% hit chance.");
-    } else if (name === "Rally Charge") {
+      log(abilityName(ab) + " — next attack has +15% hit chance.");
+    } else if (aid === "essedarius_rally_charge") {
       u.tempExtraMove = true;
       u.rallyCharge = true;
-      log("Rally Charge — Move +2 this turn.");
-    } else if (cid === "provocator" && name === "Rally") {
+      log(abilityName(ab) + " — Move +2 this turn.");
+    } else if (cid === "provocator" && aid === "provocator_rally") {
       const heal = Math.round(u.maxHp * 0.2);
       u.hp = Math.min(u.maxHp, u.hp + heal);
       spawnDmgNumber(u, "+" + heal, "#70d870");
-      log("Rally — restored " + heal + " HP.");
+      log(abilityName(ab) + " — restored " + heal + " HP.");
 
-    } else if (name === "Iron Will") {
+    } else if (aid === "murmillo_iron_will") {
       var iwHeal = Math.round(u.maxHp * 0.15);
       u.hp = Math.min(u.maxHp, u.hp + iwHeal);
       u.rootedSkip = 0;
       spawnDmgNumber(u, "+" + iwHeal, "#70d870");
-      log("Iron Will — healed " + iwHeal + " HP, root cleansed.");
+      log(abilityName(ab) + " — healed " + iwHeal + " HP, root cleansed.");
 
-    } else if (name === "Fortress Stance") {
+    } else if (aid === "murmillo_fortress_stance") {
       u.testudoBonus = 4;
       u.fortressRooted = 2;
       u.rootedSkip = 1;
-      log("Fortress Stance — +4 DEF, rooted in place.");
+      log(abilityName(ab) + " — +4 DEF, rooted in place.");
 
-    } else if (name === "Guardian Aura") {
+    } else if (aid === "murmillo_guardian_aura") {
       var gaHealed = 0;
       for (var gai = 0; gai < DIRS.length; gai++) {
         var gax = u.x + DIRS[gai][0], gay = u.y + DIRS[gai][1];
@@ -4748,31 +4764,31 @@
           gaHealed++;
         }
       }
-      log("Guardian Aura — " + (gaHealed ? gaHealed + " allies healed 5 HP." : "no allies in range."));
+      log(abilityName(ab) + " — " + (gaHealed ? gaHealed + " allies healed 5 HP." : "no allies in range."));
 
-    } else if (name === "Neptune's Favor") {
+    } else if (aid === "retiarius_neptunes_favor") {
       var nfHeal = Math.round(u.maxHp * 0.2);
       u.hp = Math.min(u.maxHp, u.hp + nfHeal);
       u.tempExtraMove = true;
       spawnDmgNumber(u, "+" + nfHeal, "#70d870");
-      log("Neptune's Favor — healed " + nfHeal + " HP, Move +1.");
+      log(abilityName(ab) + " — healed " + nfHeal + " HP, Move +1.");
 
-    } else if (name === "Battle Focus") {
+    } else if (aid === "secutor_battle_focus") {
       u.battleFocusNext = true;
-      log("Battle Focus — next attack +25% hit chance.");
+      log(abilityName(ab) + " — next attack +25% hit chance.");
 
-    } else if (name === "Parry") {
+    } else if (aid === "thraex_parry") {
       u.parryCharges = 1;
-      log("Parry — next hit halved, counter 3 damage.");
+      log(abilityName(ab) + " — next hit halved, counter 3 damage.");
 
-    } else if (name === "Spear Brace") {
+    } else if (aid === "hoplomachus_spear_brace") {
       u.spearBraceActive = true;
-      log("Spear Brace — next attacker takes 4 counter damage.");
+      log(abilityName(ab) + " — next attacker takes 4 counter damage.");
 
-    } else if (name === "Piercing Thrust") {
-      log("Piercing Thrust activated.");
+    } else if (aid === "hoplomachus_piercing_thrust") {
+      log(abilityName(ab) + " activated.");
 
-    } else if (name === "Phalanx Advance") {
+    } else if (aid === "hoplomachus_phalanx_advance") {
       var paCount = 0;
       for (var pai = 0; pai < DIRS.length; pai++) {
         var pax = u.x + DIRS[pai][0], pay = u.y + DIRS[pai][1];
@@ -4784,13 +4800,13 @@
           paCount++;
         }
       }
-      log("Phalanx Advance — " + (paCount ? paCount + " allies gain +2 ATK, +1 Move." : "no allies in range."));
+      log(abilityName(ab) + " — " + (paCount ? paCount + " allies gain +2 ATK, +1 Move." : "no allies in range."));
 
-    } else if (name === "Evasion") {
+    } else if (aid === "dimachaerus_evasion") {
       u.testudoBonus = 3;
-      log("Evasion — +3 DEF until next turn.");
+      log(abilityName(ab) + " — +3 DEF until next turn.");
 
-    } else if (name === "Inspiring Presence") {
+    } else if (aid === "provocator_inspiring_presence") {
       var ipCount = 0;
       for (var ipi = 0; ipi < DIRS.length; ipi++) {
         var ipx = u.x + DIRS[ipi][0], ipy = u.y + DIRS[ipi][1];
@@ -4801,15 +4817,15 @@
           ipCount++;
         }
       }
-      log("Inspiring Presence — " + (ipCount ? ipCount + " allies gain +2 ATK." : "no allies in range."));
+      log(abilityName(ab) + " — " + (ipCount ? ipCount + " allies gain +2 ATK." : "no allies in range."));
 
-    } else if (name === "Guardian's Oath") {
+    } else if (aid === "provocator_guardians_oath") {
       u.interceptActive = true;
-      log("Guardian's Oath — ready to intercept the next attack on an adjacent ally.");
+      log(abilityName(ab) + " — ready to intercept the next attack on an adjacent ally.");
 
-    } else if (name === "Champion's Resolve") {
+    } else if (aid === "provocator_champions_resolve") {
       if (u.resolveUsed) {
-        log("Champion's Resolve already used this battle.");
+        log(abilityName(ab) + " already used this battle.");
         state.battleMode = "idle";
         state.highlightCells.clear();
         state.selectedAbilityIndex = -1;
@@ -4819,16 +4835,16 @@
         u.hp = u.maxHp;
         u.resolveUsed = true;
         spawnDmgNumber(u, "FULL", "#ffdd44");
-        log("Champion's Resolve — fully healed!");
+        log(abilityName(ab) + " — fully healed!");
       }
 
-    } else if (name === "Battle Hardened") {
+    } else if (aid === "samnite_battle_hardened") {
       u.battleHardenedTurns = 2;
       u.battleHardenedAtk = 1;
       u.battleHardenedDef = 2;
-      log("Battle Hardened — +2 DEF, +1 ATK for 2 turns.");
+      log(abilityName(ab) + " — +2 DEF, +1 ATK for 2 turns.");
 
-    } else if (name === "Intimidating Roar") {
+    } else if (aid === "samnite_intimidating_roar") {
       var irCount = 0;
       for (var iri = 0; iri < DIRS.length; iri++) {
         var irx = u.x + DIRS[iri][0], iry = u.y + DIRS[iri][1];
@@ -4838,20 +4854,20 @@
           irCount++;
         }
       }
-      log("Intimidating Roar — " + (irCount ? irCount + " foes rooted!" : "no foes in range."));
+      log(abilityName(ab) + " — " + (irCount ? irCount + " foes rooted!" : "no foes in range."));
 
-    } else if (name === "Eagle Eye") {
+    } else if (aid === "sagittarius_eagle_eye") {
       u.eagleEyeHits = 2;
-      log("Eagle Eye — next 2 attacks cannot miss.");
+      log(abilityName(ab) + " — next 2 attacks cannot miss.");
 
-    } else if (name === "Shadow Mend") {
+    } else if (aid === "umbra_shadow_mend") {
       var smHeal = Math.round(u.maxHp * 0.25);
       u.hp = Math.min(u.maxHp, u.hp + smHeal);
       u.shadowMendAtkPenalty = 2;
       spawnDmgNumber(u, "+" + smHeal, "#70d870");
-      log("Shadow Mend — healed " + smHeal + " HP, −2 ATK this turn.");
+      log(abilityName(ab) + " — healed " + smHeal + " HP, −2 ATK this turn.");
 
-    } else if (name === "Abyssal Gate") {
+    } else if (aid === "umbra_abyssal_gate") {
       state.battleMode = "abyssal_gate";
       state.highlightCells.clear();
       for (var agi = 0; agi < DIRS.length; agi++) {
@@ -4863,30 +4879,30 @@
       }
       if (state.highlightCells.size === 0) {
         state.battleMode = "idle";
-        log("Abyssal Gate — no adjacent allies to teleport.");
+        log(abilityName(ab) + " — no adjacent allies to teleport.");
         endAction();
         return;
       }
       renderBoard();
-      log("Abyssal Gate — select an adjacent ally to teleport.");
+      log(abilityName(ab) + " — select an adjacent ally to teleport.");
       return false;
 
-    } else if (name === "Unholy Resilience") {
+    } else if (aid === "vestige_unholy_resilience") {
       u.battleHardenedTurns = 2;
       u.battleHardenedDef = 3;
       u.battleHardenedAtk = 0;
-      log("Unholy Resilience — +3 DEF for 2 turns.");
+      log(abilityName(ab) + " — +3 DEF for 2 turns.");
 
-    } else if (name === "Unyielding") {
+    } else if (aid === "praetorian_unyielding") {
       var healAmt = Math.floor(u.maxHp * 0.2);
       u.hp = Math.min(u.maxHp, u.hp + healAmt);
       spawnDmgNumber(u, "+" + healAmt, "#80ff80");
       u.debuffImmuneTurns = 1;
-      log("Unyielding — healed " + healAmt + " HP, immune to debuffs for 1 turn.");
+      log(abilityName(ab) + " — healed " + healAmt + " HP, immune to debuffs for 1 turn.");
 
-    } else if (name === "Crowd's Favor") {
+    } else if (aid === "primus_palus_crowds_favor") {
       if (u.crowdsFavorUsed) {
-        log("Crowd's Favor already used this battle.");
+        log(abilityName(ab) + " already used this battle.");
         state.battleMode = "idle";
         renderBoard();
         return false;
@@ -4897,31 +4913,30 @@
       u.battleHardenedAtk = 3;
       u.battleHardenedDef = 0;
       spawnDmgNumber(u, "FULL", "#ffdd44");
-      log("Crowd's Favor — fully healed, +3 ATK for 2 turns!");
+      log(abilityName(ab) + " — fully healed, +3 ATK for 2 turns!");
 
-    } else if (name === "Hold the Line") {
+    } else if (aid === "tertiarius_hold_the_line") {
       u.interceptActive = true;
       spawnDmgNumber(u, "GUARD", "#70b0ff");
-      log("Hold the Line — intercepting hits on adjacent allies!");
+      log(abilityName(ab) + " — intercepting hits on adjacent allies!");
 
-    } else if (name === "Last Stand") {
+    } else if (aid === "tertiarius_last_stand") {
       u.lastStandActive = true;
       spawnDmgNumber(u, "STAND", "#ff6040");
-      log("Last Stand — +5 ATK, +5 DEF while below 30% HP!");
+      log(abilityName(ab) + " — +5 ATK, +5 DEF while below 30% HP!");
 
     } else {
-      log(ab.name + " activated.");
+      log(abilityName(ab) + " activated.");
     }
     endAction();
   }
 
   async function executeAbilityOnTarget(u, tgt, ab) {
-    recordAction(u, "ability", { abilityName: ab.name, targetName: tgt.displayName || classById(tgt.classId).name, targetId: tgt.id });
+    recordAction(u, "ability", { abilityName: abilityName(ab), targetName: tgt.displayName || classById(tgt.classId).name, targetId: tgt.id });
     u._statAbilitiesUsed = (u._statAbilitiesUsed || 0) + 1;
     const cid = u.classId;
-    const name = ab.name;
 
-    if (cid === "retiarius" && name === "Iaculum") {
+    if (cid === "retiarius" && ab.aid === "retiarius_iaculum") {
       if (tgt.gifted && tgt.classId === "thraex") {
         log("The net slides off — Stone Eyes!");
         endAction();
@@ -4933,7 +4948,7 @@
       return;
     }
 
-    if (cid === "provocator" && name === "Provocatio") {
+    if (cid === "provocator" && ab.aid === "provocator_provocatio") {
       if (tgt.gifted) {
         log("Provocatio has no hold on a Gifted warrior!");
         endAction();
@@ -4959,7 +4974,7 @@
         if (!rollHit(u, tgt)) {
           SFX.miss();
           spawnDmgNumber(tgt, "MISS", "#aaaaaa");
-          log(ab.name + " strike " + (_ds + 1) + " misses! (" + dsHitPct + "% hit)");
+          log(abilityName(ab) + " strike " + (_ds + 1) + " misses! (" + dsHitPct + "% hit)");
           continue;
         }
         SFX.hit();
@@ -4967,7 +4982,7 @@
         if (tgt.riposteCharges > 0) { applyDamage(u, 5, tgt); tgt.riposteCharges--; log("Riposte!"); }
         applyDamage(tgt, dsDmg, u);
         await Promise.all([animateHitFlash(tgt), screenShake(80, 2)]);
-        log(ab.name + " strike " + (_ds + 1) + " deals " + dsDmg + ". (" + dsHitPct + "% hit)");
+        log(abilityName(ab) + " strike " + (_ds + 1) + " deals " + dsDmg + ". (" + dsHitPct + "% hit)");
         if (tgt.hp <= 0) await animateDeath(tgt);
       }
       endAction();
@@ -4980,7 +4995,7 @@
       if (!rollHit(u, tgt)) {
         SFX.miss();
         spawnDmgNumber(tgt, "MISS", "#aaaaaa");
-        log(ab.name + " misses! (" + hitPct + "% hit)");
+        log(abilityName(ab) + " misses! (" + hitPct + "% hit)");
         endAction();
         return;
       }
@@ -4991,9 +5006,9 @@
       await Promise.all([animateHitFlash(tgt), screenShake(80, 2)]);
       if (tgt.hp > 0) {
         tgt.rootedSkip = Math.max(tgt.rootedSkip, 1);
-        log(ab.name + " deals " + dmg + " and stuns! (" + hitPct + "% hit)");
+        log(abilityName(ab) + " deals " + dmg + " and stuns! (" + hitPct + "% hit)");
       } else {
-        log(ab.name + " deals " + dmg + ". (" + hitPct + "% hit)");
+        log(abilityName(ab) + " deals " + dmg + ". (" + hitPct + "% hit)");
         await animateDeath(tgt);
       }
       endAction();
@@ -5007,9 +5022,9 @@
       var pullY = tgt.y + Math.sign(ply);
       if (inBounds(pullX, pullY) && !occupantAt(pullX, pullY) && !isTileCollapsed(pullX, pullY) && !isTileImpassableTerrain(pullX, pullY)) {
         await animateMove(tgt, [[pullX, pullY]]);
-        log(ab.name + " — pulled closer!");
+        log(abilityName(ab) + " — pulled closer!");
       } else {
-        log(ab.name + " — no room to pull.");
+        log(abilityName(ab) + " — no room to pull.");
       }
       endAction();
       return;
@@ -5021,7 +5036,7 @@
       if (!rollHit(u, tgt)) {
         SFX.miss();
         spawnDmgNumber(tgt, "MISS", "#aaaaaa");
-        log(ab.name + " misses! (" + hitPct + "% hit)");
+        log(abilityName(ab) + " misses! (" + hitPct + "% hit)");
         endAction();
         return;
       }
@@ -5032,9 +5047,9 @@
       await Promise.all([animateHitFlash(tgt), screenShake(80, 2)]);
       if (tgt.hp > 0) {
         tgt.bleedTurns = 3;
-        log(ab.name + " deals " + dmg + " + bleed! (" + hitPct + "% hit)");
+        log(abilityName(ab) + " deals " + dmg + " + bleed! (" + hitPct + "% hit)");
       } else {
-        log(ab.name + " deals " + dmg + ". (" + hitPct + "% hit)");
+        log(abilityName(ab) + " deals " + dmg + ". (" + hitPct + "% hit)");
         await animateDeath(tgt);
       }
       if (ab.selfDamage) applyDamage(u, ab.selfDamage);
@@ -5048,7 +5063,7 @@
       if (!rollHit(u, tgt)) {
         SFX.miss();
         spawnDmgNumber(tgt, "MISS", "#aaaaaa");
-        log(ab.name + " misses! (" + hitPct + "% hit)");
+        log(abilityName(ab) + " misses! (" + hitPct + "% hit)");
         endAction();
         return;
       }
@@ -5061,7 +5076,7 @@
       u.hp = Math.min(u.maxHp, u.hp + stolen);
       spawnDmgNumber(u, "+" + stolen, "#70d870");
       await Promise.all([animateHitFlash(tgt), screenShake(80, 2)]);
-      log(ab.name + " deals " + dmg + ", steals " + stolen + " HP. (" + hitPct + "% hit)");
+      log(abilityName(ab) + " deals " + dmg + ", steals " + stolen + " HP. (" + hitPct + "% hit)");
       if (tgt.hp <= 0) await animateDeath(tgt);
       endAction();
       return;
@@ -5070,7 +5085,7 @@
     if (ab.effect === "atkdebuff") {
       tgt.atkDebuffTurns = ab.debuffTurns || 2;
       tgt.atkDebuffAmt = ab.debuffAmt || 3;
-      log(ab.name + " — " + classById(tgt.classId).name + " weakened (−" + tgt.atkDebuffAmt + " ATK)!");
+      log(abilityName(ab) + " — " + classById(tgt.classId).name + " weakened (−" + tgt.atkDebuffAmt + " ATK)!");
       endAction();
       return;
     }
@@ -5086,7 +5101,7 @@
         if (!rollHit(u, tgt)) {
           SFX.miss();
           spawnDmgNumber(tgt, "MISS", "#aaaaaa");
-          log(ab.name + " misses! (" + hitPct + "% hit)");
+          log(abilityName(ab) + " misses! (" + hitPct + "% hit)");
           endAction();
           return;
         }
@@ -5095,7 +5110,7 @@
         if (tgt.riposteCharges > 0) { applyDamage(u, 5, tgt); tgt.riposteCharges--; log("Riposte!"); }
         applyDamage(tgt, dmg, u);
         await Promise.all([animateHitFlash(tgt), screenShake(80, 2)]);
-        log(ab.name + " deals " + dmg + ". (" + hitPct + "% hit)");
+        log(abilityName(ab) + " deals " + dmg + ". (" + hitPct + "% hit)");
         if (tgt.hp <= 0) { await animateDeath(tgt); endAction(); return; }
         if (inBounds(pnx, pny) && !occupantAt(pnx, pny) && !isTileImpassableTerrain(pnx, pny) && !isTileCollapsed(pnx, pny)) {
           await animateMove(tgt, [[pnx, pny]]);
@@ -5120,7 +5135,7 @@
         var sny = tgt.y + sdy;
         if (inBounds(snx, sny) && !occupantAt(snx, sny) && !isTileImpassableTerrain(snx, sny) && !isTileCollapsed(snx, sny)) {
           await animateMove(tgt, [[snx, sny]]);
-          log(ab.name + " — Pushed back!");
+          log(abilityName(ab) + " — Pushed back!");
         } else {
           log("No room to shove.");
         }
@@ -5145,7 +5160,7 @@
       if (!rollHit(u, tgt)) {
         SFX.miss();
         spawnDmgNumber(tgt, "MISS", "#aaaaaa");
-        log(ab.name + " misses! (" + dragHitPct + "% hit)");
+        log(abilityName(ab) + " misses! (" + dragHitPct + "% hit)");
         endAction();
         return;
       }
@@ -5154,7 +5169,7 @@
       if (tgt.riposteCharges > 0) { applyDamage(u, 5, tgt); tgt.riposteCharges--; log("Riposte!"); }
       applyDamage(tgt, dragDmg, u);
       await Promise.all([animateHitFlash(tgt), screenShake(80, 2)]);
-      log(ab.name + " deals " + dragDmg + ". (" + dragHitPct + "% hit)");
+      log(abilityName(ab) + " deals " + dragDmg + ". (" + dragHitPct + "% hit)");
       if (tgt.hp > 0) {
         var drPx = tgt.x + Math.sign(u.x - tgt.x);
         var drPy = tgt.y + Math.sign(u.y - tgt.y);
@@ -5193,7 +5208,7 @@
       if (tDelta > 0) spawnDmgNumber(tgt, "+" + tDelta, "#70d870");
       else if (tDelta < 0) spawnDmgNumber(tgt, String(tDelta), "#ff6040");
       await Promise.all([animateHitFlash(tgt), screenShake(80, 2)]);
-      log(ab.name + " — HP swapped! " + (u.displayName || classById(u.classId).name) + ": " + u.hp + "/" + u.maxHp + ", " + (tgt.displayName || classById(tgt.classId).name) + ": " + tgt.hp + "/" + tgt.maxHp);
+      log(abilityName(ab) + " — HP swapped! " + (u.displayName || classById(u.classId).name) + ": " + u.hp + "/" + u.maxHp + ", " + (tgt.displayName || classById(tgt.classId).name) + ": " + tgt.hp + "/" + tgt.maxHp);
       endAction();
       return;
     }
@@ -5204,7 +5219,7 @@
       if (!rollHit(u, tgt)) {
         SFX.miss();
         spawnDmgNumber(tgt, "MISS", "#aaaaaa");
-        log(ab.name + " misses! (" + p2HitPct + "% hit)");
+        log(abilityName(ab) + " misses! (" + p2HitPct + "% hit)");
         endAction();
         return;
       }
@@ -5213,7 +5228,7 @@
       if (tgt.riposteCharges > 0) { applyDamage(u, 5, tgt); tgt.riposteCharges--; log("Riposte!"); }
       applyDamage(tgt, p2Dmg, u);
       await Promise.all([animateHitFlash(tgt), screenShake(80, 2)]);
-      log(ab.name + " deals " + p2Dmg + ". (" + p2HitPct + "% hit)");
+      log(abilityName(ab) + " deals " + p2Dmg + ". (" + p2HitPct + "% hit)");
       if (tgt.hp > 0) {
         var p2dx = Math.sign(tgt.x - u.x);
         var p2dy = Math.sign(tgt.y - u.y);
@@ -5238,14 +5253,14 @@
       if (u.atkDebuffTurns > 0) { u.atkDebuffTurns = 0; u.atkDebuffAmt = 0; _cleansed.push("ATK debuff"); }
       if (u.defDebuffTurns > 0) { u.defDebuffTurns = 0; u.defDebuffAmt = 0; _cleansed.push("DEF debuff"); }
       if (u.bleedTurns > 0) { u.bleedTurns = 0; _cleansed.push("bleed"); }
-      if (_cleansed.length) log(ab.name + " cleanses " + _cleansed.join(", ") + "!");
-      else log(ab.name + " — nothing to cleanse.");
+      if (_cleansed.length) log(abilityName(ab) + " cleanses " + _cleansed.join(", ") + "!");
+      else log(abilityName(ab) + " — nothing to cleanse.");
       await animateAttack(u, tgt);
       var csHitPct = computeHitChance(u, tgt);
       if (!rollHit(u, tgt, ab)) {
         SFX.miss();
         spawnDmgNumber(tgt, "MISS", "#aaaaaa");
-        log(ab.name + " strike misses! (" + csHitPct + "% hit)");
+        log(abilityName(ab) + " strike misses! (" + csHitPct + "% hit)");
         endAction();
         return;
       }
@@ -5254,7 +5269,7 @@
       if (tgt.riposteCharges > 0) { applyDamage(u, 5, tgt); tgt.riposteCharges--; log("Riposte!"); }
       applyDamage(tgt, csDmg, u);
       await Promise.all([animateHitFlash(tgt), screenShake(80, 2)]);
-      log(ab.name + " strikes for " + csDmg + ". (" + csHitPct + "% hit)");
+      log(abilityName(ab) + " strikes for " + csDmg + ". (" + csHitPct + "% hit)");
       if (tgt.hp <= 0) await animateDeath(tgt);
       endAction();
       return;
@@ -5267,7 +5282,7 @@
       tgt.duelTurns = 3;
       spawnDmgNumber(u, "DUEL", "#e8c040");
       spawnDmgNumber(tgt, "DUEL", "#e8c040");
-      log(ab.name + ": " + (u.displayName || classById(u.classId).name) + " and " + (tgt.displayName || classById(tgt.classId).name) + " deal +20% to each other for 3 turns!");
+      log(abilityName(ab) + ": " + (u.displayName || classById(u.classId).name) + " and " + (tgt.displayName || classById(tgt.classId).name) + " deal +20% to each other for 3 turns!");
       endAction();
       return;
     }
@@ -5278,7 +5293,7 @@
       if (!rollHit(u, tgt, ab)) {
         SFX.miss();
         spawnDmgNumber(tgt, "MISS", "#aaaaaa");
-        log(ab.name + " misses! (" + tbHitPct + "% hit)");
+        log(abilityName(ab) + " misses! (" + tbHitPct + "% hit)");
         endAction();
         return;
       }
@@ -5287,7 +5302,7 @@
       if (tgt.riposteCharges > 0) { applyDamage(u, 5, tgt); tgt.riposteCharges--; log("Riposte!"); }
       applyDamage(tgt, tbDmg, u);
       await Promise.all([animateHitFlash(tgt), screenShake(80, 2)]);
-      log(ab.name + " hits " + classById(tgt.classId).name + " for " + tbDmg + ". (" + tbHitPct + "% hit)");
+      log(abilityName(ab) + " hits " + classById(tgt.classId).name + " for " + tbDmg + ". (" + tbHitPct + "% hit)");
       if (tgt.hp <= 0) await animateDeath(tgt);
       if (u.hp > 0) {
         var _tbDx = u.x - tgt.x, _tbDy = u.y - tgt.y;
@@ -5310,7 +5325,7 @@
       if (!rollHit(u, tgt, ab)) {
         SFX.miss();
         spawnDmgNumber(tgt, "MISS", "#aaaaaa");
-        log(ab.name + " misses! (" + hitPct + "% hit)");
+        log(abilityName(ab) + " misses! (" + hitPct + "% hit)");
         if (ab.selfDamage) applyDamage(u, ab.selfDamage);
         endAction();
         return;
@@ -5324,7 +5339,7 @@
       }
       applyDamage(tgt, dmg, u);
       await Promise.all([animateHitFlash(tgt), screenShake(80, 2)]);
-      log(ab.name + " deals " + dmg + " to " + classById(tgt.classId).name + ". (" + hitPct + "% hit)");
+      log(abilityName(ab) + " deals " + dmg + " to " + classById(tgt.classId).name + ". (" + hitPct + "% hit)");
       if (ab.selfDamage) applyDamage(u, ab.selfDamage);
       if (tgt.hp <= 0) await animateDeath(tgt);
       endAction();
@@ -6919,7 +6934,7 @@
         var ab = abs[j];
         var abEl = document.createElement("div");
         abEl.className = "bestiary-card__ability";
-        abEl.textContent = ab.name + (ab.desc ? " — " + ab.desc : "");
+        abEl.textContent = abilityName(ab) + (abilityDesc(ab) ? " — " + abilityDesc(ab) : "");
         card.appendChild(abEl);
       }
       var promos = CLASS_PROMOTIONS[cls.id] || [];
@@ -6930,7 +6945,7 @@
         prEl.textContent = "⬆ " + pr.name;
         if (pr.abilities) {
           for (var pa = 0; pa < pr.abilities.length; pa++) {
-            prEl.textContent += " | " + pr.abilities[pa].name;
+            prEl.textContent += " | " + abilityName(pr.abilities[pa]);
           }
         }
         card.appendChild(prEl);
@@ -7216,49 +7231,49 @@
 
   async function aiTryPreMoveAbility(enemy, eDef, players, target) {
     var hpPct = enemy.maxHp > 0 ? enemy.hp / enemy.maxHp : 1;
+    var _namedHealAids = ["murmillo_iron_will", "umbra_shadow_mend", "murmillo_guardian_aura", "provocator_champions_resolve", "retiarius_neptunes_favor"];
     for (const ab of unitAbilities(enemy)) {
-      var _namedHeals = ["Iron Will", "Shadow Mend", "Guardian Aura", "Champion's Resolve", "Neptune's Favor"];
-      if (ab.type === "heal" && ab.target === "self" && hpPct < 0.5 && _namedHeals.indexOf(ab.name) === -1) {
+      if (ab.type === "heal" && ab.target === "self" && hpPct < 0.5 && _namedHealAids.indexOf(ab.aid) === -1) {
         SFX.ability();
         var heal = Math.round(enemy.maxHp * 0.2);
         enemy.hp = Math.min(enemy.maxHp, enemy.hp + heal);
         spawnDmgNumber(enemy, "+" + heal, "#80ff80");
-        log(eDef.name + " uses " + ab.name + " (+" + heal + " HP).");
+        log(eDef.name + " uses " + abilityName(ab) + " (+" + heal + " HP).");
         return true;
       }
       if (ab.type === "buff" && ab.target === "self") {
-        if (ab.name === "Testudo" && gameRng() < 0.5) {
+        if (ab.aid === "murmillo_testudo" && gameRng() < 0.5) {
           SFX.ability();
           enemy.testudoBonus = 3;
           log(eDef.name + " raises Testudo (+3 DEF).");
           return true;
         }
-        if (ab.name === "Cetus Wall" && gameRng() < 0.4) {
+        if (ab.aid === "murmillo_cetus_wall" && gameRng() < 0.4) {
           SFX.ability();
           enemy.braceCharges = 1;
           log(eDef.name + " braces with Cetus Wall.");
           return true;
         }
-        if (ab.name === "Sica Riposte" && gameRng() < 0.4 && manhattan(enemy, target) <= 2) {
+        if (ab.aid === "thraex_sica_riposte" && gameRng() < 0.4 && manhattan(enemy, target) <= 2) {
           SFX.ability();
           enemy.riposteCharges = 1;
           log(eDef.name + " readies Sica Riposte.");
           return true;
         }
-        if (ab.name === "Umbra" && gameRng() < 0.6) {
+        if (ab.aid === "secutor_umbra" && gameRng() < 0.6) {
           SFX.ability();
           enemy.tempExtraMove = true;
           log(eDef.name + " uses Umbra (+1 move).");
           return false;
         }
-        if (ab.name === "Blind Rush" && gameRng() < 0.4) {
+        if (ab.aid === "secutor_blind_rush" && gameRng() < 0.4) {
           SFX.ability();
           enemy.blindRushAtk = 2;
           enemy.blindRushDef = 2;
           log(eDef.name + " uses Blind Rush (+2 ATK, −2 DEF).");
           return false;
         }
-        if (ab.name === "Phalanx Guard" && gameRng() < 0.35) {
+        if (ab.aid === "hoplomachus_phalanx_guard" && gameRng() < 0.35) {
           var pAllies = 0;
           for (var pd = 0; pd < DIRS.length; pd++) {
             var ppx = enemy.x + DIRS[pd][0], ppy = enemy.y + DIRS[pd][1];
@@ -7267,7 +7282,7 @@
           }
           if (pAllies) { SFX.ability(); log(eDef.name + " raises Phalanx Guard!"); return true; }
         }
-        if (ab.name === "Arena Salute" && (enemy.rootedSkip || enemy.atkDebuffTurns > 0 || enemy.defDebuffTurns > 0 || enemy.bleedTurns > 0)) {
+        if (ab.aid === "provocator_arena_salute" && (enemy.rootedSkip || enemy.atkDebuffTurns > 0 || enemy.defDebuffTurns > 0 || enemy.bleedTurns > 0)) {
           SFX.ability();
           enemy.rootedSkip = 0; enemy.crowdSpdDebuff = 0; enemy.markDebuffTurns = 0;
           enemy.markFocusId = null; enemy.dreadMarkDmg = 0; enemy.bleedTurns = 0;
@@ -7276,14 +7291,14 @@
           log(eDef.name + " uses Arena Salute — cleansed!");
           return true;
         }
-        if (ab.name === "Rally Charge" && gameRng() < 0.4) {
+        if (ab.aid === "essedarius_rally_charge" && gameRng() < 0.4) {
           SFX.ability();
           enemy.tempExtraMove = true;
           enemy.rallyCharge = true;
           log(eDef.name + " uses Rally Charge (+2 move).");
           return false;
         }
-        if (ab.name === "Phase Walk" && manhattan(enemy, target) > 2 && gameRng() < 0.5) {
+        if (ab.aid === "umbra_phase_walk" && manhattan(enemy, target) > 2 && gameRng() < 0.5) {
           var bestTile = null, bestDist = 999;
           for (var pwy = 0; pwy < BOARD_H; pwy++) {
             for (var pwx = 0; pwx < BOARD_W; pwx++) {
@@ -7301,7 +7316,7 @@
             return false;
           }
         }
-        if (ab.name === "Shadow Step" && manhattan(enemy, target) > 2 && gameRng() < 0.4) {
+        if (ab.aid === "dimachaerus_shadow_step" && manhattan(enemy, target) > 2 && gameRng() < 0.4) {
           var bst = null, bsd = 999;
           for (var ssy = 0; ssy < BOARD_H; ssy++) {
             for (var ssx = 0; ssx < BOARD_W; ssx++) {
@@ -7319,31 +7334,31 @@
             return false;
           }
         }
-        if (ab.name === "High Ground" && gameRng() < 0.35) {
+        if (ab.aid === "sagittarius_high_ground" && gameRng() < 0.35) {
           SFX.ability();
           enemy.highGroundNext = true;
           log(eDef.name + " uses High Ground (+15% accuracy).");
           return false;
         }
-        if (ab.name === "Battle Focus" && gameRng() < 0.35) {
+        if (ab.aid === "secutor_battle_focus" && gameRng() < 0.35) {
           SFX.ability();
           enemy.battleFocusNext = true;
           log(eDef.name + " uses Battle Focus (+25% accuracy).");
           return false;
         }
-        if (ab.name === "Evasion" && gameRng() < 0.35 && hpPct < 0.6) {
+        if (ab.aid === "dimachaerus_evasion" && gameRng() < 0.35 && hpPct < 0.6) {
           SFX.ability();
           enemy.testudoBonus = 3;
           log(eDef.name + " uses Evasion (+3 DEF).");
           return true;
         }
-        if (ab.name === "Eagle Eye" && gameRng() < 0.35) {
+        if (ab.aid === "sagittarius_eagle_eye" && gameRng() < 0.35) {
           SFX.ability();
           enemy.eagleEyeHits = 2;
           log(eDef.name + " uses Eagle Eye — cannot miss!");
           return false;
         }
-        if (ab.name === "Unholy Resilience" && gameRng() < 0.3 && hpPct < 0.5) {
+        if (ab.aid === "vestige_unholy_resilience" && gameRng() < 0.3 && hpPct < 0.5) {
           SFX.ability();
           enemy.battleHardenedTurns = 2;
           enemy.battleHardenedDef = 3;
@@ -7351,20 +7366,20 @@
           log(eDef.name + " uses Unholy Resilience (+3 DEF).");
           return true;
         }
-        if (ab.name === "Parry" && gameRng() < 0.3 && manhattan(enemy, target) <= 2) {
+        if (ab.aid === "thraex_parry" && gameRng() < 0.3 && manhattan(enemy, target) <= 2) {
           SFX.ability();
           enemy.parryCharges = 1;
           log(eDef.name + " uses Parry.");
           return true;
         }
-        if (ab.name === "Spear Brace" && gameRng() < 0.3 && manhattan(enemy, target) <= 2) {
+        if (ab.aid === "hoplomachus_spear_brace" && gameRng() < 0.3 && manhattan(enemy, target) <= 2) {
           SFX.ability();
           enemy.spearBraceActive = true;
           log(eDef.name + " readies Spear Brace.");
           return true;
         }
       }
-      if (ab.type === "heal" && ab.target === "self" && ab.name === "Iron Will" && hpPct < 0.5) {
+      if (ab.type === "heal" && ab.target === "self" && ab.aid === "murmillo_iron_will" && hpPct < 0.5) {
         SFX.ability();
         var iwH = Math.round(enemy.maxHp * 0.15);
         enemy.hp = Math.min(enemy.maxHp, enemy.hp + iwH);
@@ -7373,7 +7388,7 @@
         log(eDef.name + " uses Iron Will (+" + iwH + " HP).");
         return true;
       }
-      if (ab.name === "Neptune's Favor" && ab.type === "heal" && hpPct < 0.5) {
+      if (ab.aid === "retiarius_neptunes_favor" && ab.type === "heal" && hpPct < 0.5) {
         SFX.ability();
         var nfH = Math.round(enemy.maxHp * 0.2);
         enemy.hp = Math.min(enemy.maxHp, enemy.hp + nfH);
@@ -7382,7 +7397,7 @@
         log(eDef.name + " uses Neptune's Favor.");
         return false;
       }
-      if (ab.name === "Shadow Mend" && ab.type === "heal" && hpPct < 0.4) {
+      if (ab.aid === "umbra_shadow_mend" && ab.type === "heal" && hpPct < 0.4) {
         SFX.ability();
         var smH = Math.round(enemy.maxHp * 0.25);
         enemy.hp = Math.min(enemy.maxHp, enemy.hp + smH);
@@ -7391,7 +7406,7 @@
         log(eDef.name + " uses Shadow Mend.");
         return true;
       }
-      if (ab.name === "Champion's Resolve" && hpPct < 0.3 && !enemy.resolveUsed) {
+      if (ab.aid === "provocator_champions_resolve" && hpPct < 0.3 && !enemy.resolveUsed) {
         SFX.ability();
         enemy.hp = enemy.maxHp;
         enemy.resolveUsed = true;
@@ -7399,16 +7414,16 @@
         log(eDef.name + " uses Champion's Resolve — fully healed!");
         return true;
       }
-      if (ab.name === "Crowd's Favor" && hpPct < 0.3 && !enemy.crowdsFavorUsed) {
+      if (ab.aid === "primus_palus_crowds_favor" && hpPct < 0.3 && !enemy.crowdsFavorUsed) {
         SFX.ability();
         enemy.hp = enemy.maxHp;
         enemy.crowdsFavorUsed = true;
         enemy.battleHardenedTurns = 2; enemy.battleHardenedAtk = 3; enemy.battleHardenedDef = 0;
         spawnDmgNumber(enemy, "FAVOR", "#ffdd44");
-        log(eDef.name + " uses Crowd's Favor — fully healed!");
+        log(eDef.name + " uses " + abilityName(ab) + " — fully healed!");
         return true;
       }
-      if (ab.name === "Hold the Line" && hpPct > 0.5 && gameRng() < 0.25) {
+      if (ab.aid === "tertiarius_hold_the_line" && hpPct > 0.5 && gameRng() < 0.25) {
         var htlAdj = false;
         for (var htli = 0; htli < DIRS.length; htli++) {
           var htlx = enemy.x + DIRS[htli][0], htly = enemy.y + DIRS[htli][1];
@@ -7422,14 +7437,14 @@
           return true;
         }
       }
-      if (ab.name === "Last Stand" && hpPct < 0.35 && !enemy.lastStandActive) {
+      if (ab.aid === "tertiarius_last_stand" && hpPct < 0.35 && !enemy.lastStandActive) {
         SFX.ability();
         enemy.lastStandActive = true;
         spawnDmgNumber(enemy, "STAND", "#ff8844");
         log(eDef.name + " activates Last Stand!");
         return true;
       }
-      if (ab.name === "Battle Hardened" && gameRng() < 0.3) {
+      if (ab.aid === "samnite_battle_hardened" && gameRng() < 0.3) {
         SFX.ability();
         enemy.battleHardenedTurns = 2;
         enemy.battleHardenedAtk = 1;
@@ -7437,7 +7452,7 @@
         log(eDef.name + " uses Battle Hardened (+2 DEF, +1 ATK).");
         return true;
       }
-      if (ab.name === "Intimidating Roar" && manhattan(enemy, target) <= 1 && gameRng() < 0.4) {
+      if (ab.aid === "samnite_intimidating_roar" && manhattan(enemy, target) <= 1 && gameRng() < 0.4) {
         var irC = 0;
         for (var iri = 0; iri < DIRS.length; iri++) {
           var eirx = enemy.x + DIRS[iri][0], eiry = enemy.y + DIRS[iri][1];
@@ -7449,7 +7464,7 @@
         }
         if (irC) { SFX.ability(); log(eDef.name + " Intimidating Roar — " + irC + " foes rooted!"); return true; }
       }
-      if (ab.name === "Inspiring Presence" && gameRng() < 0.3) {
+      if (ab.aid === "provocator_inspiring_presence" && gameRng() < 0.3) {
         var ipC = 0;
         for (var ipi = 0; ipi < DIRS.length; ipi++) {
           var eipx = enemy.x + DIRS[ipi][0], eipy = enemy.y + DIRS[ipi][1];
@@ -7458,7 +7473,7 @@
         }
         if (ipC) { SFX.ability(); log(eDef.name + " Inspiring Presence — " + ipC + " allies buffed!"); return true; }
       }
-      if (ab.name === "War Cry" && ab.type === "debuff" && ab.target === "self") {
+      if (ab.aid === "samnite_war_cry" && ab.type === "debuff" && ab.target === "self") {
         if (manhattan(enemy, target) <= 1 && gameRng() < 0.35) {
           SFX.ability();
           var wc = 0;
@@ -7470,7 +7485,7 @@
           if (wc) { log(eDef.name + " War Cry — " + wc + " foes weakened!"); return true; }
         }
       }
-      if (ab.type === "debuff" && ab.target === "adjacent_enemy" && ab.name === "Iaculum") {
+      if (ab.type === "debuff" && ab.target === "adjacent_enemy" && ab.aid === "retiarius_iaculum") {
         if (target.gifted && target.classId === "thraex") continue;
         if (manhattan(enemy, target) <= 1 && gameRng() < 0.5 && !target.rootedSkip && canDebuff(target)) {
           SFX.ability();
@@ -7515,13 +7530,13 @@
           if (enemy.hp <= 0) { await animateDeath(enemy); break; }
           applyDamage(t, dmg, enemy);
           await Promise.all([animateHitFlash(t), screenShake(80, 2)]);
-          log(eDef.name + " uses " + ab.name + " on " + classById(t.classId).name + " (" + dmg + ").");
+          log(eDef.name + " uses " + abilityName(ab) + " on " + classById(t.classId).name + " (" + dmg + ").");
           if (t.hp <= 0) await animateDeath(t);
         }
         return true;
       }
 
-      if (ab.type === "debuff" && ab.target === "adjacent_enemy" && ab.name === "Provocatio") {
+      if (ab.type === "debuff" && ab.target === "adjacent_enemy" && ab.aid === "provocator_provocatio") {
         if (adjTarget.gifted) continue;
         if (gameRng() < 0.35 && adjTarget.markDebuffTurns <= 0 && canDebuff(adjTarget)) {
           SFX.ability();
@@ -7537,7 +7552,7 @@
         }
       }
 
-      if (ab.type === "debuff" && ab.target === "adjacent_enemy" && ab.name === "Iaculum") {
+      if (ab.type === "debuff" && ab.target === "adjacent_enemy" && ab.aid === "retiarius_iaculum") {
         if (adjTarget.gifted && adjTarget.classId === "thraex") continue;
         if (gameRng() < 0.45 && !adjTarget.rootedSkip && canDebuff(adjTarget)) {
           SFX.ability();
@@ -7573,7 +7588,7 @@
             const dmg = physicalDamage(enemy, adjTarget, ab.mult || 1);
             applyDamage(adjTarget, dmg, enemy);
             await Promise.all([animateHitFlash(adjTarget), screenShake(80, 2)]);
-            log(eDef.name + " uses " + ab.name + " on " + classById(adjTarget.classId).name + " (" + dmg + ").");
+            log(eDef.name + " uses " + abilityName(ab) + " on " + classById(adjTarget.classId).name + " (" + dmg + ").");
             const pdx = adjTarget.x - enemy.x;
             const pdy = adjTarget.y - enemy.y;
             const pnx = adjTarget.x + pdx;
@@ -7585,7 +7600,7 @@
           } else {
             SFX.miss();
             spawnDmgNumber(adjTarget, "MISS", "#aaaaaa");
-            log(eDef.name + " uses " + ab.name + " — misses!");
+            log(eDef.name + " uses " + abilityName(ab) + " — misses!");
           }
           return true;
         }
@@ -7633,12 +7648,12 @@
           applyDamage(adjTarget, dmg, enemy);
           await Promise.all([animateHitFlash(adjTarget), screenShake(80, 2)]);
           if (adjTarget.hp > 0 && canDebuff(adjTarget)) adjTarget.rootedSkip = Math.max(adjTarget.rootedSkip, 1);
-          log(eDef.name + " uses " + ab.name + " on " + classById(adjTarget.classId).name + " (" + dmg + (canDebuff(adjTarget) ? " + stun" : "") + ").");
+          log(eDef.name + " uses " + abilityName(ab) + " on " + classById(adjTarget.classId).name + " (" + dmg + (canDebuff(adjTarget) ? " + stun" : "") + ").");
           if (adjTarget.hp <= 0) await animateDeath(adjTarget);
         } else {
           SFX.miss();
           spawnDmgNumber(adjTarget, "MISS", "#aaaaaa");
-          log(eDef.name + " uses " + ab.name + " — misses!");
+          log(eDef.name + " uses " + abilityName(ab) + " — misses!");
         }
         return true;
       }
@@ -7666,12 +7681,12 @@
           applyDamage(adjTarget, dmg, enemy);
           await Promise.all([animateHitFlash(adjTarget), screenShake(80, 2)]);
           if (adjTarget.hp > 0 && canDebuff(adjTarget)) adjTarget.bleedTurns = 3;
-          log(eDef.name + " uses " + ab.name + " on " + classById(adjTarget.classId).name + " (" + dmg + (adjTarget.hp > 0 && canDebuff(adjTarget) ? " + bleed" : "") + ").");
+          log(eDef.name + " uses " + abilityName(ab) + " on " + classById(adjTarget.classId).name + " (" + dmg + (adjTarget.hp > 0 && canDebuff(adjTarget) ? " + bleed" : "") + ").");
           if (adjTarget.hp <= 0) await animateDeath(adjTarget);
         } else {
           SFX.miss();
           spawnDmgNumber(adjTarget, "MISS", "#aaaaaa");
-          log(eDef.name + " uses " + ab.name + " — misses!");
+          log(eDef.name + " uses " + abilityName(ab) + " — misses!");
         }
         return true;
       }
@@ -7689,12 +7704,12 @@
           enemy.hp = Math.min(enemy.maxHp, enemy.hp + stolen);
           spawnDmgNumber(enemy, "+" + stolen, "#80ff80");
           await Promise.all([animateHitFlash(adjTarget), screenShake(80, 2)]);
-          log(eDef.name + " uses " + ab.name + " (" + dmg + " dmg, +" + stolen + " HP).");
+          log(eDef.name + " uses " + abilityName(ab) + " (" + dmg + " dmg, +" + stolen + " HP).");
           if (adjTarget.hp <= 0) await animateDeath(adjTarget);
         } else {
           SFX.miss();
           spawnDmgNumber(adjTarget, "MISS", "#aaaaaa");
-          log(eDef.name + " uses " + ab.name + " — misses!");
+          log(eDef.name + " uses " + abilityName(ab) + " — misses!");
         }
         return true;
       }
@@ -7703,7 +7718,7 @@
         SFX.ability();
         adjTarget.atkDebuffTurns = ab.debuffTurns || 2;
         adjTarget.atkDebuffAmt = ab.debuffAmt || 3;
-        log(eDef.name + " uses " + ab.name + " on " + classById(adjTarget.classId).name + " (−" + adjTarget.atkDebuffAmt + " ATK)!");
+        log(eDef.name + " uses " + abilityName(ab) + " on " + classById(adjTarget.classId).name + " (−" + adjTarget.atkDebuffAmt + " ATK)!");
         return true;
       }
 
@@ -7787,7 +7802,7 @@
           var aoeDmg = aoeD > 0 ? aoeD : physicalDamage(enemy, adjTargets[aoei], ab.mult || 1);
           applyDamage(adjTargets[aoei], aoeDmg, enemy);
           await Promise.all([animateHitFlash(adjTargets[aoei]), screenShake(80, 2)]);
-          log(eDef.name + " " + ab.name + " hits " + classById(adjTargets[aoei].classId).name + " (" + aoeDmg + ").");
+          log(eDef.name + " " + abilityName(ab) + " hits " + classById(adjTargets[aoei].classId).name + " (" + aoeDmg + ").");
           if (ab.effect === "voidburst") totalStolen += 2;
           if (ab.effect === "deathembrace") totalStolen += 6;
           if (adjTargets[aoei].hp <= 0) await animateDeath(adjTargets[aoei]);
@@ -7848,13 +7863,13 @@
           if (enemy.hp <= 0) { await animateDeath(enemy); return true; }
           applyDamage(adjTarget, dmg, enemy);
           await Promise.all([animateHitFlash(adjTarget), screenShake(80, 2)]);
-          log(eDef.name + " uses " + ab.name + " on " + classById(adjTarget.classId).name + " (" + dmg + ").");
+          log(eDef.name + " uses " + abilityName(ab) + " on " + classById(adjTarget.classId).name + " (" + dmg + ").");
           if (ab.selfDamage && enemy.hp > 0) applyDamage(enemy, ab.selfDamage);
           if (adjTarget.hp <= 0) await animateDeath(adjTarget);
         } else {
           SFX.miss();
           spawnDmgNumber(adjTarget, "MISS", "#aaaaaa");
-          log(eDef.name + " uses " + ab.name + " — misses!");
+          log(eDef.name + " uses " + abilityName(ab) + " — misses!");
         }
         return true;
       }
@@ -7890,7 +7905,7 @@
               if (occ.riposteCharges > 0 && s === 1) { applyDamage(enemy, 5, occ); occ.riposteCharges--; }
               applyDamage(occ, dmg, enemy);
               await Promise.all([animateHitFlash(occ), screenShake(80, 2)]);
-              log(eDef.name + " uses " + ab.name + " on " + classById(occ.classId).name + " (" + dmg + ").");
+              log(eDef.name + " uses " + abilityName(ab) + " on " + classById(occ.classId).name + " (" + dmg + ").");
               if (enemy.gifted && enemy.classId === "hoplomachus" && occ.hp > 0) {
                 var ppx = occ.x + dx, ppy = occ.y + dy;
                 if (inBounds(ppx, ppy) && !occupantAt(ppx, ppy) && !isTileImpassableTerrain(ppx, ppy) && !isTileCollapsed(ppx, ppy)) {
@@ -7915,7 +7930,7 @@
             } else {
               SFX.miss();
               spawnDmgNumber(occ, "MISS", "#aaaaaa");
-              log(eDef.name + " uses " + ab.name + " — misses!");
+              log(eDef.name + " uses " + abilityName(ab) + " — misses!");
             }
             return true;
           }
@@ -7967,12 +7982,12 @@
           var dmg = physicalDamage(enemy, targets[ti], ab.mult || 0.5);
           applyDamage(targets[ti], dmg, enemy);
           await Promise.all([animateHitFlash(targets[ti]), screenShake(80, 2)]);
-          log(eDef.name + " " + ab.name + " hits " + classById(targets[ti].classId).name + " (" + dmg + ").");
+          log(eDef.name + " " + abilityName(ab) + " hits " + classById(targets[ti].classId).name + " (" + dmg + ").");
           if (targets[ti].hp <= 0) await animateDeath(targets[ti]);
         } else {
           SFX.miss();
           spawnDmgNumber(targets[ti], "MISS", "#aaaaaa");
-          log(eDef.name + " " + ab.name + " misses " + classById(targets[ti].classId).name + "!");
+          log(eDef.name + " " + abilityName(ab) + " misses " + classById(targets[ti].classId).name + "!");
         }
       }
       return true;
@@ -8044,7 +8059,35 @@
     isoCanvas.addEventListener("gesturechange", function (e) { e.preventDefault(); }, { passive: false });
     isoCanvas.addEventListener("gestureend", function (e) { e.preventDefault(); }, { passive: false });
 
+    var _spacePanArm = false;
+    var _panFromSpace = false;
+    var _spacePanStartX = 0;
+    var _spacePanStartY = 0;
+    var _suppressNextCanvasClick = false;
+
+    window.addEventListener("keydown", function (e) {
+      if (e.key !== " " && e.code !== "Space") return;
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.tagName === "SELECT" || e.target.isContentEditable) return;
+      if (state.cutscene.active) return;
+      e.preventDefault();
+      _spacePanArm = true;
+    }, true);
+    window.addEventListener("keyup", function (e) {
+      if (e.key !== " " && e.code !== "Space") return;
+      _spacePanArm = false;
+      if (_panFromSpace) {
+        _panFromSpace = false;
+        renderer._isPanning = false;
+      }
+    }, true);
+
     isoCanvas.addEventListener("click", function (e) {
+      if (_suppressNextCanvasClick) {
+        e.preventDefault();
+        e.stopPropagation();
+        _suppressNextCanvasClick = false;
+        return;
+      }
       const rect = isoCanvas.getBoundingClientRect();
       const mx = e.clientX - rect.left;
       const my = e.clientY - rect.top;
@@ -8068,7 +8111,9 @@
           showTileInfo(cell.col, cell.row);
         }
         const key = cellKey(cell.col, cell.row);
-        if (state.highlightCells.has(key)) {
+        if (_spacePanArm && !state.cutscene.active) {
+          isoCanvas.style.cursor = renderer._isPanning ? "grabbing" : "grab";
+        } else if (state.highlightCells.has(key)) {
           if (state.battleMode === "attack" || state.battleMode === "ability") {
             isoCanvas.style.cursor = "crosshair";
             var u = state.activeUnit;
@@ -8111,14 +8156,18 @@
             hideForecast();
           }
         } else {
-          isoCanvas.style.cursor = "default";
+          if (_spacePanArm && !state.cutscene.active) {
+            isoCanvas.style.cursor = renderer._isPanning ? "grabbing" : "grab";
+          } else {
+            isoCanvas.style.cursor = "default";
+          }
           hideForecast();
         }
       } else {
         if (_lastHoverCol === -1 && _lastHoverRow === -1) return;
         _lastHoverCol = -1;
         _lastHoverRow = -1;
-        isoCanvas.style.cursor = "default";
+        isoCanvas.style.cursor = (_spacePanArm && !state.cutscene.active) ? "grab" : "default";
         hideTileInfo();
         hideForecast();
       }
@@ -8256,9 +8305,21 @@
       if (key === "f3") { e.preventDefault(); var _sb = document.getElementById("btnSpeed"); if (_sb) _sb.click(); return; }
     });
 
-    // Pan via middle-mouse or right-click drag
+    // Pan via middle-mouse, right-click drag, or Space + left-drag
     isoCanvas.addEventListener("mousedown", function (e) {
       if (state.cutscene.active) return;
+      if (e.button === 0 && _spacePanArm) {
+        e.preventDefault();
+        _panFromSpace = true;
+        _spacePanStartX = e.clientX;
+        _spacePanStartY = e.clientY;
+        renderer._isPanning = true;
+        renderer._panStartX = e.clientX;
+        renderer._panStartY = e.clientY;
+        renderer._panOriginX = renderer.panX;
+        renderer._panOriginY = renderer.panY;
+        return;
+      }
       if (e.button === 1 || e.button === 2) {
         e.preventDefault();
         renderer._isPanning = true;
@@ -8283,6 +8344,13 @@
     });
     window.addEventListener("mouseup", function (e) {
       if (e.button === 1 || e.button === 2) {
+        renderer._isPanning = false;
+      }
+      if (e.button === 0 && _panFromSpace) {
+        var _sdx = Math.abs(e.clientX - _spacePanStartX);
+        var _sdy = Math.abs(e.clientY - _spacePanStartY);
+        if (_sdx + _sdy > 10) _suppressNextCanvasClick = true;
+        _panFromSpace = false;
         renderer._isPanning = false;
       }
     });

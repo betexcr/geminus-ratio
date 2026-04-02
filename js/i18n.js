@@ -79,9 +79,13 @@ var I18n = (function () {
       bestiary: { heading: "Bestiary", back: "Back", listAria: "Class list" },
       survival: { heading: "Survival Arena", diff: "Difficulty", start: "Start", back: "Back", betweenWaves: "Between Waves", nextWave: "Next Wave" },
       promo: { heading: "Promotion", optionsAria: "Promotion options" },
-      canvas: { arenaAria: "Isometric battle grid — use Q/E to rotate, scroll to zoom", ctAria: "Upcoming turns", rosterAria: "Roster management", deployAria: "Deployment", battleAria: "Battle", battleActions: "Battle actions", abilitiesMenu: "Abilities", combatLog: "Combat log", deployQueue: "Deployment queue", pickedAria: "Selected fighters", classListAria: "Available fighter classes", rosterStatsAria: "Roster statistics", stageAria: "Arena view", camAria: "Camera controls" },
+      canvas: { arenaAria: "Isometric battle grid — Q/E rotate, scroll zoom, Space+drag or middle/right mouse to pan", ctAria: "Upcoming turns", rosterAria: "Roster management", deployAria: "Deployment", battleAria: "Battle", battleActions: "Battle actions", abilitiesMenu: "Abilities", combatLog: "Combat log", deployQueue: "Deployment queue", pickedAria: "Selected fighters", classListAria: "Available fighter classes", rosterStatsAria: "Roster statistics", stageAria: "Arena view", camAria: "Camera controls" },
       cam: { rotL: "Rotate left (Q)", zoomIn: "Zoom in (+)", zoomOut: "Zoom out (-)", rotR: "Rotate right (E)", reset: "Reset camera (R)", mute: "Toggle mute (F2)", speed: "Animation speed (F3)" },
       hud: { diffBracket: "[{label}]" },
+      battle: { noUsableAbilities: "No usable abilities." },
+      abilityTip: {
+        range: "Range {r}", multDmg: "×{m} dmg", trueDmg: "{n} true dmg", heal: "Heal {n}", lvl: "Lv{n}",
+      },
       ai: { balanced: "Balanced", berserker: "Berserker", tactician: "Tactician", assassin: "Assassin", guardian: "Guardian" },
       endings: {
         a: "Ending A — Geminus", b: "Ending B — The Sacrifice", c: "Ending C — The Vessel", d: "Ending D — The Emperor's Dog", e: "Ending E — The Pyre",
@@ -160,9 +164,14 @@ var I18n = (function () {
       bestiary: { heading: "Bestiario", back: "Atrás", listAria: "Lista de clases" },
       survival: { heading: "Arena de supervivencia", diff: "Dificultad", start: "Empezar", back: "Atrás", betweenWaves: "Entre oleadas", nextWave: "Siguiente oleada" },
       promo: { heading: "Ascenso", optionsAria: "Opciones de ascenso" },
-      canvas: { arenaAria: "Cuadrícula isométrica — Q/E para girar, rueda para zoom", ctAria: "Próximos turnos", rosterAria: "Gestión de plantilla", deployAria: "Despliegue", battleAria: "Combate", battleActions: "Acciones de combate", abilitiesMenu: "Habilidades", combatLog: "Registro de combate", deployQueue: "Cola de despliegue", pickedAria: "Luchadores elegidos", classListAria: "Clases disponibles", rosterStatsAria: "Estadísticas de plantilla", stageAria: "Vista de arena", camAria: "Cámara" },
+      canvas: { arenaAria: "Cuadrícula isométrica — Q/E girar, rueda zoom, Espacio+arrastrar o botón central/derecho para desplazar", ctAria: "Próximos turnos", rosterAria: "Gestión de plantilla", deployAria: "Despliegue", battleAria: "Combate", battleActions: "Acciones de combate", abilitiesMenu: "Habilidades", combatLog: "Registro de combate", deployQueue: "Cola de despliegue", pickedAria: "Luchadores elegidos", classListAria: "Clases disponibles", rosterStatsAria: "Estadísticas de plantilla", stageAria: "Vista de arena", camAria: "Cámara" },
       cam: { rotL: "Girar izquierda (Q)", zoomIn: "Acercar (+)", zoomOut: "Alejar (-)", rotR: "Girar derecha (E)", reset: "Restablecer cámara (R)", mute: "Silenciar (F2)", speed: "Velocidad de animación (F3)" },
       hud: { diffBracket: "[{label}]" },
+      battle: { noUsableAbilities: "No hay habilidades usables." },
+      abilityTip: {
+        range: "Alcance {r}", multDmg: "×{m} daño", trueDmg: "{n} daño verdadero", heal: "Cura {n}", lvl: "Nv{n}",
+      },
+      abilities: {},
       ai: { balanced: "Equilibrado", berserker: "Berserker", tactician: "Táctico", assassin: "Asesino", guardian: "Guardián" },
       endings: {
         a: "Final A — Geminus", b: "Final B — El sacrificio", c: "Final C — El recipiente", d: "Final D — El perro del emperador", e: "Final E — La pira",
@@ -340,6 +349,51 @@ var I18n = (function () {
 
   function aiProfileLabel(key) {
     return t("ai." + key);
+  }
+
+  function mergeEsAbilities(map) {
+    if (!STRINGS.es) return;
+    STRINGS.es.abilities = STRINGS.es.abilities || {};
+    for (var k in map) {
+      if (map[k] && typeof map[k].name === "string") STRINGS.es.abilities[k] = map[k];
+    }
+  }
+
+  function abilityName(ab) {
+    if (!ab) return "";
+    if (_locale === "es" && ab.aid && STRINGS.es.abilities && STRINGS.es.abilities[ab.aid] && STRINGS.es.abilities[ab.aid].name) {
+      return STRINGS.es.abilities[ab.aid].name;
+    }
+    return ab.name || "";
+  }
+
+  function abilityDesc(ab) {
+    if (!ab) return "";
+    if (_locale === "es" && ab.aid && STRINGS.es.abilities && STRINGS.es.abilities[ab.aid]) {
+      var d = STRINGS.es.abilities[ab.aid].desc;
+      if (d != null && d !== "") return d;
+    }
+    return ab.desc || "";
+  }
+
+  var _ABILITY_TYPE_ES = { attack: "Ataque", buff: "Beneficio", debuff: "Perjuicio", heal: "Curación", utility: "Utilidad", passive: "Pasiva", summon: "Invocación" };
+
+  function abilityTipExtras(ab) {
+    if (!ab) return "";
+    var parts = [];
+    if (ab.type) {
+      if (_locale === "es") {
+        parts.push(_ABILITY_TYPE_ES[ab.type] || ab.type.charAt(0).toUpperCase() + ab.type.slice(1));
+      } else {
+        parts.push(ab.type.charAt(0).toUpperCase() + ab.type.slice(1));
+      }
+    }
+    if (ab.range != null) parts.push(t("abilityTip.range", { r: ab.range }));
+    if (ab.mult != null) parts.push(t("abilityTip.multDmg", { m: ab.mult }));
+    if (ab.fixedDmg) parts.push(t("abilityTip.trueDmg", { n: ab.fixedDmg }));
+    if (ab.healAmt) parts.push(t("abilityTip.heal", { n: ab.healAmt }));
+    if (ab.levelReq && ab.levelReq > 1) parts.push(t("abilityTip.lvl", { n: ab.levelReq }));
+    return parts.length ? "\n" + parts.join(" · ") : "";
   }
 
   function localizeClassDef(classDef) {
@@ -664,6 +718,10 @@ var I18n = (function () {
     actLabel: actLabel,
     difficultyLabel: difficultyLabel,
     aiProfileLabel: aiProfileLabel,
+    mergeEsAbilities: mergeEsAbilities,
+    abilityName: abilityName,
+    abilityDesc: abilityDesc,
+    abilityTipExtras: abilityTipExtras,
     localizeClassDef: localizeClassDef,
     localizeMissionSteps: localizeMissionSteps,
     localizeChoices: localizeChoices,
